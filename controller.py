@@ -17,12 +17,11 @@ class Controller:
 
         self._repository = Repo(self._repository_path)
 
-        self.update()
-
     def _update_repositories(self):
         L.debug("Pulling changes from environment repository")
 
         env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
+        env_main_module_repo = env_main_module.module()
 
         try:
             env_main_module.update(to_latest_revision=True, init=True)
@@ -30,19 +29,27 @@ class Controller:
             L.error(f"Failed to update environment repository, giving up: {e}")
             return
 
-        env_submodules = env_main_module.module().submodules
+        env_submodules = env_main_module_repo.submodules
         L.debug("Pulling {} submodules from environment repository".format(len(env_submodules)))
 
         env_submodule_list = []
 
         for env_submodule in env_submodules:
             try:
-                env_submodule.update(to_latest_revision=True, init=True)
-            except Exception as e:
-                L.error(f"Failed to update submodule {env_submodule.name}, skipping: {e}")
-                continue
+                L.debug(f"Updating submodule '{env_submodule.name}'")
 
-            if env_submodule.module().head.commit.hexsha == env_submodule.hexsha:
+                env_submodule_repo = env_submodule.module()
+                env_submodule_remote = env_submodule_repo.remote()
+
+                env_submodule_remote.fetch()
+
+                if env_submodule_repo.head.commit.hexsha == env_submodule.hexsha:
+                    L.debug(f"Submodule '{env_submodule.name}' is already up to date")
+                    continue
+
+                env_submodule_repo.git.checkout(env_submodule_remote.refs[0].commit.hexsha)
+            except Exception as e:
+                L.error(f"Failed to update submodule '{env_submodule.name}', skipping: {e}")
                 continue
 
             env_submodule_list.append(env_submodule)
@@ -59,15 +66,22 @@ class Controller:
         L.debug("Pushing repository submodule pointer updates")
 
         try:
-            self._repository.git.add(update=True)
-            if self._repository.is_dirty():
+            env_main_module_repo.git.add(update=True)
+
+            if env_main_module_repo.is_dirty():
                 self._repository.index.commit(f"""
 [META] [UPDATE] Update submodule pointers
 
 This is an automated commit. The following submodules were updated:
 {"\n".join(env_submodule_list)}
 """.strip())
-                origin.push()
+                L.debug("Prepared commit for updated submodule pointers")
+
+                env_main_module_origin = env_main_module_repo.remote()
+                env_main_module_origin.push()
+                L.debug("Pushed updated submodule pointers")
+            else:
+                L.debug("No submodule pointer updates to commit")
         except Exception as e:
             L.error(f"Failed to push submodule pointer updates, giving up: {e}")
             return
@@ -77,7 +91,7 @@ This is an automated commit. The following submodules were updated:
     def _is_compose_up(self) -> bool:
         process = subprocess.Popen(
             ["docker-compose", "ps"],
-            cwd=self.DEV_ENVIRONMENT_PATH,
+            cwd=self._runtime_path,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
@@ -96,7 +110,7 @@ This is an automated commit. The following submodules were updated:
 
         process = subprocess.Popen(
             ["docker-compose", "up", "-d"],
-            cwd=self.DEV_ENVIRONMENT_PATH,
+            cwd=self._runtime_path,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
@@ -110,7 +124,7 @@ This is an automated commit. The following submodules were updated:
 
         process = subprocess.Popen(
             ["docker-compose", "ps"],
-            cwd=self.DEV_ENVIRONMENT_PATH,
+            cwd=self._runtime_path,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
@@ -139,7 +153,7 @@ This is an automated commit. The following submodules were updated:
 
         process = subprocess.Popen(
             ["docker-compose", "down"],
-            cwd=self.DEV_ENVIRONMENT_PATH,
+            cwd=self._runtime_path,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
         )
