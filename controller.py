@@ -3,19 +3,21 @@ from git import Repo
 from loguru import logger as L
 
 import os
+import sys
 import subprocess
 
 
 class Controller:
-    DEV_ENVIRONMENT_PATH = "dev_environment"
     DEV_ENVIRONMENT_TIMEOUT = 60
 
     def __init__(self):
-        try:
-            self._repository = Repo(os.path.join(os.getcwd(), self.DEV_ENVIRONMENT_PATH, ".git"))
-        except Exception as e:
-            L.error(f"Failed to load environment repository, giving up: {e}")
-            return
+        self._repository = Repo(
+            os.path.join(
+                os.path.abspath(
+                    os.path.dirname(sys.argv[0])
+                ), ".git"
+            )
+        )
 
         self.update()
 
