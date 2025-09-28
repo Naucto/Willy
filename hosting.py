@@ -24,6 +24,9 @@ class WebhookListener:
 
         L.info("The listener is available on {}:{}", host, port)
 
+        L.info("Running controller update on startup")
+        self._controller.update()
+
         @self._app.errorhandler(Exception)
         def on_error(exception):
             L.error("Unhandled exception occured: {}", exception)
