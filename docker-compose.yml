@@ -1,0 +1,42 @@
+networks:
+  back-tier:
+  front-tier:
+
+volumes:
+  db-data:
+
+services:
+  db:
+    image: postgres
+    volumes:
+      - db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+    networks:
+      - back-tier
+
+  backend:
+    image: naucto-dev-backend
+    build: dev_environment/backend
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - POSTGRES_DB
+      - POSTGRES_HOST
+      - POSTGRES_PORT
+      - BACKEND_PORT
+    networks:
+      - back-tier
+      - front-tier
+
+  frontend:
+    image: naucto-dev-frontend
+    build: dev_environment/frontend
+    environment:
+      - VITE_BACKEND_URL=http://backend:${BACKEND_PORT}/
+    networks:
+      - front-tier
