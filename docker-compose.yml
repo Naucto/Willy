@@ -32,6 +32,8 @@ services:
     networks:
       - back-tier
       - front-tier
+    depends_on:
+      - db
 
   frontend:
     image: naucto-dev-frontend
@@ -40,3 +42,5 @@ services:
       - VITE_BACKEND_URL=http://backend:${BACKEND_PORT}/
     networks:
       - front-tier
+    depends_on:
+      - backend
