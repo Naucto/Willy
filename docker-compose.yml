@@ -21,7 +21,14 @@ services:
 
   backend:
     image: naucto-dev-backend
-    build: dev_environment/backend
+    build:
+      context: dev_environment/backend
+      args:
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_HOST: ${POSTGRES_HOST}
+        POSTGRES_PORT: ${POSTGRES_PORT}
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
@@ -29,6 +36,11 @@ services:
       - POSTGRES_HOST
       - POSTGRES_PORT
       - BACKEND_PORT
+      - JWT_SECRET
+      - JWT_EXPIRES_IN
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_REGION
     networks:
       - back-tier
       - front-tier
