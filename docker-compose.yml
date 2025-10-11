@@ -46,6 +46,8 @@ services:
       - front-tier
     depends_on:
       - db
+    publish:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
 
   frontend:
     image: naucto-dev-frontend
@@ -56,3 +58,5 @@ services:
       - front-tier
     depends_on:
       - backend
+    publish:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
