@@ -22,11 +22,16 @@ class Controller:
 
         try:
             self._repository.remote().fetch()
+            L.trace("Fetched changes from origin")
 
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
+            L.trace(f"Located environment submodule '{self.DEV_ENVIRONMENT_SUBMODULE_NAME}'")
 
             env_main_module.update(to_latest_revision=True, recursive=True)
+            L.debug("Pulled changes from environment repository")
+
             env_main_module_repo = env_main_module.module()
+            L.trace("Located environment repository")
         except Exception as e:
             L.error(f"Failed to update environment repository, giving up: {e}")
             return
