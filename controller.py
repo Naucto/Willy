@@ -24,9 +24,6 @@ class Controller:
         for submodule in self._repository.submodules:
             subrepo = submodule.module()
 
-            with subrepo.config_writer() as config_writer:
-                config_writer.set_value("branch", self.DEV_ENVIRONMENT_BRANCH)
-
             subrepo.git.fetch("--prune", "origin")
             L.trace(f"Fetched updates for submodule '{submodule.name}'")
 
