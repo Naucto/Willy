@@ -19,6 +19,7 @@ class Controller:
 
     def _update_repositories(self):
         submodule_list = [*self._repository.submodules]
+        submodule_commit_desc = ""
 
         while submodule_list:
             submodule = submodule_list.pop(0)
@@ -37,6 +38,12 @@ class Controller:
             subrepo.git.checkout("origin/HEAD")
             L.debug(f"Updated submodule '{submodule.name}' to commit {subrepo.head.commit.hexsha}")
 
+            submodule_commit_desc += "- {}: commit {} ({})\n".format(
+                submodule.name,
+                submodule.module().head.commit.hexsha,
+                submodule.module().head.commit.message.splitlines()[0]
+            )
+
         try:
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
             L.trace(f"Located environment submodule '{self.DEV_ENVIRONMENT_SUBMODULE_NAME}'")
@@ -47,40 +54,6 @@ class Controller:
             L.error(f"Failed to update environment repository, giving up: {e}")
             return
 
-        env_submodules = env_main_module_repo.submodules
-        L.debug("Pulling {} submodules from environment repository".format(len(env_submodules)))
-
-        env_submodule_list = []
-
-        for env_submodule in env_submodules:
-            try:
-                L.debug(f"Updating submodule '{env_submodule.name}'")
-
-                env_submodule_repo = env_submodule.module()
-                env_submodule_remote = env_submodule_repo.remote()
-
-                env_submodule_remote.fetch()
-
-                if env_submodule_repo.head.commit.hexsha == env_submodule.hexsha:
-                    L.debug(f"Submodule '{env_submodule.name}' is already up to date")
-                    continue
-
-                env_submodule_repo.git.checkout(env_submodule_remote.refs[0].commit.hexsha)
-            except Exception as e:
-                L.error(f"Failed to update submodule '{env_submodule.name}', skipping: {e}")
-                continue
-
-            env_submodule_list.append(env_submodule)
-
-        env_submodule_list = [
-            "- {}: commit {} ({})".format(
-                submodule.name,
-                submodule.module().head.commit.hexsha,
-                submodule.module().head.commit.message.splitlines()[0]
-            ) for submodule in env_submodule_list
-        ]
-
-        L.info("Updated {} submodules".format(len(env_submodule_list)))
         L.debug("Pushing repository submodule pointer updates")
 
         try:
@@ -91,7 +64,7 @@ class Controller:
 [META] [UPDATE] Update submodule pointers
 
 This is an automated commit. The following submodules were updated:
-{chr(10).join(env_submodule_list)}
+{submodule_commit_desc}
 """.strip())
                 L.debug("Prepared commit for updated submodule pointers")
 
