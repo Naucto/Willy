@@ -8,7 +8,7 @@ import subprocess
 
 
 class Controller:
-    DEV_ENVIRONMENT_TIMEOUT = 60
+    DEV_ENVIRONMENT_TIMEOUT = 3600
     DEV_ENVIRONMENT_SUBMODULE_NAME = "dev-environment"
 
     def __init__(self):
@@ -84,7 +84,7 @@ This is an automated commit. The following submodules were updated:
             ["docker-compose", "ps"],
             cwd=self._runtime_path,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
 
         process_stdout, process_stderr = process.communicate(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
