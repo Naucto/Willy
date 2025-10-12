@@ -73,7 +73,7 @@ class Controller:
 [META] [UPDATE] Update submodule pointers
 
 This is an automated commit. The following submodules were updated:
-{"\n".join(env_submodule_list)}
+{chr(10).join(env_submodule_list)}
 """.strip())
                 L.debug("Prepared commit for updated submodule pointers")
 
