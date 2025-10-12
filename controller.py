@@ -10,7 +10,6 @@ import subprocess
 class Controller:
     DEV_ENVIRONMENT_TIMEOUT = 60
     DEV_ENVIRONMENT_SUBMODULE_NAME = "dev-environment"
-    DEV_ENVIRONMENT_BRANCH = "main"
 
     def __init__(self):
         self._runtime_path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -27,14 +26,9 @@ class Controller:
             subrepo.git.fetch("--prune", "origin")
             L.trace(f"Fetched updates for submodule '{submodule.name}'")
 
-            if self.DEV_ENVIRONMENT_BRANCH not in [h.name for h in submodule.heads]:
-                submodule.git.checkout("-b", self.DEV_ENVIRONMENT_BRANCH, f"origin/{self.DEV_ENVIRONMENT_BRANCH}")
-                L.warning(f"Submodule '{submodule.name}' did not have branch '{self.DEV_ENVIRONMENT_BRANCH}', created it")
-            else:
-                submodule.git.checkout(self.DEV_ENVIRONMENT_BRANCH)
-                submodule.git.reset("--hard", f"origin/{self.DEV_ENVIRONMENT_BRANCH}")
+            submodule.git.checkout()
 
-            L.debug(f"Updated submodule '{submodule.name}' to latest '{self.DEV_ENVIRONMENT_BRANCH}' branch")
+            L.debug(f"Updated submodule '{submodule.name}' to commit {subrepo.head.commit.hexsha}")
 
         try:
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
