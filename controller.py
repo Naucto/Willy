@@ -23,6 +23,8 @@ class Controller:
         try:
             self._repository.remote().fetch()
 
+            print(self._repository.submodules)
+
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
             env_main_module.update(to_latest_revision=True, init=True)
             env_main_module_repo = env_main_module.module()
