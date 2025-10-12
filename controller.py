@@ -9,7 +9,7 @@ import subprocess
 
 class Controller:
     DEV_ENVIRONMENT_TIMEOUT = 60
-    DEV_ENVIRONMENT_SUBMODULE_NAME = "dev_environment"
+    DEV_ENVIRONMENT_SUBMODULE_NAME = "dev-environment"
 
     def __init__(self):
         self._runtime_path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -22,8 +22,6 @@ class Controller:
 
         try:
             self._repository.remote().fetch()
-
-            print(self._repository.submodules)
 
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
             env_main_module.update(to_latest_revision=True, init=True)
