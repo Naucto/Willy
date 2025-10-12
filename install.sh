@@ -249,6 +249,17 @@ EOF
 
     cat >&2 <<EOF
 
+We also need a JSON configuration file for the frontend, which describes the
+available proxy peer nodes to use for end users.
+
+EOF
+
+    frontend_config_path="`sv_question "Where is the frontend configuration file located?" "/opt/naucto-docker/synchronizer/frontend-config.json"`"
+
+    # ---
+
+    cat >&2 <<EOF
+
 Everything has been collected and the service is now being installed and
 configured.
 
@@ -325,6 +336,7 @@ POSTGRES_HOST=db
 POSTGRES_PORT=5432
 
 FRONTEND_PORT=443
+FRONTEND_CONFIG_FILE=$frontend_config_path
 BACKEND_PORT=1987
 NODE_ENV=production
 
@@ -336,7 +348,7 @@ AWS_REGION=$aws_region
 S3_BUCKET_NAME=$aws_bucket_name
 
 SSL_TARGET_DOMAIN=$target_domain
-SSL_CERT_PATH=$public_certificates_path
+SSL_CERTS_PATH=$public_certificates_path
 EOF
 
     sv_status_show "Installing the service script file"

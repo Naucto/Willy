@@ -56,6 +56,8 @@ services:
       - VITE_BACKEND_URL=http://backend:${BACKEND_PORT}/
     networks:
       - front-tier
+    volumes:
+      - /app/config.json:${FRONTEND_CONFIG_PATH}:ro
     depends_on:
       - backend
 
@@ -68,7 +70,8 @@ services:
     networks:
       - front-tier
     volumes:
-      - /etc/nginx/certs:${SSL_CERTS_PATH}:ro
+      - /etc/nginx/certs/cert.pem:${SSL_CERTS_PATH}/fullchain.pem:ro
+      - /etc/nginx/certs/key.pem:${SSL_CERTS_PATH}/privkey.pem:ro
     depends_on:
       - frontend
 
