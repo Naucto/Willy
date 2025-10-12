@@ -19,6 +19,8 @@ class Controller:
         self._repository = Repo(self._repository_path)
 
     def _update_repositories(self):
+        L.trace(f"Updating {len(self._repository.submodules)} submodules")
+
         for submodule in self._repository.submodules:
             subrepo = submodule.module()
 
