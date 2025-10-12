@@ -159,8 +159,8 @@ EOF
                              "$SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH"`"
 
     if [ ! -d "$public_certificates_path" ] || \
-         ! -f "$public_certificates_path/fullchain.pem" || \
-         ! -f "$public_certificates_path/privkey.pem" ; then
+       [ ! -f "$public_certificates_path/fullchain.pem" ] || \
+       [ ! -f "$public_certificates_path/privkey.pem" ]; then
         echo "$0: Bad certificates path passed, cannot continue." >&2
         exit 1
     fi
