@@ -1,5 +1,6 @@
 networks:
   back-tier:
+  back-public-tier:
   front-tier:
 
 volumes:
@@ -43,11 +44,10 @@ services:
       - AWS_REGION
     networks:
       - back-tier
+      - back-public-tier
       - front-tier
     depends_on:
       - db
-    publish:
-      - "${BACKEND_PORT}:${BACKEND_PORT}"
 
   frontend:
     image: naucto-dev-frontend
@@ -58,5 +58,29 @@ services:
       - front-tier
     depends_on:
       - backend
-    publish:
-      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
+
+  ssl_proxy_frontend:
+    image: fsouza/docker-ssl-proxy
+    environment:
+      - DOMAIN=${SSL_TARGET_DOMAIN}
+      - TARGET_PORT=${FRONTEND_PORT}
+      - TARGET_HOST=frontend
+    networks:
+      - front-tier
+    volumes:
+      - /etc/nginx/certs:${SSL_CERTS_PATH}:ro
+    depends_on:
+      - frontend
+
+  ssl_proxy_backend:
+    image: fsouza/docker-ssl-proxy
+    environment:
+      - DOMAIN=${SSL_TARGET_DOMAIN}
+      - TARGET_PORT=${FRONTEND_PORT}
+      - TARGET_HOST=backend
+    networks:
+      - back-public-tier
+    volumes:
+      - /etc/nginx/certs:${SSL_CERTS_PATH}:ro
+    depends_on:
+      - backend
