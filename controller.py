@@ -9,7 +9,7 @@ import subprocess
 
 class Controller:
     DEV_ENVIRONMENT_TIMEOUT = 60
-    DEV_ENVIRONMENT_SUBMODULE_NAME = "dev-environment"
+    DEV_ENVIRONMENT_SUBMODULE_NAME = "dev_environment"
 
     def __init__(self):
         self._runtime_path = os.path.abspath(os.path.dirname(sys.argv[0]))
