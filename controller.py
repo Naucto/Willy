@@ -24,7 +24,8 @@ class Controller:
             self._repository.remote().fetch()
 
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
-            env_main_module.update(to_latest_revision=True, init=True)
+
+            env_main_module.update(to_latest_revision=True, recursive=True)
             env_main_module_repo = env_main_module.module()
         except Exception as e:
             L.error(f"Failed to update environment repository, giving up: {e}")
