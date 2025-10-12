@@ -26,6 +26,9 @@ class Controller:
             submodule_list.extend(submodule.module().submodules)
             L.trace(f"Queued {len(submodule.module().submodules)} submodules from '{submodule.name}'")
 
+            submodule.update(init=True, recursive=False)
+            L.debug(f"Initialized submodule '{submodule.name}'")
+
             subrepo = submodule.module()
 
             subrepo.git.fetch("--prune", "origin")
