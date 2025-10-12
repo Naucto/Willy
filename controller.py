@@ -18,17 +18,15 @@ class Controller:
         self._repository = Repo(self._repository_path)
 
     def _update_repositories(self):
-        L.debug("Pulling changes from environment repository")
-
         try:
-            self._repository.remote().fetch()
-            L.trace("Fetched changes from origin")
+            self._repository.remote().pull()
+            L.debug("Pulled changes from environment repository")
+
+            self._repository.submodule_update(init=True, recursive=True, to_latest_revision=True)
+            L.debug("Updated main repository submodules")
 
             env_main_module = self._repository.submodule(self.DEV_ENVIRONMENT_SUBMODULE_NAME)
             L.trace(f"Located environment submodule '{self.DEV_ENVIRONMENT_SUBMODULE_NAME}'")
-
-            env_main_module.update(to_latest_revision=True, recursive=True)
-            L.debug("Pulled changes from environment repository")
 
             env_main_module_repo = env_main_module.module()
             L.trace("Located environment repository")
