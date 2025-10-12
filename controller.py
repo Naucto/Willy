@@ -23,11 +23,11 @@ class Controller:
         while submodule_list:
             submodule = submodule_list.pop(0)
 
-            submodule_list.extend(submodule.module().submodules)
-            L.trace(f"Queued {len(submodule.module().submodules)} submodules from '{submodule.name}'")
-
             submodule.update(init=True, recursive=False)
             L.debug(f"Initialized submodule '{submodule.name}'")
+
+            submodule_list.extend(submodule.module().submodules)
+            L.trace(f"Queued {len(submodule.module().submodules)} submodules from '{submodule.name}'")
 
             subrepo = submodule.module()
 
