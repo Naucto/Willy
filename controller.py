@@ -26,8 +26,7 @@ class Controller:
             subrepo.git.fetch("--prune", "origin")
             L.trace(f"Fetched updates for submodule '{submodule.name}'")
 
-            submodule.git.checkout()
-
+            subrepo.git.checkout()
             L.debug(f"Updated submodule '{submodule.name}' to commit {subrepo.head.commit.hexsha}")
 
         try:
