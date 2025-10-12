@@ -263,6 +263,11 @@ EOF
                "$tool_useradd -m $SV_SERVICE_USER"
     fi
 
+    sv_status_show "Adding the dedicated service user to the 'docker' group"
+
+    sv_try "Add the service user to the 'docker' group so that it can manage Docker containers" \
+           "usermod -aG docker $SV_SERVICE_USER"
+
     sv_status_show "Downloading service repository and installing it in $SV_INSTALL_PATH"
 
     if [ -d "$SV_TEMP_PATH" ]; then
