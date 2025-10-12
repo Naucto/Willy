@@ -3,8 +3,10 @@
 SV_REPO_PATH="`dirname "$0"`"
 
 SV_INSTALL_PATH="/opt/naucto-docker-synchronizer"
-SV_INSTALL_DEFAULT_CERT_FNAME="cert"
-SV_INSTALL_DEFAULT_CERT_PATH="$SV_INSTALL_PATH/$SV_INSTALL_DEFAULT_CERT_FNAME"
+SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME="webhook-cert"
+SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH="$SV_INSTALL_PATH/$SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME"
+SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME="public-cert"
+SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH="$SV_INSTALL_PATH/$SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME"
 SV_LOCK_PATH="$SV_REPO_PATH/.`basename "$0"`.lock"
 SV_TEMP_PATH="$SV_REPO_PATH/.repo"
 
@@ -135,17 +137,33 @@ The path must be a folder containing the following two files:
    - privkey.pem, the private key used to encrypt responses to be decoded by
      end users/clients
 EOF
-    certificates_path="`sv_question "Where are the SSL public and private keys located?" \
-                        "$SV_INSTALL_DEFAULT_CERT_PATH"`"
+    webhook_certificates_path="`sv_question "Where are the SSL public and private keys located?" \
+                               "$SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH"`"
 
-    if [ ! -d "$certificates_path" ] || \
-       [ ! -f "$certificates_path/fullchain.pem" ] || \
-       [ ! -f "$certificates_path/privkey.pem" ]; then
+    if [ ! -d "$webhook_certificates_path" ] || \
+       [ ! -f "$webhook_certificates_path/fullchain.pem" ] || \
+       [ ! -f "$webhook_certificates_path/privkey.pem" ]; then
         echo "$0: Bad certificates path passed, cannot continue." >&2
         exit 1
     fi
 
-    certificates_path="`realpath "$certificates_path"`"    
+    webhook_certificates_path="`realpath "$webhook_certificates_path"`"
+
+    cat >&2 <<EOF
+
+We also need certificates to serve the frontend and backend securely through
+SSL.
+
+EOF
+    public_certificates_path="`sv_question "Where are the SSL public and private keys located?" \
+                             "$SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH"`"
+
+    if [ ! -d "$public_certificates_path" ] || \
+         ! -f "$public_certificates_path/fullchain.pem" || \
+         ! -f "$public_certificates_path/privkey.pem" ; then
+        echo "$0: Bad certificates path passed, cannot continue." >&2
+        exit 1
+    fi
 
     # ---
 
@@ -289,7 +307,7 @@ EOF
 LOGURU_LEVEL=INFO
 
 CW_HOST=1
-CW_HOST_CERT=$certificates_path
+CW_HOST_CERT=$webhook_certificates_path
 EOF
 
     sv_status_show "Installing the Docker environment file"
@@ -311,6 +329,9 @@ AWS_ACCESS_KEY_ID=$aws_access_key_id
 AWS_SECRET_ACCESS_KEY=$aws_secret_access_key
 AWS_REGION=$aws_region
 S3_BUCKET_NAME=$aws_bucket_name
+
+SSL_TARGET_DOMAIN=$target_domain
+SSL_CERT_PATH=$public_certificates_path
 EOF
 
     sv_status_show "Installing the service script file"
@@ -336,7 +357,10 @@ EOF
            ". $SV_SERVICE_VENV_PATH/bin/activate && pip install -r '$SV_INSTALL_PATH/requirements.txt'"
 
     sv_try "Add a certificates folder for auto-renewing certificate bots." \
-           "mkdir -p '$SV_INSTALL_DEFAULT_CERT_PATH'"
+           "mkdir -p '$SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH' && \
+            mkdir -p '$SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH'"
+
+    
 
     sv_status_show "Configuring filesystem permissions"
 
