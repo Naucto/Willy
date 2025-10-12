@@ -81,6 +81,7 @@ services:
     networks:
       - back-public-tier
     volumes:
-      - /etc/nginx/certs:${SSL_CERTS_PATH}:ro
+      - /etc/nginx/certs/cert.pem:${SSL_CERTS_PATH}/fullchain.pem:ro
+      - /etc/nginx/certs/key.pem:${SSL_CERTS_PATH}/privkey.pem:ro
     depends_on:
       - backend
