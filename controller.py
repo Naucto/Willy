@@ -18,9 +18,14 @@ class Controller:
         self._repository = Repo(self._repository_path)
 
     def _update_repositories(self):
-        L.trace(f"Updating {len(self._repository.submodules)} submodules")
+        submodule_list = [*self._repository.submodules]
 
-        for submodule in self._repository.submodules:
+        while submodule_list:
+            submodule = submodule_list.pop(0)
+
+            submodule_list.extend(submodule.module().submodules)
+            L.trace(f"Queued {len(submodule.module().submodules)} submodules from '{submodule.name}'")
+
             subrepo = submodule.module()
 
             subrepo.git.fetch("--prune", "origin")
