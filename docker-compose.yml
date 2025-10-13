@@ -25,6 +25,7 @@ services:
     build:
       context: dev_environment/backend
       args:
+        BACKEND_PORT: ${BACKEND_PORT}
         POSTGRES_USER: ${POSTGRES_USER}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         POSTGRES_DB: ${POSTGRES_DB}
@@ -51,9 +52,12 @@ services:
 
   frontend:
     image: naucto-dev-frontend
-    build: dev_environment/frontend
+    build:
+      context: dev_environment/frontend
+      args:
+        FRONTEND_PORT: ${FRONTEND_PORT}
     environment:
-      - VITE_BACKEND_URL=http://backend:${BACKEND_PORT}/
+      - VITE_BACKEND_URL=https://${SSL_TARGET_DOMAIN}:${BACKEND_PORT}/
     networks:
       - front-tier
     volumes:
