@@ -78,7 +78,7 @@ services:
       - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - frontend
-    publish:
+    ports:
       - "${FRONTEND_PORT}:${FRONTEND_PORT}"
 
   ssl_proxy_backend:
@@ -94,5 +94,5 @@ services:
       - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - backend
-    publish:
+    ports:
       - "${BACKEND_PORT}:${BACKEND_PORT}"
