@@ -78,12 +78,14 @@ services:
       - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - frontend
+    publish:
+      - "${FRONTEND_PORT}:${FRONTEND_PORT}"
 
   ssl_proxy_backend:
     image: fsouza/docker-ssl-proxy
     environment:
       - DOMAIN=${SSL_TARGET_DOMAIN}
-      - TARGET_PORT=${FRONTEND_PORT}
+      - TARGET_PORT=${BACKEND_PORT}
       - TARGET_HOST=backend
     networks:
       - back-public-tier
@@ -92,3 +94,5 @@ services:
       - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - backend
+    publish:
+      - "${BACKEND_PORT}:${BACKEND_PORT}"
