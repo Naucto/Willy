@@ -25,7 +25,7 @@ services:
     build:
       context: dev_environment/backend
       args:
-        BACKEND_PORT: ${BACKEND_PORT}
+        BACKEND_PORT: 3000
         POSTGRES_USER: ${POSTGRES_USER}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         POSTGRES_DB: ${POSTGRES_DB}
@@ -85,7 +85,7 @@ services:
     image: fsouza/docker-ssl-proxy
     environment:
       - DOMAIN=${SSL_TARGET_DOMAIN}
-      - TARGET_PORT=${BACKEND_PORT}
+      - TARGET_PORT=3000
       - TARGET_HOST=backend
     networks:
       - back-public-tier
