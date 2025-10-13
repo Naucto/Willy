@@ -57,7 +57,7 @@ services:
     networks:
       - front-tier
     volumes:
-      - /app/config.json:${FRONTEND_CONFIG_PATH}:ro
+      - ${FRONTEND_CONFIG_PATH}:/app/config.json:ro
     depends_on:
       - backend
 
@@ -70,8 +70,8 @@ services:
     networks:
       - front-tier
     volumes:
-      - /etc/nginx/certs/cert.pem:${SSL_CERTS_PATH}/fullchain.pem:ro
-      - /etc/nginx/certs/key.pem:${SSL_CERTS_PATH}/privkey.pem:ro
+      - ${SSL_CERTS_PATH}/fullchain.pem:/etc/nginx/certs/cert.pem:ro
+      - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - frontend
 
@@ -84,7 +84,7 @@ services:
     networks:
       - back-public-tier
     volumes:
-      - /etc/nginx/certs/cert.pem:${SSL_CERTS_PATH}/fullchain.pem:ro
-      - /etc/nginx/certs/key.pem:${SSL_CERTS_PATH}/privkey.pem:ro
+      - ${SSL_CERTS_PATH}/fullchain.pem:/etc/nginx/certs/cert.pem:ro
+      - ${SSL_CERTS_PATH}/privkey.pem:/etc/nginx/certs/key.pem:ro
     depends_on:
       - backend
