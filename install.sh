@@ -313,6 +313,7 @@ ConditionPathExists=$SV_INSTALL_PATH
 User=$SV_SERVICE_USER
 EnvironmentFile=$SV_SERVICE_ENV_PATH
 ExecStart=$SV_SERVICE_SCRIPT_PATH
+WorkingDirectory=$SV_INSTALL_PATH
 Restart=on-failure
 
 [Install]
