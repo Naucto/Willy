@@ -123,7 +123,7 @@ This is an automated commit. The following submodules were updated:
         process_return_code = process.wait(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
 
         if process_return_code != 0:
-            L.error("Failed to check Docker-based compose environment status, giving up")
+            L.error(f"Failed to check Docker-based compose environment status, giving up (error code {process_return_code}")
             return
         elif process_stderr:
             L.error(f"Failed to check Docker-based compose environment status, giving up: {process_stderr.decode().strip()}")
@@ -134,6 +134,28 @@ This is an automated commit. The following submodules were updated:
             return
 
         L.info("Docker-based compose environment is running and alive")
+
+    def _build_compose(self):
+        if self._is_compose_up():
+            L.debug("Docker-based compose is running, we need to stop it first before building")
+            self._stop_compose()
+
+        L.debug("Building Docker-based compose")
+
+        process = subprocess.Popen(
+            ["docker-compose", "build"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        process_stdout, process_stderr = process.communicate(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
+        process_return_code = process.wait(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
+
+        if process_return_code != 0:
+            L.error(f"Failed to build Docker-based compose, giving up (error code {process_return_code}")
+            L.error(process_stderr)
+            return
+
+        L.info("Docker-based compose built successfully")
 
     def _stop_compose(self):
         if not self._is_compose_up():
@@ -160,6 +182,33 @@ This is an automated commit. The following submodules were updated:
         self._stop_compose()
         self._start_compose()
 
+    def _prune_system(self):
+        if self._is_compose_up():
+            L.debug("Docker-based compose is running, we need to stop it first before pruning")
+            self._stop_compose()
+
+        L.debug("Pruning Docker to free up some space")
+
+        process = subprocess.Popen(
+            ["docker", "system", "prune", "-f"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        process_stdout, process_stderr = process.communicate(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
+        process_return_code = process.wait(timeout=self.DEV_ENVIRONMENT_TIMEOUT)
+
+        if process_return_code != 0:
+            L.error(f"Failed to prune Docker, giving up (error code {process_return_code}")
+            return
+        elif process_stderr:
+            L.error(f"Failed to prune Docker, giving up: {process_stderr.decode().strip()}")
+            return
+
+        L.info("Docker pruned successfully")
+
     def update(self):
+        self._stop_compose()
         self._update_repositories()
-        self._restart_compose()
+        self._prune_system()
+        self._build_compose()
+        self._start_compose()
