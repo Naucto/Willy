@@ -183,10 +183,6 @@ This is an automated commit. The following submodules were updated:
         self._start_compose()
 
     def _prune_system(self):
-        if self._is_compose_up():
-            L.debug("Docker-based compose is running, we need to stop it first before pruning")
-            self._stop_compose()
-
         L.debug("Pruning Docker to free up some space")
 
         process = subprocess.Popen(
@@ -207,8 +203,7 @@ This is an automated commit. The following submodules were updated:
         L.info("Docker pruned successfully")
 
     def update(self):
-        self._stop_compose()
         self._update_repositories()
         self._prune_system()
         self._build_compose()
-        self._start_compose()
+        self._restart_compose()
