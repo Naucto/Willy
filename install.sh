@@ -3,10 +3,12 @@
 SV_REPO_PATH="`dirname "$0"`"
 
 SV_INSTALL_PATH="/opt/naucto-docker-synchronizer"
-SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME="webhook-cert"
-SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH="$SV_INSTALL_PATH/$SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME"
-SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME="public-cert"
-SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH="$SV_INSTALL_PATH/$SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME"
+SV_INSTALL_CONFIG_PATH="$SV_INSTALL_PATH/config"
+SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME="webhook_cert"
+SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH="$SV_INSTALL_CONFIG_PATH/$SV_INSTALL_DEFAULT_WEBHOOK_CERT_FNAME"
+SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME="public_cert"
+SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH="$SV_INSTALL_CONFIG_PATH/$SV_INSTALL_DEFAULT_PUBLIC_CERT_FNAME"
+SV_INSTALL_FRONTEND_PROVIDERS_PATH="$SV_INSTALL_PATH/frontend/config/providers.json"
 SV_LOCK_PATH="$SV_REPO_PATH/.`basename "$0"`.lock"
 SV_TEMP_PATH="$SV_REPO_PATH/.repo"
 
@@ -287,7 +289,7 @@ EOF
     fi
 
     sv_try_as "$tool_su" "$sv_repo_userowner" "Clone the service repository to a temporary path." \
-              "$tool_git clone '$sv_repo_url' '$SV_TEMP_PATH'"
+              "$tool_git clone --recurse-submodules '$sv_repo_url' '$SV_TEMP_PATH'"
 
     if [ -d "$SV_INSTALL_PATH" ]; then
         sv_try "Duplicate the cloned repository to the installation path." \
@@ -336,7 +338,6 @@ POSTGRES_HOST=db
 POSTGRES_PORT=5432
 
 FRONTEND_PORT=443
-FRONTEND_CONFIG_PATH=$frontend_config_path
 BACKEND_PORT=1987
 NODE_ENV=production
 
@@ -350,6 +351,10 @@ S3_BUCKET_NAME=$aws_bucket_name
 SSL_TARGET_DOMAIN=$target_domain
 SSL_CERTS_PATH=$public_certificates_path
 EOF
+
+    sv_status_show "Installing the frontend providers configuration file"
+    sv_try "Copy the providers frontend config file to the frontend subrepository" \
+	   "cp '$frontend_config_path' '$SV_INSTALL_FRONTEND_PROVIDERS_PATH'"
 
     sv_status_show "Installing the service script file"
 
@@ -376,8 +381,6 @@ EOF
     sv_try "Add a certificates folder for auto-renewing certificate bots." \
            "mkdir -p '$SV_INSTALL_DEFAULT_WEBHOOK_CERT_PATH' && \
             mkdir -p '$SV_INSTALL_DEFAULT_PUBLIC_CERT_PATH'"
-
-    
 
     sv_status_show "Configuring filesystem permissions"
 
