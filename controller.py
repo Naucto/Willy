@@ -10,6 +10,7 @@ import subprocess
 class Controller:
     DEV_ENVIRONMENT_TIMEOUT = 3600
     DEV_ENVIRONMENT_SUBMODULE_NAME = "dev-environment"
+    DEV_ENVIRONMENT_BRANCH_NAME = "main"
 
     def __init__(self):
         self._runtime_path = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -57,10 +58,14 @@ class Controller:
         L.debug("Pushing repository submodule pointer updates")
 
         try:
+            if env_main_module_repo.head.is_detached:
+                env_main_module_repo.git.checkout(self.DEV_ENVIRONMENT_BRANCH_NAME)
+                L.debug("Checked out local repo as we're working with a detached head")
+
             env_main_module_repo.git.add(update=True)
 
             if env_main_module_repo.is_dirty():
-                self._repository.index.commit(f"""
+                env_main_module_repo.index.commit(f"""
 [META] [UPDATE] Update submodule pointers
 
 This is an automated commit. The following submodules were updated:
@@ -69,6 +74,7 @@ This is an automated commit. The following submodules were updated:
                 L.debug("Prepared commit for updated submodule pointers")
 
                 env_main_module_origin = env_main_module_repo.remote()
+
                 env_main_module_origin.push()
                 L.debug("Pushed updated submodule pointers")
             else:
