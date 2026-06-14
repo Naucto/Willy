@@ -27,8 +27,9 @@ The full master plan with all decisions, the data model, and the phased roadmap 
   streaming console/logs.
 - **Frontend:** Vite + React 19 + TypeScript + MUI 9 + TanStack Query.
 - **Edge:** Traefik v3.7 (ACME DNS-01 via OVH).
-- **Tooling:** Biome (lint+format), strict `tsc`, Vitest (unit/integration) + Testcontainers, Playwright
-  (e2e), lefthook (pre-commit), GitHub Actions (CI).
+- **Tooling:** **Biome** (lint+format) for frontend + root; **ESLint + Prettier** for the backend
+  (Biome can't parse NestJS parameter decorators); strict `tsc`; Vitest (unit/integration) +
+  Testcontainers; Playwright (e2e); lefthook (pre-commit); GitHub Actions (CI). `npm run lint` runs both.
 
 ## Common commands
 
@@ -51,11 +52,13 @@ make e2e        # Playwright against the local stack
 - **Throw `Error`-extended classes, never bare `Error`.** Each app has a base (`backend/src/common/errors.ts`,
   `frontend/src/errors.ts`); derive specific named errors from it so failures are typed and catchable.
 - **Aerate the code.** Add a blank line after a block (e.g. after an `if {…}`) before the following
-  statements; group logically. Readability over density.
+  statements; group logically. Readability over density. Separate consecutive top-level declarations
+  (e.g. `export const`) with a blank line **only when the right-hand side spans multiple lines**;
+  keep single-line declarations grouped tightly.
 - **Shell scripts (POSIX `sh`):** always brace variables (`${var}`, never bare `$var`); never write an
   inline `if … then … fi` — unfold into multi-line blocks; aerate (blank lines between logical groups);
   filenames use `under_scores.sh`. Keep them shellcheck-clean (CI runs `shellcheck scripts/*.sh`).
-- **Match surrounding style.** Biome formats; don't hand-fight it.
+- **Match surrounding style.** Biome (frontend/root) and Prettier (backend) own formatting; don't hand-fight them.
 - **Backend exposes DTOs** (class-validator) as the API contract; **the frontend never hand-writes API
   types** — it consumes a client generated from the backend's OpenAPI spec.
 - **Commit format: `[AREA] [ACTION] What it does`** (enforced by the commit-msg hook). `AREA` is the part
