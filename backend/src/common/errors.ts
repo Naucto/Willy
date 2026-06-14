@@ -12,3 +12,6 @@ export class WillyError extends Error {
 }
 
 export class ConfigError extends WillyError {}
+
+// An invariant about the database was violated (e.g. an insert returned no row).
+export class DatabaseError extends WillyError {}

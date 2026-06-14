@@ -12,9 +12,9 @@
     "frontend"
   ],
   "scripts": {
-    "lint": "biome check .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
+    "lint": "biome check . && npm run lint -w @willy/backend",
+    "lint:fix": "biome check --write . && npm run lint:fix -w @willy/backend",
+    "format": "biome format --write . && npm run format -w @willy/backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",

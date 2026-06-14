@@ -1,21 +1,27 @@
-import { createServer } from "node:http";
-import { describeBackend } from "./version";
+import "reflect-metadata";
+import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { AppModule } from "./app.module";
 
-const port = Number(process.env.PORT ?? 3000);
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
-// Minimal placeholder server so the container stays healthy until the NestJS
-// control plane (HTTP + WS + Drizzle) lands in Phase 2.
-const server = createServer((req, res) => {
-  if (req.url === "/health") {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
-    return;
-  }
+  // Health probes stay un-prefixed so the container healthcheck can hit /health directly.
+  app.setGlobalPrefix("api", { exclude: ["health", "health/ready"] });
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+  );
 
-  res.writeHead(200, { "content-type": "text/plain" });
-  res.end(`${describeBackend()} — not implemented yet\n`);
-});
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle("Willy API")
+    .setVersion("0.0.0")
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup("api/docs", app, SwaggerModule.createDocument(app, swaggerConfig));
 
-server.listen(port, () => {
-  console.log(`${describeBackend()} listening on :${port}`);
-});
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port, "0.0.0.0");
+}
+
+void bootstrap();

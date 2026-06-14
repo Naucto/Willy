@@ -1,10 +1,9 @@
 pre-commit:
   parallel: true
   commands:
-    biome:
-      glob: "*.{js,ts,jsx,tsx,json}"
-      run: npx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
-      stage_fixed: true
+    # Biome (frontend/root) + ESLint/Prettier (backend) — see the root "lint" script.
+    lint:
+      run: npm run lint
     typecheck:
       run: npm run typecheck
 

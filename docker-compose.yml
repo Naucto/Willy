@@ -104,6 +104,10 @@ services:
       WILLY_MASTER_KEY: ${WILLY_MASTER_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      WILLY_ADMIN_EMAIL: ${WILLY_ADMIN_EMAIL:-}
+      WILLY_ADMIN_PASSWORD: ${WILLY_ADMIN_PASSWORD:-}
       DOCKER_PROXY_HOST: ${DOCKER_PROXY_HOST:-docker-socket-proxy}
       DOCKER_PROXY_PORT: ${DOCKER_PROXY_PORT:-2375}
       BASE_DOMAIN: ${BASE_DOMAIN}
@@ -112,10 +116,15 @@ services:
       OVH_APPLICATION_SECRET: ${OVH_APPLICATION_SECRET:-}
       OVH_CONSUMER_KEY: ${OVH_CONSUMER_KEY:-}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test:
+        - CMD
+        - node
+        - "-e"
+        - "fetch('http://localhost:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
     networks:
       - willy_edge
       - willy_internal
