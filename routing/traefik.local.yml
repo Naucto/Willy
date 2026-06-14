@@ -1,0 +1,37 @@
+# Traefik static config for LOCAL development (no OVH, no ACME).
+# Routers still carry `certresolver=ovh` labels; with no resolver defined here, Traefik
+# falls back to its default (self-signed) cert. Phase 1 replaces this with mkcert-issued,
+# browser-trusted certs for *.localhost via the file provider.
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: DEBUG
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "tcp://docker-socket-proxy:2375"
+    exposedByDefault: false
+    network: willy_edge
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

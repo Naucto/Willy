@@ -1,0 +1,52 @@
+# Traefik static config (production). Certs are issued per-domain via OVH DNS-01;
+# a per-zone wildcard can be added in dynamic/ as an optimization.
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: false
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "tcp://docker-socket-proxy:2375"
+    exposedByDefault: false
+    network: willy_edge
+    watch: true
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+certificatesResolvers:
+  ovh:
+    acme:
+      # Traefik does not expand env vars in this file: provision.sh rewrites the email
+      # and flips caServer staging -> prod during deploy.
+      email: "ops@example.com"
+      storage: /letsencrypt/acme.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      dnsChallenge:
+        provider: ovh
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+        propagation:
+          delayBeforeChecks: 30s

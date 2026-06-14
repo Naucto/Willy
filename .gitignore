@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+test-results/
+playwright-report/
+.vitest/
+
+# Env & secrets — never commit real values
+.env
+.env.*
+!.env.example
+
+# Local TLS (mkcert) + ACME cert store
+routing/certs/
+routing/letsencrypt/
+
+# Local build workspaces / backup artifacts (host runtime dirs)
+/var/willy/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

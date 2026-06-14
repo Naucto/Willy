@@ -1,0 +1,16 @@
+# Host-agnostic shared middlewares (Traefik file provider). Host-specific routers are
+# created from container labels (compose-expanded), not here.
+http:
+  middlewares:
+    sec-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50

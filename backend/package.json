@@ -1,0 +1,16 @@
+{
+  "name": "@willy/backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Willy control plane (NestJS + Drizzle). Scaffold — full app lands in Phase 2.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.0"
+  }
+}

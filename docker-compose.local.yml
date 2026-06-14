@@ -1,0 +1,16 @@
+# Local development override: `docker compose -f docker-compose.yml -f docker-compose.local.yml up`
+# (use `make dev`). Swaps Traefik to a no-OVH/no-ACME config. Set BASE_DOMAIN=willy.localhost
+# and PANEL_HOST=willy.localhost in your .env. Phase 1 adds mkcert-trusted *.localhost certs
+# and a fast hot-reload (watch) profile.
+name: willy
+
+services:
+  traefik:
+    volumes:
+      - ./routing/traefik.local.yml:/etc/traefik/traefik.yml:ro
+      - ./routing/dynamic:/etc/traefik/dynamic:ro
+      - letsencrypt:/letsencrypt
+
+  postgres:
+    ports:
+      - "5432:5432"
