@@ -141,6 +141,24 @@ EOF
   fi
 }
 
+install_deploy_key() {
+  if [ -z "${WILLY_DEPLOY_KEY:-}" ]; then
+    return
+  fi
+
+  log "Installing read-only deploy key for ${WILLY_USER}"
+
+  ssh_dir="/home/${WILLY_USER}/.ssh"
+  mkdir -p "${ssh_dir}"
+  cp "${WILLY_DEPLOY_KEY}" "${ssh_dir}/id_ed25519"
+  ssh-keyscan -t ed25519,rsa github.com > "${ssh_dir}/known_hosts" 2>/dev/null || true
+  chmod 700 "${ssh_dir}"
+  chmod 600 "${ssh_dir}/id_ed25519"
+  chown -R "${WILLY_USER}:${WILLY_USER}" "${ssh_dir}"
+
+  rm -f "${WILLY_DEPLOY_KEY}"
+}
+
 clone_or_update_repo() {
   if [ -d "${WILLY_DIR}/.git" ]; then
     log "Updating ${WILLY_DIR} to ${WILLY_REF}"
@@ -356,6 +374,7 @@ cmd_provision() {
   install_packages
   install_docker
   setup_user
+  install_deploy_key
   setup_firewall
   harden_system
   clone_or_update_repo
@@ -376,6 +395,7 @@ cmd_upgrade() {
     die "Willy is not installed at ${WILLY_DIR}"
   fi
 
+  install_deploy_key
   clone_or_update_repo
   configure_traefik
   prepare_acme

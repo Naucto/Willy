@@ -24,6 +24,7 @@ ADMIN_EMAIL=""
 REPO=""
 REF="main"
 CA=""
+DEPLOY_KEY=""
 VERB="provision"
 
 die() {
@@ -57,9 +58,10 @@ Options:
   --acme-email <email>       Let's Encrypt account email
   --ovh-endpoint <ep>        OVH endpoint (default: ovh-eu)
   --admin-email <email>      bootstrap admin email
-  --repo <url>               Willy git repo (default: project origin)
+  --repo <url>               Willy git repo (default: SSH origin when --deploy-key is set)
   --ref <ref>                git ref/branch (default: main)
   --ca staging|prod          ACME CA (default: staging first, auto-flip to prod)
+  --deploy-key <path>        read-only SSH deploy key to clone a private repo on the host
 
 Secrets via env only: OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY,
 and optionally WILLY_ADMIN_PASSWORD (generated + printed once if absent).
@@ -89,6 +91,7 @@ while [ ${#} -gt 0 ]; do
     --repo) REPO="${2}"; shift 2 ;;
     --ref) REF="${2}"; shift 2 ;;
     --ca) CA="${2}"; shift 2 ;;
+    --deploy-key) DEPLOY_KEY="${2}"; shift 2 ;;
     -h|--help) usage ;;
     *) die "unknown option '${1}' (see --help)" ;;
   esac
@@ -96,6 +99,11 @@ done
 
 if [ -z "${HOST}" ]; then
   die "--host is required"
+fi
+
+# With a deploy key, default to the SSH remote so the host can clone the private repo.
+if [ -n "${DEPLOY_KEY}" ] && [ -z "${REPO}" ]; then
+  REPO="git@github.com:Naucto/Willy.git"
 fi
 
 # Panel host = apex when subdomain is empty, else <sub>.<base>.
@@ -128,6 +136,10 @@ preflight() {
 
   command -v ssh >/dev/null 2>&1 || die "ssh not found"
   command -v scp >/dev/null 2>&1 || die "scp not found"
+
+  if [ -n "${DEPLOY_KEY}" ] && [ ! -f "${DEPLOY_KEY}" ]; then
+    die "--deploy-key file not found: ${DEPLOY_KEY}"
+  fi
 
   ssh_run true 2>/dev/null || die "cannot SSH to ${TARGET} (check host, key, port, firewall)"
   ssh_run "sudo -n true" 2>/dev/null || die "passwordless sudo not available for ${SSH_USER} on ${HOST}"
@@ -185,6 +197,10 @@ EOF
   if [ -n "${CA}" ]; then
     echo "export ACME_CA='${CA}'"
   fi
+
+  if [ -n "${DEPLOY_KEY}" ]; then
+    echo "export WILLY_DEPLOY_KEY=/tmp/willy_deploy_key"
+  fi
 }
 
 run_remote_verb() {
@@ -195,6 +211,13 @@ run_remote_verb() {
   scp ${scp_opts} "${SCRIPT_DIR}/willy_deploy.sh" "${TARGET}:/tmp/willy_deploy.sh"
 
   if [ "${verb}" = "provision" ] || [ "${verb}" = "upgrade" ]; then
+    if [ -n "${DEPLOY_KEY}" ]; then
+      log "Sending deploy key"
+      # shellcheck disable=SC2086  # scp_opts intentionally word-split
+      scp ${scp_opts} "${DEPLOY_KEY}" "${TARGET}:/tmp/willy_deploy_key"
+      ssh_run "chmod 600 /tmp/willy_deploy_key"
+    fi
+
     log "Sending configuration"
     remote_env | ssh_run "cat > /tmp/willy_provision.env && chmod 600 /tmp/willy_provision.env"
 
