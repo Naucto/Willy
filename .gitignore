@@ -17,9 +17,13 @@ playwright-report/
 .env.*
 !.env.example
 
-# Local TLS (mkcert) + ACME cert store
+# Local TLS (mkcert) + ACME cert store + generated dashboard auth
 routing/certs/
 routing/letsencrypt/
+routing/auth/
+
+# Empty mountpoint Docker creates for the local-only TLS file (nested bind mount)
+routing/dynamic/tls.local.yml
 
 # Local build workspaces / backup artifacts (host runtime dirs)
 /var/willy/

@@ -15,7 +15,6 @@ networks:
 volumes:
   postgres-data:
   willy_backups:
-  letsencrypt:
 
 services:
   traefik:
@@ -35,10 +34,20 @@ services:
     volumes:
       - ./routing/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./routing/dynamic:/etc/traefik/dynamic:ro
-      - letsencrypt:/letsencrypt
+      - ./routing/auth:/etc/traefik/auth:ro
+      # Host bind (not a named volume) so the provisioner can create it 600, poll it, and back it up.
+      - ./routing/letsencrypt:/letsencrypt
     networks:
       - willy_edge
       - willy_internal
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: willy_edge
+      traefik.http.routers.dashboard.rule: Host(`traefik.${BASE_DOMAIN}`)
+      traefik.http.routers.dashboard.entrypoints: websecure
+      traefik.http.routers.dashboard.tls: "true"
+      traefik.http.routers.dashboard.service: api@internal
+      traefik.http.routers.dashboard.middlewares: dashboard-auth@file
 
   # Least-privilege gateway to the Docker Engine. Traefik and willy-server talk to Docker
   # through this, never the raw socket. Only the API surface Willy needs is enabled.
@@ -115,7 +124,6 @@ services:
       traefik.http.routers.willy-api.rule: Host(`${PANEL_HOST}`) && PathPrefix(`/api`)
       traefik.http.routers.willy-api.entrypoints: websecure
       traefik.http.routers.willy-api.tls: "true"
-      traefik.http.routers.willy-api.tls.certresolver: ovh
       traefik.http.services.willy-api.loadbalancer.server.port: "3000"
 
   willy-web:
@@ -134,5 +142,4 @@ services:
       traefik.http.routers.willy-web.rule: Host(`${PANEL_HOST}`)
       traefik.http.routers.willy-web.entrypoints: websecure
       traefik.http.routers.willy-web.tls: "true"
-      traefik.http.routers.willy-web.tls.certresolver: ovh
       traefik.http.services.willy-web.loadbalancer.server.port: "80"

@@ -1,0 +1,8 @@
+# Local-only TLS: serve the mkcert/self-signed cert as the default for every host.
+# Mounted into the dynamic dir only by docker-compose.local.yml (never in production).
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/local-cert.pem
+        keyFile: /certs/local-key.pem

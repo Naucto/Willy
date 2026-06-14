@@ -1,7 +1,6 @@
 # Traefik static config for LOCAL development (no OVH, no ACME).
-# Routers still carry `certresolver=ovh` labels; with no resolver defined here, Traefik
-# falls back to its default (self-signed) cert. Phase 1 replaces this with mkcert-issued,
-# browser-trusted certs for *.localhost via the file provider.
+# The websecure entrypoint has no certResolver, so routers (tls=true) serve the default
+# certificate provided by the file provider (routing/local/tls.yml -> mkcert cert).
 global:
   checkNewVersion: false
   sendAnonymousUsage: false

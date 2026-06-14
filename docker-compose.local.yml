@@ -1,16 +1,19 @@
-# Local development override: `docker compose -f docker-compose.yml -f docker-compose.local.yml up`
-# (use `make dev`). Swaps Traefik to a no-OVH/no-ACME config. Set BASE_DOMAIN=willy.localhost
-# and PANEL_HOST=willy.localhost in your .env. Phase 1 adds mkcert-trusted *.localhost certs
-# and a fast hot-reload (watch) profile.
+# Local development override: `make dev`
+# (= docker compose -f docker-compose.yml -f docker-compose.local.yml up --build).
+# Swaps Traefik to a no-OVH/no-ACME config and serves a mkcert (or self-signed) cert for
+# *.localhost. Run `scripts/dev-setup.sh` first (make dev does this) to create .env + certs.
 name: willy
 
 services:
   traefik:
     volumes:
       - ./routing/traefik.local.yml:/etc/traefik/traefik.yml:ro
-      - ./routing/dynamic:/etc/traefik/dynamic:ro
-      - letsencrypt:/letsencrypt
+      # dynamic dir is rw so the nested tls.local.yml mountpoint can be created.
+      - ./routing/dynamic:/etc/traefik/dynamic
+      - ./routing/local/tls.yml:/etc/traefik/dynamic/tls.local.yml:ro
+      - ./routing/certs:/certs:ro
 
   postgres:
+    # Bind to localhost on a non-default port to avoid clashing with a host Postgres.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"

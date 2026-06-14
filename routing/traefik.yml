@@ -24,6 +24,11 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
+    http:
+      # Default resolver for all websecure routers: each app's Host gets a cert on demand
+      # via OVH DNS-01. Routers only need `tls=true` (no per-router certresolver).
+      tls:
+        certResolver: ovh
 
 providers:
   docker:
