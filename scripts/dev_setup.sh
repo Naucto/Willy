@@ -3,10 +3,12 @@
 # for *.localhost (mkcert -> browser-trusted; falls back to self-signed). Idempotent.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
+ROOT="$(cd "$(dirname "${0}")/.." && pwd)"
+cd "${ROOT}"
 
-gen() { openssl rand -hex "$1"; }
+gen() {
+  openssl rand -hex "${1:-32}"
+}
 
 if [ ! -f .env ]; then
   echo "Creating .env for local development..."
@@ -65,13 +67,16 @@ if [ ! -f routing/certs/local-cert.pem ]; then
 
     # Installing the local CA needs sudo; don't abort if it can't (e.g. non-interactive).
     # The cert still chains to the mkcert CA — re-run 'mkcert -install' to trust it.
-    mkcert -install || echo "warning: could not install the local CA (needs sudo); run 'mkcert -install' to trust it."
+    if ! mkcert -install; then
+      echo "warning: could not install the local CA (needs sudo); run 'mkcert -install' to trust it."
+    fi
 
     mkcert -cert-file routing/certs/local-cert.pem -key-file routing/certs/local-key.pem \
       "willy.localhost" "*.localhost" "localhost" 127.0.0.1 ::1
   else
     echo "mkcert not found — generating a self-signed cert (the browser will warn)."
     echo "Install mkcert for a trusted cert: https://github.com/FiloSottile/mkcert"
+
     openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
       -keyout routing/certs/local-key.pem -out routing/certs/local-cert.pem \
       -subj "/CN=willy.localhost" \

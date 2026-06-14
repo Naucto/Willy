@@ -52,6 +52,9 @@ make e2e        # Playwright against the local stack
   `frontend/src/errors.ts`); derive specific named errors from it so failures are typed and catchable.
 - **Aerate the code.** Add a blank line after a block (e.g. after an `if {…}`) before the following
   statements; group logically. Readability over density.
+- **Shell scripts (POSIX `sh`):** always brace variables (`${var}`, never bare `$var`); never write an
+  inline `if … then … fi` — unfold into multi-line blocks; aerate (blank lines between logical groups);
+  filenames use `under_scores.sh`. Keep them shellcheck-clean (CI runs `shellcheck scripts/*.sh`).
 - **Match surrounding style.** Biome formats; don't hand-fight it.
 - **Backend exposes DTOs** (class-validator) as the API contract; **the frontend never hand-writes API
   types** — it consumes a client generated from the backend's OpenAPI spec.

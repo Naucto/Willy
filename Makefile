@@ -1,7 +1,7 @@
 COMPOSE      := docker compose
 COMPOSE_DEV  := docker compose -f docker-compose.yml -f docker-compose.local.yml
 
-.PHONY: help install dev-setup dev down logs build test lint lint-fix typecheck e2e
+.PHONY: help install dev_setup dev down logs build test lint lint-fix typecheck e2e
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -9,10 +9,10 @@ help: ## Show this help
 install: ## Install workspace dependencies
 	npm install
 
-dev-setup: ## Generate local .env + TLS cert if missing
-	./scripts/dev-setup.sh
+dev_setup: ## Generate local .env + TLS cert if missing
+	./scripts/dev_setup.sh
 
-dev: dev-setup ## Run the full stack locally (https://willy.localhost)
+dev: dev_setup ## Run the full stack locally (https://willy.localhost)
 	$(COMPOSE_DEV) up --build
 
 down: ## Stop the local stack
