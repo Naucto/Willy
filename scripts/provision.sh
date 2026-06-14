@@ -147,7 +147,7 @@ preflight() {
   # shellcheck disable=SC2016  # must expand on the remote, not locally
   os_id="$(ssh_run '. /etc/os-release && echo "${ID} ${VERSION_ID}"' 2>/dev/null || true)"
   case "${os_id}" in
-    debian\ *) log "Target OS: Debian ${os_id}" ;;
+    debian\ *) log "Target OS: ${os_id}" ;;
     *) printf 'warning: target is not Debian (%s); the deploy script targets Debian.\n' "${os_id}" >&2 ;;
   esac
 
