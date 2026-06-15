@@ -1,13 +1,11 @@
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Card,
   CardContent,
   FormControlLabel,
   MenuItem,
-  Slider,
   Stack,
   Switch,
   TextField,
@@ -22,37 +20,6 @@ import { describeError } from "../errors";
 import { DomainsManager } from "./DomainsManager";
 
 const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE", "IMAGE"];
-const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
-
-const MEMORY_MARKS = [
-  { value: 0, label: "Off" },
-  { value: 1024, label: "1G" },
-  { value: 2048, label: "2G" },
-  { value: 4096, label: "4G" },
-];
-
-const CPU_MARKS = [
-  { value: 0, label: "Off" },
-  { value: 2, label: "2" },
-  { value: 4, label: "4" },
-  { value: 8, label: "8" },
-];
-
-const COMMON_CAPS = [
-  "ALL",
-  "CHOWN",
-  "DAC_OVERRIDE",
-  "FOWNER",
-  "SETUID",
-  "SETGID",
-  "KILL",
-  "NET_ADMIN",
-  "NET_RAW",
-  "NET_BIND_SERVICE",
-  "SYS_TIME",
-  "SYS_ADMIN",
-  "SYS_PTRACE",
-];
 
 interface FormValues {
   gitUrl: string;
@@ -66,20 +33,7 @@ interface FormValues {
   healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
-  restartPolicy: (typeof RESTART)[number];
-  memoryLimitMb: string;
-  cpuCores: string;
-  capAdd: string;
-  capDrop: string;
   autoDeploy: boolean;
-}
-
-// Capabilities are entered as a comma list (e.g. "NET_ADMIN, SYS_TIME").
-function parseCaps(value: string): string[] {
-  return value
-    .split(",")
-    .map((cap) => cap.trim().toUpperCase())
-    .filter(Boolean);
 }
 
 function trimmed(value: string): string | undefined {
@@ -101,11 +55,6 @@ function initialValues(deployment: Deployment): FormValues {
     healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
     cronExpr: deployment.cronExpr ?? "",
-    restartPolicy: deployment.restartPolicy,
-    memoryLimitMb: deployment.memoryLimitMb?.toString() ?? "",
-    cpuCores: deployment.nanoCpus ? (deployment.nanoCpus / 1e9).toString() : "",
-    capAdd: (deployment.capAdd ?? []).join(", "),
-    capDrop: (deployment.capDrop ?? []).join(", "),
     autoDeploy: deployment.autoDeploy,
   };
 }
@@ -126,7 +75,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     const payload: UpdateDeploymentInput = {
       buildStrategy: values.buildStrategy,
       healthCheckPath: values.healthCheckPath.trim() || "/",
-      restartPolicy: values.restartPolicy,
       autoDeploy: values.autoDeploy,
     };
 
@@ -152,10 +100,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
-    set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
-    set("nanoCpus", values.cpuCores ? Math.round(Number(values.cpuCores) * 1e9) : undefined);
-    set("capAdd", parseCaps(values.capAdd));
-    set("capDrop", parseCaps(values.capDrop));
 
     try {
       await update.mutateAsync(payload);
@@ -234,88 +178,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
                 {deployment.type === "CRON" && (
                   <TextField label="Cron expression" {...register("cronExpr")} />
                 )}
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined">
-            <CardContent>
-              <Stack spacing={2}>
-                <Typography variant="overline" color="text.secondary">
-                  Runtime
-                </Typography>
-
-                <Controller
-                  name="restartPolicy"
-                  control={control}
-                  render={({ field }) => (
-                    <TextField select label="Restart policy" {...field}>
-                      {RESTART.map((value) => (
-                        <MenuItem key={value} value={value}>
-                          {value}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-                />
-
-                <Controller
-                  name="memoryLimitMb"
-                  control={control}
-                  render={({ field }) => (
-                    <LimitSlider
-                      label="Memory limit"
-                      value={field.value ? Number(field.value) : 0}
-                      max={4096}
-                      step={64}
-                      marks={MEMORY_MARKS}
-                      format={(v) => (v === 0 ? "No limit" : `${v} MB`)}
-                      onChange={(v) => field.onChange(v === 0 ? "" : String(v))}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="cpuCores"
-                  control={control}
-                  render={({ field }) => (
-                    <LimitSlider
-                      label="CPU limit"
-                      value={field.value ? Number(field.value) : 0}
-                      max={8}
-                      step={0.5}
-                      marks={CPU_MARKS}
-                      format={(v) => (v === 0 ? "No limit" : `${v} cores`)}
-                      onChange={(v) => field.onChange(v === 0 ? "" : String(v))}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="capAdd"
-                  control={control}
-                  render={({ field }) => (
-                    <CapabilityPicker
-                      label="Add capabilities"
-                      helperText="Linux capabilities to add on top of Docker's defaults."
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="capDrop"
-                  control={control}
-                  render={({ field }) => (
-                    <CapabilityPicker
-                      label="Drop capabilities"
-                      helperText="Use ALL to start from none, then add only what's needed."
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
 
                 <Controller
                   name="autoDeploy"
@@ -339,76 +201,15 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
         </Stack>
       </form>
 
+      <Alert severity="info">
+        Resource limits (memory, CPU, capabilities, restart, logs) moved to the <b>Resources</b>{" "}
+        tab.
+      </Alert>
+
       {deployment.type === "WEB" && <DomainsManager deployment={deployment} />}
 
       <WebhookCard deploymentId={deployment.id} autoDeploy={deployment.autoDeploy} />
     </Stack>
-  );
-}
-
-function LimitSlider({
-  label,
-  value,
-  max,
-  step,
-  marks,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  step: number;
-  marks: { value: number; label: string }[];
-  format: (value: number) => string;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, px: 2, pt: 1, pb: 0.5 }}>
-      <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-        <Box sx={{ flexGrow: 1 }} />
-        <Typography variant="body2" color="text.secondary">
-          {format(value)}
-        </Typography>
-      </Box>
-      <Slider
-        value={value}
-        min={0}
-        max={max}
-        step={step}
-        marks={marks}
-        valueLabelDisplay="auto"
-        valueLabelFormat={(v) => format(v)}
-        onChange={(_, v) => onChange(typeof v === "number" ? v : (v[0] ?? 0))}
-        sx={{ mx: 1.5, "& .MuiSlider-markLabel": { fontSize: 11 } }}
-      />
-    </Box>
-  );
-}
-
-function CapabilityPicker({
-  label,
-  helperText,
-  value,
-  onChange,
-}: {
-  label: string;
-  helperText: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Autocomplete
-      multiple
-      freeSolo
-      options={COMMON_CAPS}
-      value={parseCaps(value)}
-      onChange={(_, val) => onChange(val.map((cap) => cap.toUpperCase()).join(", "))}
-      renderInput={(params) => <TextField {...params} label={label} helperText={helperText} />}
-    />
   );
 }
 

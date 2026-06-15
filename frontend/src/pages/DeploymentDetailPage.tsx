@@ -35,6 +35,8 @@ import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
+import { NetworkingTab } from "../components/NetworkingTab";
+import { ResourcesTab } from "../components/ResourcesTab";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
@@ -42,7 +44,7 @@ import { describeError } from "../errors";
 
 // Tabs that act on a single container follow the ?container= selection; the rest are
 // deployment-scoped and ignore it.
-const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes"]);
+const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -155,6 +157,8 @@ export function DeploymentDetailPage() {
         ))}
       {active === "env" && <EnvVarEditor deploymentId={id} />}
       {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
+      {active === "networking" && <NetworkingTab container={selected} />}
+      {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
       {active === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );

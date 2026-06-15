@@ -32,6 +32,7 @@ export type CreateBackupDestinationInput = components["schemas"]["CreateBackupDe
 export type DeploymentDomain = components["schemas"]["DomainDto"];
 export type AddDomainInput = components["schemas"]["AddDomainDto"];
 export type UpdateDomainTargetInput = components["schemas"]["UpdateDomainTargetDto"];
+export type ResourceLimits = components["schemas"]["ResourceLimitsDto"];
 
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];

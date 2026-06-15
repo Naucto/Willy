@@ -9,6 +9,7 @@ import type {
   CreateDeploymentInput,
   CreateDnsRecordInput,
   CreateUserInput,
+  ResourceLimits,
   Role,
   SetEnvVarInput,
   UpdateDeploymentInput,
@@ -408,6 +409,37 @@ export function useRemoveDomain(id: string) {
         }),
       ),
     onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function useServiceResources(id: string, service: string) {
+  return useQuery({
+    queryKey: ["deployments", id, "services", service, "resources"],
+    enabled: id.length > 0 && service.length > 0,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/deployments/{id}/services/{service}/resources", {
+          params: { path: { id, service } },
+        }),
+      ),
+  });
+}
+
+export function useUpdateServiceResources(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { service: string; body: ResourceLimits }) =>
+      unwrap(
+        await api.PATCH("/deployments/{id}/services/{service}/resources", {
+          params: { path: { id, service: input.service } },
+          body: input.body,
+        }),
+      ),
+    onSuccess: (_data, input) =>
+      queryClient.invalidateQueries({
+        queryKey: ["deployments", id, "services", input.service, "resources"],
+      }),
   });
 }
 

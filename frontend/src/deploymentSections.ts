@@ -18,6 +18,8 @@ export function deploymentSections(isCron: boolean): DeploymentSection[] {
         ]),
     { key: "env", label: "Environment" },
     { key: "volumes", label: "Volumes" },
+    { key: "networking", label: "Networking" },
+    { key: "resources", label: "Resources" },
     { key: "settings", label: "Settings" },
   ];
 }

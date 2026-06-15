@@ -3,7 +3,9 @@ import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
 import HistoryIcon from "@mui/icons-material/History";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import MemoryIcon from "@mui/icons-material/Memory";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
@@ -58,8 +60,13 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   console: <TerminalIcon />,
   env: <TuneIcon />,
   volumes: <StorageIcon />,
+  networking: <HubOutlinedIcon />,
+  resources: <MemoryIcon />,
   settings: <SettingsIcon />,
 };
+
+// Tabs whose content depends on the selected container — keep ?container= when navigating to them.
+const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
 
 // Recognise a deployment-detail route (/deployments/:id[/:section]); "new" and the bare list aren't.
 function matchDeployment(pathname: string): { id: string; section: string } | null {
@@ -170,15 +177,21 @@ export function AppShell() {
             <>
               {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
               <Divider sx={{ my: 1 }} />
-              {deploymentSections(deployment?.type === "CRON").map((section) =>
-                item(
+              {deploymentSections(deployment?.type === "CRON").map((section) => {
+                const container = new URLSearchParams(location.search).get("container");
+                const query =
+                  container && CONTAINER_SCOPED.has(section.key)
+                    ? `?container=${encodeURIComponent(container)}`
+                    : "";
+
+                return item(
                   section.key,
-                  `/deployments/${detail.id}/${section.key}`,
+                  `/deployments/${detail.id}/${section.key}${query}`,
                   section.label,
                   SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
                   detail.section === section.key,
-                ),
-              )}
+                );
+              })}
             </>
           ) : (
             GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>
