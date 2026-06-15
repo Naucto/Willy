@@ -132,6 +132,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/run": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DeploymentActionsController_run"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/cron-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentActionsController_cronRunHistory"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/deploy": {
     parameters: {
       query?: never;
@@ -707,6 +739,20 @@ export interface components {
       scope?: "BUILD" | "RUNTIME" | "BOTH";
       isSecret?: boolean;
     };
+    CronRunDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      deploymentId: string;
+      /** @enum {string} */
+      status: "RUNNING" | "SUCCESS" | "FAILED";
+      exitCode: number | null;
+      logs: string | null;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: string | null;
+    };
     ReleaseDto: {
       /** Format: uuid */
       id: string;
@@ -1143,6 +1189,48 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  DeploymentActionsController_run: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentActionsController_cronRunHistory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CronRunDto"][];
+        };
       };
     };
   };

@@ -26,6 +26,7 @@ import { useDeleteRelease, useDeployment, useReleases, useRollback } from "../ap
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
 import { CopyButton } from "../components/CopyButton";
+import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
@@ -34,7 +35,15 @@ import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { describeError } from "../errors";
 
-type TabKey = "overview" | "build" | "runtime" | "console" | "env" | "volumes" | "settings";
+type TabKey =
+  | "overview"
+  | "build"
+  | "runs"
+  | "runtime"
+  | "console"
+  | "env"
+  | "volumes"
+  | "settings";
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -93,6 +102,8 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
+  const isCron = deployment.type === "CRON";
+
   return (
     <Stack spacing={3}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
@@ -110,8 +121,14 @@ export function DeploymentDetailPage() {
       <Tabs value={tab} onChange={(_, value: TabKey) => setTab(value)}>
         <Tab label="Overview" value="overview" />
         <Tab label="Build logs" value="build" />
-        <Tab label="Runtime logs" value="runtime" />
-        <Tab label="Console" value="console" />
+        {isCron ? (
+          <Tab label="Runs" value="runs" />
+        ) : (
+          [
+            <Tab key="runtime" label="Runtime logs" value="runtime" />,
+            <Tab key="console" label="Console" value="console" />,
+          ]
+        )}
         <Tab label="Env" value="env" />
         <Tab label="Volumes" value="volumes" />
         <Tab label="Settings" value="settings" />
@@ -119,6 +136,7 @@ export function DeploymentDetailPage() {
 
       {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
       {tab === "build" && <BuildLogsTab deploymentId={id} />}
+      {tab === "runs" && <CronRunsTab deploymentId={id} />}
       {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
       {tab === "console" &&
         (isRunning(deployment) ? (

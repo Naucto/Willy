@@ -307,6 +307,25 @@ export function useReleases(id: string) {
   });
 }
 
+export function useCronRuns(id: string) {
+  return useQuery({
+    queryKey: ["deployments", id, "cron-runs"],
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/cron-runs", { params: { path: { id } } })),
+    refetchInterval: 5000,
+  });
+}
+
+export function useRunCron(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.POST("/deployments/{id}/run", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deployments", id, "cron-runs"] }),
+  });
+}
+
 export function useEnvVars(id: string) {
   return useQuery({
     queryKey: queryKeys.env(id),

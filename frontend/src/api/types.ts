@@ -3,6 +3,7 @@ import type { components } from "./schema";
 // Convenience aliases over the generated OpenAPI schema — the single source of truth.
 export type Deployment = components["schemas"]["DeploymentDto"];
 export type Release = components["schemas"]["ReleaseDto"];
+export type CronRun = components["schemas"]["CronRunDto"];
 export type MaskedEnvVar = components["schemas"]["MaskedEnvVarDto"];
 export type Session = components["schemas"]["SessionDto"];
 export type AuthUser = components["schemas"]["AuthUserDto"];
