@@ -3,17 +3,28 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Willy control panel (React + Vite + MUI). Scaffold — full dashboard lands in Phase 4.",
+  "description": "Willy control panel (React + Vite + MUI).",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api": "npx -y openapi-typescript@^7 ../backend/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.1.1",
+    "@mui/material": "^9.1.1",
+    "@tanstack/react-query": "^5.101.0",
+    "notistack": "^3.0.2",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-hook-form": "^7.79.0",
+    "react-router-dom": "^7.17.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

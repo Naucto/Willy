@@ -9,6 +9,6 @@ COPY frontend ./frontend
 RUN npm run build --workspace @willy/frontend
 
 FROM nginx:alpine AS runtime
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
-# Phase 4 adds the SPA-fallback nginx config.
 EXPOSE 80

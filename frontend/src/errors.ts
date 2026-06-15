@@ -11,3 +11,12 @@ export class WillyError extends Error {
 }
 
 export class MissingRootElementError extends WillyError {}
+
+// Best-effort human-readable message for any thrown value (for toasts/logs).
+export function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return typeof error === "string" ? error : "Unexpected error";
+}
