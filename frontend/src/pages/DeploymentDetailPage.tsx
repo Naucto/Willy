@@ -7,7 +7,6 @@ import {
   CircularProgress,
   Dialog,
   DialogContent,
-  DialogTitle,
   Link,
   Stack,
   Tab,
@@ -19,7 +18,7 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef, GridToolbarQuickFilter } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -169,31 +168,61 @@ function OverviewTab({
         <Typography variant="h6" sx={{ mb: 1 }}>
           Releases
         </Typography>
-        <ReleasesTable
-          releases={releases}
-          deploymentId={deploymentId}
-          activeReleaseId={deployment.activeReleaseId}
-        />
+        {releases && releases.length > 0 ? (
+          <ReleasesGrid
+            releases={releases}
+            deploymentId={deploymentId}
+            activeReleaseId={deployment.activeReleaseId}
+            height={380}
+          />
+        ) : (
+          <Alert severity="info">No releases yet. Trigger a deploy.</Alert>
+        )}
       </Box>
     </Stack>
   );
 }
 
-function ReleasesTable({
+function PickerToolbar({ title }: { title: string }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 2,
+        p: 1.5,
+      }}
+    >
+      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+        {title}
+      </Typography>
+      <GridToolbarQuickFilter />
+    </Box>
+  );
+}
+
+// Shared releases grid: "manage" mode (Overview) shows copy buttons + a Rollback action and
+// highlights the active release; "select" mode (passing onSelect, used by the build-log picker)
+// makes rows clickable and shows a titled toolbar instead.
+function ReleasesGrid({
   releases,
-  deploymentId,
   activeReleaseId,
+  deploymentId,
+  height,
+  onSelect,
+  toolbarTitle,
 }: {
-  releases: Release[] | undefined;
-  deploymentId: string;
+  releases: Release[];
   activeReleaseId: string | null;
+  deploymentId: string;
+  height: number;
+  onSelect?: (releaseId: string) => void;
+  toolbarTitle?: string;
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const rollback = useRollback(deploymentId);
-
-  if (!releases || releases.length === 0) {
-    return <Alert severity="info">No releases yet. Trigger a deploy.</Alert>;
-  }
+  const selectMode = onSelect !== undefined;
 
   const onRollback = async (releaseId: string) => {
     try {
@@ -204,59 +233,101 @@ function ReleasesTable({
     }
   };
 
+  const columns: GridColDef<Release>[] = [
+    {
+      field: "status",
+      headerName: "Status",
+      width: 150,
+      renderCell: (params) => <StatusBadge status={params.row.status} />,
+    },
+    {
+      field: "commit",
+      headerName: "Commit",
+      width: 150,
+      sortable: false,
+      valueGetter: (_value, row) => row.gitSha ?? "",
+      renderCell: (params) =>
+        params.row.gitSha ? (
+          <Box sx={{ display: "flex", alignItems: "center", fontFamily: "monospace" }}>
+            {params.row.gitSha.slice(0, 8)}
+            {!selectMode && <CopyButton value={params.row.gitSha} label="commit" />}
+          </Box>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      field: "imageTag",
+      headerName: "Image",
+      flex: 1,
+      minWidth: 220,
+      valueGetter: (_value, row) => row.imageTag ?? "",
+      renderCell: (params) =>
+        params.row.imageTag ? (
+          <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, fontFamily: "monospace" }}>
+            <Box sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{params.row.imageTag}</Box>
+            {!selectMode && <CopyButton value={params.row.imageTag} label="image" />}
+          </Box>
+        ) : (
+          "—"
+        ),
+    },
+    {
+      field: "queuedAt",
+      headerName: "Queued",
+      width: 190,
+      valueFormatter: (value) => new Date(value as string).toLocaleString(),
+    },
+  ];
+
+  if (!selectMode) {
+    columns.push({
+      field: "actions",
+      headerName: "",
+      width: 120,
+      sortable: false,
+      filterable: false,
+      align: "right",
+      headerAlign: "right",
+      renderCell: (params) =>
+        params.row.imageTag && params.row.id !== activeReleaseId ? (
+          <Button
+            size="small"
+            disabled={rollback.isPending}
+            onClick={() => void onRollback(params.row.id)}
+          >
+            Rollback
+          </Button>
+        ) : null,
+    });
+  }
+
   return (
-    <Table size="small">
-      <TableHead>
-        <TableRow>
-          <TableCell>Status</TableCell>
-          <TableCell>Commit</TableCell>
-          <TableCell>Image</TableCell>
-          <TableCell>Queued</TableCell>
-          <TableCell align="right" />
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {releases.map((release) => (
-          <TableRow key={release.id} selected={release.id === activeReleaseId}>
-            <TableCell>
-              <StatusBadge status={release.status} />
-            </TableCell>
-            <TableCell sx={{ fontFamily: "monospace" }}>
-              {release.gitSha ? (
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  {release.gitSha.slice(0, 8)}
-                  <CopyButton value={release.gitSha} label="commit" />
-                </Box>
-              ) : (
-                "—"
-              )}
-            </TableCell>
-            <TableCell sx={{ fontFamily: "monospace" }}>
-              {release.imageTag ? (
-                <Box sx={{ display: "flex", alignItems: "center" }}>
-                  {release.imageTag}
-                  <CopyButton value={release.imageTag} label="image" />
-                </Box>
-              ) : (
-                "—"
-              )}
-            </TableCell>
-            <TableCell>{new Date(release.queuedAt).toLocaleString()}</TableCell>
-            <TableCell align="right">
-              {release.imageTag && release.id !== activeReleaseId && (
-                <Button
-                  size="small"
-                  disabled={rollback.isPending}
-                  onClick={() => void onRollback(release.id)}
-                >
-                  Rollback
-                </Button>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <Box sx={{ height }}>
+      <DataGrid
+        rows={releases}
+        columns={columns}
+        getRowId={(row) => row.id}
+        getRowClassName={(params) => (params.id === activeReleaseId ? "willy-active" : "")}
+        showToolbar
+        {...(onSelect ? { onRowClick: (params) => onSelect(params.row.id) } : {})}
+        {...(toolbarTitle
+          ? { slots: { toolbar: () => <PickerToolbar title={toolbarTitle} /> } }
+          : {})}
+        density="compact"
+        disableRowSelectionOnClick
+        initialState={{
+          sorting: { sortModel: [{ field: "queuedAt", sort: "desc" }] },
+          pagination: { paginationModel: { pageSize: 25 } },
+        }}
+        pageSizeOptions={[10, 25, 50, 100]}
+        sx={{
+          border: 0,
+          "& .willy-active": { bgcolor: "action.selected" },
+          ...(selectMode ? { "& .MuiDataGrid-row": { cursor: "pointer" } } : {}),
+        }}
+      />
+    </Box>
   );
 }
 
@@ -290,30 +361,6 @@ function releaseSummary(release: Release): string {
 
   return `${release.status} · ${ref} · ${new Date(release.queuedAt).toLocaleString()}`;
 }
-
-const RELEASE_COLUMNS: GridColDef<Release>[] = [
-  { field: "status", headerName: "Status", width: 150 },
-  {
-    field: "commit",
-    headerName: "Commit",
-    width: 120,
-    sortable: false,
-    valueGetter: (_value, row) => row.gitSha?.slice(0, 8) ?? row.id.slice(0, 8),
-  },
-  {
-    field: "imageTag",
-    headerName: "Image",
-    flex: 1,
-    minWidth: 220,
-    valueGetter: (_value, row) => row.imageTag ?? "—",
-  },
-  {
-    field: "queuedAt",
-    headerName: "Queued",
-    width: 190,
-    valueFormatter: (value) => new Date(value as string).toLocaleString(),
-  },
-];
 
 function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
   const { data: releases } = useReleases(deploymentId);
@@ -351,25 +398,17 @@ function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
       {releaseId && <LogViewer key={releaseId} path={`/releases/${releaseId}/logs`} />}
 
       <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Select a release</DialogTitle>
-        <DialogContent sx={{ height: 460 }}>
-          <DataGrid
-            rows={releases}
-            columns={RELEASE_COLUMNS}
-            getRowId={(row) => row.id}
-            onRowClick={(params) => {
-              setReleaseId(params.row.id);
+        <DialogContent sx={{ p: 0 }}>
+          <ReleasesGrid
+            releases={releases}
+            activeReleaseId={releaseId || null}
+            deploymentId={deploymentId}
+            height={480}
+            toolbarTitle="Select a release"
+            onSelect={(id) => {
+              setReleaseId(id);
               setPickerOpen(false);
             }}
-            showToolbar
-            density="compact"
-            disableRowSelectionOnClick
-            initialState={{
-              sorting: { sortModel: [{ field: "queuedAt", sort: "desc" }] },
-              pagination: { paginationModel: { pageSize: 25 } },
-            }}
-            pageSizeOptions={[25, 50, 100]}
-            sx={{ border: 0, cursor: "pointer", "& .MuiDataGrid-row:hover": { cursor: "pointer" } }}
           />
         </DialogContent>
       </Dialog>
