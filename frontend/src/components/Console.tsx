@@ -1,5 +1,5 @@
 import "@xterm/xterm/css/xterm.css";
-import { Box, Typography } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
@@ -100,14 +100,18 @@ export function Console({
   }, [deploymentId, container]);
 
   return (
-    <Box>
-      <Typography variant="caption" color="text.secondary">
-        {status === "open" ? "connected" : status} — interactive /bin/sh in the running container
-      </Typography>
+    <Stack spacing={1}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Box sx={{ fontSize: 12, color: "text.secondary" }}>
+          {status} · interactive /bin/sh in the running container
+        </Box>
+        <Box sx={{ flexGrow: 1 }} />
+        {error && <Box sx={{ fontSize: 12, color: "error.main" }}>{error}</Box>}
+      </Box>
+
       <Box
         ref={mountRef}
         sx={{
-          mt: 1,
           height: 460,
           bgcolor: "#0b0e13",
           border: 1,
@@ -117,11 +121,6 @@ export function Console({
           "& .xterm": { height: "100%" },
         }}
       />
-      {error && (
-        <Typography variant="caption" color="error.main">
-          {error}
-        </Typography>
-      )}
-    </Box>
+    </Stack>
   );
 }
