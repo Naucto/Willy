@@ -97,7 +97,7 @@ export interface paths {
     delete: operations["DeploymentActionsController_remove"];
     options?: never;
     head?: never;
-    patch?: never;
+    patch: operations["DeploymentsController_update"];
     trace?: never;
   };
   "/deployments/{id}/env": {
@@ -212,6 +212,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["WebhooksController_status"];
+    put?: never;
+    post: operations["WebhooksController_rotate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -303,6 +319,21 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    UpdateDeploymentDto: {
+      gitUrl?: string;
+      gitRef?: string;
+      /** @enum {string} */
+      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
+      dockerfilePath?: string;
+      webServicePort?: number;
+      healthCheckPath?: string;
+      runCommand?: string;
+      cronExpr?: string;
+      autoDeploy?: boolean;
+      /** @enum {string} */
+      restartPolicy?: "NO" | "ON_FAILURE" | "ALWAYS" | "UNLESS_STOPPED";
+      memoryLimitMb?: number;
+    };
     MaskedEnvVarDto: {
       key: string;
       /** @enum {string} */
@@ -347,6 +378,14 @@ export interface components {
       finishedAt: string | null;
       /** Format: date-time */
       createdAt: string;
+    };
+    WebhookStatusDto: {
+      configured: boolean;
+      path: string;
+    };
+    WebhookSecretDto: {
+      secret: string;
+      path: string;
     };
   };
   responses: never;
@@ -521,6 +560,31 @@ export interface operations {
       };
     };
   };
+  DeploymentsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateDeploymentDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeploymentDto"];
+        };
+      };
+    };
+  };
   EnvVarsController_list: {
     parameters: {
       query?: never;
@@ -687,6 +751,48 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ReleaseDto"];
+        };
+      };
+    };
+  };
+  WebhooksController_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WebhookStatusDto"];
+        };
+      };
+    };
+  };
+  WebhooksController_rotate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["WebhookSecretDto"];
         };
       };
     };

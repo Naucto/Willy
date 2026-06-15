@@ -23,10 +23,11 @@ import type { Deployment, Release } from "../api/types";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
+import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
 
-type TabKey = "overview" | "build" | "runtime" | "env";
+type TabKey = "overview" | "build" | "runtime" | "env" | "settings";
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
@@ -73,12 +74,14 @@ export function DeploymentDetailPage() {
         <Tab label="Build logs" value="build" />
         <Tab label="Runtime logs" value="runtime" />
         <Tab label="Env" value="env" />
+        <Tab label="Settings" value="settings" />
       </Tabs>
 
       {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
       {tab === "build" && <BuildLogsTab deploymentId={id} />}
       {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
       {tab === "env" && <EnvVarEditor deploymentId={id} />}
+      {tab === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );
 }

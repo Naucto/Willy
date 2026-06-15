@@ -8,7 +8,10 @@ export type Session = components["schemas"]["SessionDto"];
 export type AuthUser = components["schemas"]["AuthUserDto"];
 
 export type CreateDeploymentInput = components["schemas"]["CreateDeploymentDto"];
+export type UpdateDeploymentInput = components["schemas"]["UpdateDeploymentDto"];
 export type SetEnvVarInput = components["schemas"]["SetEnvVarDto"];
+export type WebhookStatus = components["schemas"]["WebhookStatusDto"];
+export type WebhookSecret = components["schemas"]["WebhookSecretDto"];
 
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];

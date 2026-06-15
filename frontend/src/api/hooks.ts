@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
-import type { CreateDeploymentInput, SetEnvVarInput } from "./types";
+import type { CreateDeploymentInput, SetEnvVarInput, UpdateDeploymentInput } from "./types";
 
 export const queryKeys = {
   deployments: ["deployments"] as const,
@@ -8,6 +8,7 @@ export const queryKeys = {
   releases: (id: string) => ["deployments", id, "releases"] as const,
   release: (id: string) => ["releases", id] as const,
   env: (id: string) => ["deployments", id, "env"] as const,
+  webhook: (id: string) => ["deployments", id, "webhook"] as const,
 };
 
 export function useDeployments() {
@@ -51,6 +52,37 @@ export function useCreateDeployment() {
     mutationFn: async (body: CreateDeploymentInput) =>
       unwrap(await api.POST("/deployments", { body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.deployments }),
+  });
+}
+
+export function useUpdateDeployment(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: UpdateDeploymentInput) =>
+      unwrap(await api.PATCH("/deployments/{id}", { params: { path: { id } }, body })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployment(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
+    },
+  });
+}
+
+export function useWebhook(id: string) {
+  return useQuery({
+    queryKey: queryKeys.webhook(id),
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/webhook", { params: { path: { id } } })),
+  });
+}
+
+export function useRotateWebhook(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.POST("/deployments/{id}/webhook", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.webhook(id) }),
   });
 }
 
