@@ -1,9 +1,10 @@
 import type { Readable } from "node:stream";
-import { Controller, NotFoundException, Param, Sse } from "@nestjs/common";
+import { Controller, NotFoundException, Param, Query, Sse } from "@nestjs/common";
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
 import { ReleasesService } from "../build/releases.service";
+import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
 
@@ -20,6 +21,7 @@ export class LogsController {
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
     private readonly docker: DockerService,
+    private readonly containers: ContainersService,
   ) {}
 
   // Live build log for a release: replays buffered lines then streams new ones.
@@ -37,27 +39,41 @@ export class LogsController {
     });
   }
 
-  // Live runtime logs of a deployment's active container.
+  // Live runtime logs of a deployment's container. With ?container=<id|name> streams that specific
+  // container's logs (validated to belong to the deployment); otherwise the active release's.
   @ApiExcludeEndpoint()
   @Sse("deployments/:id/logs")
-  runtimeLogs(@Param("id") id: string): Observable<LogEvent> {
+  runtimeLogs(
+    @Param("id") id: string,
+    @Query("container") container?: string,
+  ): Observable<LogEvent> {
     return new Observable<LogEvent>((subscriber) => {
       let stream: Readable | undefined;
       let cancelled = false;
 
       void (async () => {
         const deployment = await this.deployments.findById(id);
-        const release = deployment?.activeReleaseId
-          ? await this.releases.findById(deployment.activeReleaseId)
-          : undefined;
 
-        if (!release?.containerId) {
+        if (!deployment) {
+          subscriber.error(new NotFoundException("deployment not found"));
+
+          return;
+        }
+
+        const containerId = container
+          ? await this.containers.resolveContainerId(deployment, container)
+          : ((deployment.activeReleaseId
+              ? await this.releases.findById(deployment.activeReleaseId)
+              : undefined
+            )?.containerId ?? null);
+
+        if (!containerId) {
           subscriber.error(new NotFoundException("no running container"));
 
           return;
         }
 
-        stream = await this.docker.getLogStream(release.containerId, 200);
+        stream = await this.docker.getLogStream(containerId, 200);
 
         if (cancelled) {
           stream.destroy();

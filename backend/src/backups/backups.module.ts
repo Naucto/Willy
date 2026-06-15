@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
+import { ContainersModule } from "../containers/containers.module";
 import { DeploymentsModule } from "../deployments/deployments.module";
 import { BackupQueue } from "./backup-queue";
 import { BackupsController } from "./backups.controller";
 import { BackupsService } from "./backups.service";
-import { ContainersService } from "./containers.service";
 import { BackupDestinationsController } from "./destinations.controller";
 import { BackupDestinationsService } from "./destinations.service";
 import { OffsiteService } from "./offsite/offsite.service";
@@ -12,7 +12,7 @@ import { BackupSchedulesService } from "./schedules.service";
 import { DeploymentVolumesController } from "./volumes.controller";
 
 @Module({
-  imports: [DeploymentsModule],
+  imports: [DeploymentsModule, ContainersModule],
   controllers: [
     BackupsController,
     BackupSchedulesController,
@@ -22,7 +22,6 @@ import { DeploymentVolumesController } from "./volumes.controller";
   providers: [
     BackupsService,
     BackupQueue,
-    ContainersService,
     BackupSchedulesService,
     BackupDestinationsService,
     OffsiteService,

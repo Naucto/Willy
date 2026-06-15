@@ -3,6 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { RawData, WebSocket } from "ws";
 import { ReleasesService } from "../build/releases.service";
+import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
 
@@ -64,6 +65,7 @@ export class ConsoleService {
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
     private readonly docker: DockerService,
+    private readonly containers: ContainersService,
   ) {
     this.secret = config.getOrThrow<string>("JWT_SECRET");
   }
@@ -76,14 +78,26 @@ export class ConsoleService {
     return verifyStreamTicket(this.secret, token);
   }
 
-  // Bridges a browser terminal to an interactive shell in the deployment's active container.
-  async attach(ws: WebSocket, deploymentId: string): Promise<void> {
+  // Bridges a browser terminal to an interactive shell in one of the deployment's containers. With
+  // a container id/name (validated to belong to the deployment) attaches to that one; otherwise the
+  // active release's container.
+  async attach(ws: WebSocket, deploymentId: string, container?: string): Promise<void> {
     const deployment = await this.deployments.findById(deploymentId);
-    const release = deployment?.activeReleaseId
-      ? await this.releases.findById(deployment.activeReleaseId)
-      : undefined;
 
-    if (!release?.containerId) {
+    if (!deployment) {
+      ws.close(1011, "deployment not found");
+
+      return;
+    }
+
+    const containerId = container
+      ? await this.containers.resolveContainerId(deployment, container)
+      : ((deployment.activeReleaseId
+          ? await this.releases.findById(deployment.activeReleaseId)
+          : undefined
+        )?.containerId ?? null);
+
+    if (!containerId) {
       ws.close(1011, "no running container");
 
       return;
@@ -92,7 +106,7 @@ export class ConsoleService {
     let session: Awaited<ReturnType<DockerService["execShell"]>>;
 
     try {
-      session = await this.docker.execShell(release.containerId);
+      session = await this.docker.execShell(containerId);
     } catch (error) {
       this.logger.warn(`console exec failed: ${error instanceof Error ? error.message : error}`);
       ws.close(1011, "exec failed");

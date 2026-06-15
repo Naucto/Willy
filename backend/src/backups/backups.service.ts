@@ -12,8 +12,8 @@ import { DB, type Database } from "../db/db.module";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
 import { backups } from "../db/schema";
+import { ContainersService } from "../containers/containers.service";
 import { BackupQueue } from "./backup-queue";
-import { ContainersService } from "./containers.service";
 import {
   BackupDestinationsService,
   type DestinationConfig,

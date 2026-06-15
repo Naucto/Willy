@@ -56,8 +56,10 @@ function attachConsoleWebsocket(app: Awaited<ReturnType<typeof NestFactory.creat
       return;
     }
 
+    const container = url.searchParams.get("container") ?? undefined;
+
     wss.handleUpgrade(req, socket, head, (ws) => {
-      void consoleService.attach(ws, match[1] as string);
+      void consoleService.attach(ws, match[1] as string, container);
     });
   });
 }

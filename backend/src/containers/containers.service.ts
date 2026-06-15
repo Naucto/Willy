@@ -40,6 +40,21 @@ export class ContainersService {
     return containers;
   }
 
+  // Validates that a requested container (full/short id or name) belongs to the deployment and
+  // returns its full id, or null if it isn't one of the deployment's containers. Guards
+  // per-container logs/console against pointing at arbitrary containers.
+  async resolveContainerId(deployment: Deployment, requested: string): Promise<string | null> {
+    const containers = await this.listForDeployment(deployment);
+    const match = containers.find(
+      (container) =>
+        container.id === requested ||
+        container.id.startsWith(requested) ||
+        container.name === requested,
+    );
+
+    return match?.id ?? null;
+  }
+
   async containersUsingVolume(deployment: Deployment, volume: string): Promise<string[]> {
     const containers = await this.listForDeployment(deployment);
 
