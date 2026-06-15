@@ -11,6 +11,7 @@ import {
   DeploymentsService,
   composeConfig,
 } from "../../deployments/deployments.service";
+import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
 import { DockerService } from "../../docker/docker.service";
 import {
   LabelGeneratorService,
@@ -19,6 +20,52 @@ import {
 } from "../../traefik/label-generator.service";
 
 const exec = promisify(execFile);
+
+// Willy's restart-policy enum → the strings `docker compose` understands.
+const RESTART_COMPOSE: Record<RestartPolicyName, string> = {
+  NO: "no",
+  ON_FAILURE: "on-failure",
+  ALWAYS: "always",
+  UNLESS_STOPPED: "unless-stopped",
+};
+
+// Translate a service's resource limits into compose service keys honoured by `docker compose up`
+// (non-swarm): mem_limit/cpus/cap_add/cap_drop/restart/logging.
+function resourceFragment(limits: ResourceLimits): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+
+  if (limits.memoryLimitMb) {
+    out.mem_limit = `${limits.memoryLimitMb}m`;
+  }
+
+  if (limits.nanoCpus) {
+    out.cpus = limits.nanoCpus / 1e9;
+  }
+
+  if (limits.capAdd?.length) {
+    out.cap_add = limits.capAdd;
+  }
+
+  if (limits.capDrop?.length) {
+    out.cap_drop = limits.capDrop;
+  }
+
+  if (limits.restartPolicy) {
+    out.restart = RESTART_COMPOSE[limits.restartPolicy];
+  }
+
+  if (limits.logMaxSizeMb || limits.logMaxFiles) {
+    out.logging = {
+      driver: "json-file",
+      options: {
+        "max-size": limits.logMaxSizeMb ? `${limits.logMaxSizeMb}m` : "10m",
+        "max-file": String(limits.logMaxFiles ?? 3),
+      },
+    };
+  }
+
+  return out;
+}
 
 const EDGE_NETWORK = "willy_edge";
 const COMPOSE_PROJECT_LABEL = "com.docker.compose.project";
@@ -147,6 +194,16 @@ export class ComposeService {
       }
 
       networks[EDGE_NETWORK] = { external: true };
+    }
+
+    // Merge per-service resource limits (memory/cpu/caps/restart/log retention) onto whichever
+    // services they're configured for — independent of routing, so worker services get them too.
+    for (const [name, limits] of Object.entries(deployment.serviceResources ?? {})) {
+      const fragment = resourceFragment(limits);
+
+      if (Object.keys(fragment).length > 0) {
+        services[name] = { ...(services[name] ?? {}), ...fragment };
+      }
     }
 
     const override: Record<string, unknown> = { services };

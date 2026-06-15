@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { ServiceResources } from "../../deployments/resource-limits";
 import type { StrategyConfig } from "../../deployments/strategy-config";
 import {
   auditActionEnum,
@@ -62,9 +63,14 @@ export const deployments = pgTable("deployments", {
   restartPolicy: restartPolicyEnum("restart_policy").notNull().default("UNLESS_STOPPED"),
   memoryLimitMb: integer("memory_limit_mb"),
   nanoCpus: bigint("nano_cpus", { mode: "number" }),
-  // Linux capabilities to add/drop relative to Docker's default set.
+  // Linux capabilities to add/drop relative to Docker's default set (single-container deployments).
   capAdd: jsonb("cap_add").$type<string[]>(),
   capDrop: jsonb("cap_drop").$type<string[]>(),
+  // Per-container log rotation for single-container deployments (json-file driver).
+  logMaxSizeMb: integer("log_max_size_mb"),
+  logMaxFiles: integer("log_max_files"),
+  // Per-service resource limits for compose deployments, keyed by compose service name.
+  serviceResources: jsonb("service_resources").$type<ServiceResources>().notNull().default({}),
   state: deploymentStateEnum("state").notNull().default("CREATED"),
   // Logical FK to releases.id (kept constraint-free to avoid a circular FK with releases).
   activeReleaseId: uuid("active_release_id"),

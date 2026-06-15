@@ -690,6 +690,100 @@
         ]
       }
     },
+    "/deployments/{id}/services/{service}/resources": {
+      "get": {
+        "operationId": "DeploymentsController_serviceResources",
+        "parameters": [
+          {
+            "name": "service",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceLimitsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "patch": {
+        "operationId": "DeploymentsController_setServiceResources",
+        "parameters": [
+          {
+            "name": "service",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceLimitsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResourceLimitsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/deployments/{id}/env": {
       "get": {
         "operationId": "EnvVarsController_list",
@@ -2511,6 +2605,14 @@
               "type": "string"
             }
           },
+          "logMaxSizeMb": {
+            "type": "number",
+            "nullable": true
+          },
+          "logMaxFiles": {
+            "type": "number",
+            "nullable": true
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -2563,6 +2665,8 @@
           "nanoCpus",
           "capAdd",
           "capDrop",
+          "logMaxSizeMb",
+          "logMaxFiles",
           "state",
           "activeReleaseId",
           "gitCredentialId",
@@ -2630,10 +2734,12 @@
           },
           "memoryLimitMb": {
             "type": "number",
-            "minimum": 16
+            "minimum": 16,
+            "nullable": true
           },
           "nanoCpus": {
             "type": "number",
+            "nullable": true,
             "description": "CPU limit in nano-CPUs (1 CPU = 1e9)"
           },
           "capAdd": {
@@ -2653,6 +2759,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "logMaxSizeMb": {
+            "type": "number",
+            "example": 10,
+            "nullable": true
+          },
+          "logMaxFiles": {
+            "type": "number",
+            "example": 3,
+            "nullable": true
           },
           "domain": {
             "type": "string",
@@ -2726,6 +2842,58 @@
             "type": "number",
             "nullable": true,
             "example": 8080
+          }
+        }
+      },
+      "ResourceLimitsDto": {
+        "type": "object",
+        "properties": {
+          "memoryLimitMb": {
+            "type": "number",
+            "nullable": true,
+            "example": 512
+          },
+          "nanoCpus": {
+            "type": "number",
+            "nullable": true,
+            "example": 1000000000
+          },
+          "capAdd": {
+            "example": [
+              "NET_ADMIN"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capDrop": {
+            "example": [
+              "ALL"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "restartPolicy": {
+            "type": "string",
+            "enum": [
+              "NO",
+              "ON_FAILURE",
+              "ALWAYS",
+              "UNLESS_STOPPED"
+            ]
+          },
+          "logMaxSizeMb": {
+            "type": "number",
+            "nullable": true,
+            "example": 10
+          },
+          "logMaxFiles": {
+            "type": "number",
+            "nullable": true,
+            "example": 3
           }
         }
       },
@@ -3391,6 +3559,22 @@
           "rw"
         ]
       },
+      "NetworkInfoDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "ip"
+        ]
+      },
       "ContainerDto": {
         "type": "object",
         "properties": {
@@ -3411,6 +3595,16 @@
             "items": {
               "$ref": "#/components/schemas/VolumeMountDto"
             }
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "networks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NetworkInfoDto"
+            }
           }
         },
         "required": [
@@ -3418,7 +3612,9 @@
           "name",
           "image",
           "running",
-          "volumes"
+          "volumes",
+          "service",
+          "networks"
         ]
       }
     }

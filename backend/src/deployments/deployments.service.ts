@@ -4,6 +4,7 @@ import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
 import { deployments, domains, gitCredentials } from "../db/schema";
+import type { ResourceLimits } from "./resource-limits";
 import type {
   ComposeConfig,
   DockerfileConfig,
@@ -118,6 +119,8 @@ export interface UpdateDeploymentInput {
   nanoCpus?: number | null;
   capAdd?: string[] | null;
   capDrop?: string[] | null;
+  logMaxSizeMb?: number | null;
+  logMaxFiles?: number | null;
   // The primary domain lives in a separate table; handled out-of-band in update().
   domain?: string;
 }
@@ -139,6 +142,8 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "nanoCpus",
   "capAdd",
   "capDrop",
+  "logMaxSizeMb",
+  "logMaxFiles",
 ];
 
 @Injectable()
@@ -410,6 +415,40 @@ export class DeploymentsService {
       .update(domains)
       .set({ isPrimary: true })
       .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)));
+  }
+
+  // Sets a compose service's resource limits (merged into the serviceResources map). An empty
+  // limits object clears that service's entry. Applies on the next deploy/restart.
+  async updateServiceResources(
+    id: string,
+    service: string,
+    limits: ResourceLimits,
+  ): Promise<Deployment> {
+    const current = await this.findById(id);
+
+    if (!current) {
+      throw new NotFoundException("deployment not found");
+    }
+
+    const next = { ...(current.serviceResources ?? {}) };
+
+    if (Object.keys(limits).length === 0) {
+      delete next[service];
+    } else {
+      next[service] = limits;
+    }
+
+    const [row] = await this.db
+      .update(deployments)
+      .set({ serviceResources: next, updatedAt: new Date() })
+      .where(eq(deployments.id, id))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException("deployment not found");
+    }
+
+    return row;
   }
 
   // List/get enriched with the primary domain fqdn for API responses.

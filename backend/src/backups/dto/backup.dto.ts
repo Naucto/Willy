@@ -195,6 +195,14 @@ export class VolumeMountDto {
   rw!: boolean;
 }
 
+export class NetworkInfoDto {
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  ip!: string | null;
+}
+
 export class ContainerDto {
   @ApiProperty({ type: String })
   id!: string;
@@ -210,6 +218,12 @@ export class ContainerDto {
 
   @ApiProperty({ type: [VolumeMountDto] })
   volumes!: VolumeMountDto[];
+
+  @ApiProperty({ type: String, nullable: true })
+  service!: string | null;
+
+  @ApiProperty({ type: [NetworkInfoDto] })
+  networks!: NetworkInfoDto[];
 }
 
 export class CreateBackupDto {

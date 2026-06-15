@@ -212,6 +212,22 @@ export interface paths {
     patch: operations["DeploymentsController_makeDomainPrimary"];
     trace?: never;
   };
+  "/deployments/{id}/services/{service}/resources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentsController_serviceResources"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["DeploymentsController_setServiceResources"];
+    trace?: never;
+  };
   "/deployments/{id}/env": {
     parameters: {
       query?: never;
@@ -856,6 +872,8 @@ export interface components {
       nanoCpus: number | null;
       capAdd: string[] | null;
       capDrop: string[] | null;
+      logMaxSizeMb: number | null;
+      logMaxFiles: number | null;
       /** @enum {string} */
       state: "CREATED" | "DEPLOYING" | "RUNNING" | "DEGRADED" | "STOPPED" | "ERROR";
       /** Format: uuid */
@@ -885,9 +903,9 @@ export interface components {
       autoDeploy?: boolean;
       /** @enum {string} */
       restartPolicy?: "NO" | "ON_FAILURE" | "ALWAYS" | "UNLESS_STOPPED";
-      memoryLimitMb?: number;
+      memoryLimitMb?: number | null;
       /** @description CPU limit in nano-CPUs (1 CPU = 1e9) */
-      nanoCpus?: number;
+      nanoCpus?: number | null;
       /**
        * @example [
        *       "NET_ADMIN"
@@ -900,6 +918,10 @@ export interface components {
        *     ]
        */
       capDrop?: string[];
+      /** @example 10 */
+      logMaxSizeMb?: number | null;
+      /** @example 3 */
+      logMaxFiles?: number | null;
       /** @example app.example.com */
       domain?: string;
     };
@@ -926,6 +948,30 @@ export interface components {
       targetService?: string | null;
       /** @example 8080 */
       targetPort?: number | null;
+    };
+    ResourceLimitsDto: {
+      /** @example 512 */
+      memoryLimitMb?: number | null;
+      /** @example 1000000000 */
+      nanoCpus?: number | null;
+      /**
+       * @example [
+       *       "NET_ADMIN"
+       *     ]
+       */
+      capAdd?: string[];
+      /**
+       * @example [
+       *       "ALL"
+       *     ]
+       */
+      capDrop?: string[];
+      /** @enum {string} */
+      restartPolicy?: "NO" | "ON_FAILURE" | "ALWAYS" | "UNLESS_STOPPED";
+      /** @example 10 */
+      logMaxSizeMb?: number | null;
+      /** @example 3 */
+      logMaxFiles?: number | null;
     };
     MaskedEnvVarDto: {
       key: string;
@@ -1122,12 +1168,18 @@ export interface components {
       destination: string;
       rw: boolean;
     };
+    NetworkInfoDto: {
+      name: string;
+      ip: string | null;
+    };
     ContainerDto: {
       id: string;
       name: string;
       image: string;
       running: boolean;
       volumes: components["schemas"]["VolumeMountDto"][];
+      service: string | null;
+      networks: components["schemas"]["NetworkInfoDto"][];
     };
   };
   responses: never;
@@ -1552,6 +1604,54 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_serviceResources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        service: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ResourceLimitsDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_setServiceResources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        service: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResourceLimitsDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ResourceLimitsDto"];
         };
       };
     };

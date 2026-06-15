@@ -24,6 +24,7 @@ import { type Domain, type DeploymentView, DeploymentsService } from "./deployme
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
 import { AddDomainDto, DomainDto, UpdateDomainTargetDto } from "./dto/domain.dto";
+import { ResourceLimitsDto } from "./dto/resource-limits.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
 
 function domainToDto(row: Domain): DomainDto {
@@ -145,6 +146,35 @@ export class DeploymentsController {
     await this.deployments.removeDomain(id, domainId);
 
     return { ok: true };
+  }
+
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "service", type: String })
+  @ApiOkResponse({ type: ResourceLimitsDto })
+  @Get(":id/services/:service/resources")
+  async serviceResources(
+    @Param("id") id: string,
+    @Param("service") service: string,
+  ): Promise<ResourceLimitsDto> {
+    const deployment = await this.requireForApi(id);
+
+    return deployment.serviceResources?.[service] ?? {};
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "service", type: String })
+  @ApiBody({ type: ResourceLimitsDto })
+  @ApiOkResponse({ type: ResourceLimitsDto })
+  @Patch(":id/services/:service/resources")
+  async setServiceResources(
+    @Param("id") id: string,
+    @Param("service") service: string,
+    @Body() dto: ResourceLimitsDto,
+  ): Promise<ResourceLimitsDto> {
+    const updated = await this.deployments.updateServiceResources(id, service, dto);
+
+    return updated.serviceResources?.[service] ?? {};
   }
 
   private async requireForApi(id: string): Promise<DeploymentView> {

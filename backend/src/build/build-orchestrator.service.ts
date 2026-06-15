@@ -539,6 +539,8 @@ export class BuildOrchestrator {
       nanoCpus: deployment.nanoCpus ?? undefined,
       capAdd: deployment.capAdd ?? undefined,
       capDrop: deployment.capDrop ?? undefined,
+      logMaxSizeMb: deployment.logMaxSizeMb ?? undefined,
+      logMaxFiles: deployment.logMaxFiles ?? undefined,
       command: deployment.runCommand ? ["sh", "-c", deployment.runCommand] : undefined,
     });
 

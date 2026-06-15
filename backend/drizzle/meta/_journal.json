@@ -64,6 +64,13 @@
       "when": 1781554393456,
       "tag": "0008_blushing_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781556468142,
+      "tag": "0009_square_ezekiel_stane",
+      "breakpoints": true
     }
   ]
 }

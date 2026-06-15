@@ -74,17 +74,21 @@ export class UpdateDeploymentDto {
   @IsIn(RESTART)
   restartPolicy?: Deployment["restartPolicy"];
 
-  @ApiPropertyOptional({ type: Number, minimum: 16 })
+  @ApiPropertyOptional({ type: Number, minimum: 16, nullable: true })
   @IsOptional()
   @IsInt()
   @Min(16)
-  memoryLimitMb?: number;
+  memoryLimitMb?: number | null;
 
-  @ApiPropertyOptional({ type: Number, description: "CPU limit in nano-CPUs (1 CPU = 1e9)" })
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: "CPU limit in nano-CPUs (1 CPU = 1e9)",
+  })
   @IsOptional()
   @IsInt()
   @Min(0)
-  nanoCpus?: number;
+  nanoCpus?: number | null;
 
   @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
   @IsOptional()
@@ -97,6 +101,18 @@ export class UpdateDeploymentDto {
   @IsArray()
   @IsString({ each: true })
   capDrop?: string[];
+
+  @ApiPropertyOptional({ type: Number, example: 10, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  logMaxSizeMb?: number | null;
+
+  @ApiPropertyOptional({ type: Number, example: 3, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  logMaxFiles?: number | null;
 
   @ApiPropertyOptional({ type: String, example: "app.example.com" })
   @IsOptional()

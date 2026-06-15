@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Deployment } from "../deployments/deployments.service";
-import { DockerService, type VolumeMount } from "../docker/docker.service";
+import { type ContainerNetwork, DockerService, type VolumeMount } from "../docker/docker.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 
 const COMPOSE_PROJECT_LABEL = "com.docker.compose.project";
@@ -11,6 +11,9 @@ export interface DeploymentContainer {
   image: string;
   running: boolean;
   volumes: VolumeMount[];
+  // Compose service name; null for single-container deployments.
+  service: string | null;
+  networks: ContainerNetwork[];
 }
 
 // Discovers the live containers (and their named volumes) belonging to a deployment: compose stacks
@@ -33,6 +36,8 @@ export class ContainersService {
           image: info.image ?? "",
           running: info.running,
           volumes: info.mounts,
+          service: info.service ?? null,
+          networks: info.networks,
         });
       }
     }

@@ -73,6 +73,12 @@ export class DeploymentDto {
   @ApiProperty({ type: [String], nullable: true })
   capDrop!: string[] | null;
 
+  @ApiProperty({ type: Number, nullable: true })
+  logMaxSizeMb!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  logMaxFiles!: number | null;
+
   @ApiProperty({ enum: STATES })
   state!: (typeof STATES)[number];
 

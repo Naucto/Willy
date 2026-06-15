@@ -27,12 +27,20 @@ export interface RunContainerOptions {
   capAdd?: string[] | undefined;
   capDrop?: string[] | undefined;
   command?: string[] | undefined;
+  // Per-container log rotation overrides (fall back to the operator-wide default).
+  logMaxSizeMb?: number | undefined;
+  logMaxFiles?: number | undefined;
 }
 
 export interface VolumeMount {
   name: string;
   destination: string;
   rw: boolean;
+}
+
+export interface ContainerNetwork {
+  name: string;
+  ip: string | null;
 }
 
 export interface ContainerStatus {
@@ -43,6 +51,10 @@ export interface ContainerStatus {
   health: string | undefined;
   ip: string | undefined;
   mounts: VolumeMount[];
+  // Compose service name (com.docker.compose.service label), when part of a stack.
+  service: string | undefined;
+  // Networks the container is attached to, with its IP on each.
+  networks: ContainerNetwork[];
 }
 
 export interface OneShotOptions {
@@ -113,6 +125,24 @@ export class DockerService {
     };
   }
 
+  // Per-container log config: override max-size/max-file when set, else the operator-wide default.
+  private resolveLogConfig(
+    maxSizeMb?: number,
+    maxFiles?: number,
+  ): { Type: string; Config: Record<string, string> } {
+    if (maxSizeMb === undefined && maxFiles === undefined) {
+      return this.logConfig;
+    }
+
+    return {
+      Type: "json-file",
+      Config: {
+        "max-size": maxSizeMb ? `${maxSizeMb}m` : (this.logConfig.Config["max-size"] ?? "10m"),
+        "max-file": maxFiles ? String(maxFiles) : (this.logConfig.Config["max-file"] ?? "3"),
+      },
+    };
+  }
+
   async ping(): Promise<boolean> {
     try {
       await this.docker.ping();
@@ -179,7 +209,7 @@ export class DockerService {
         NanoCpus: options.nanoCpus,
         CapAdd: options.capAdd && options.capAdd.length > 0 ? options.capAdd : undefined,
         CapDrop: options.capDrop && options.capDrop.length > 0 ? options.capDrop : undefined,
-        LogConfig: this.logConfig,
+        LogConfig: this.resolveLogConfig(options.logMaxSizeMb, options.logMaxFiles),
       },
     });
 
@@ -254,6 +284,9 @@ export class DockerService {
     try {
       const info = await this.docker.getContainer(id).inspect();
       const ip = network ? info.NetworkSettings.Networks[network]?.IPAddress : undefined;
+      const networks: ContainerNetwork[] = Object.entries(info.NetworkSettings.Networks ?? {}).map(
+        ([name, net]) => ({ name, ip: net?.IPAddress || null }),
+      );
       const mounts: VolumeMount[] = (info.Mounts ?? [])
         .filter((mount) => mount.Type === "volume" && Boolean(mount.Name))
         .map((mount) => ({
@@ -270,6 +303,8 @@ export class DockerService {
         health: info.State.Health?.Status,
         ip: ip || undefined,
         mounts,
+        service: info.Config?.Labels?.["com.docker.compose.service"] || undefined,
+        networks,
       };
     } catch {
       return undefined;
