@@ -20,7 +20,7 @@ import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const DRAWER_WIDTH = 220;
-const COLLAPSED_WIDTH = 72;
+const COLLAPSED_WIDTH = 64;
 
 const NAV = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
@@ -109,10 +109,10 @@ export function AppShell() {
                 selected={location.pathname.startsWith(item.to)}
                 sx={{ justifyContent: open ? "initial" : "center", px: 2.5 }}
               >
-                <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : "auto", justifyContent: "center" }}>
+                <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 0, justifyContent: "center" }}>
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText primary={item.label} sx={{ opacity: open ? 1 : 0 }} />
+                {open && <ListItemText primary={item.label} />}
               </ListItemButton>
             </Tooltip>
           ))}
