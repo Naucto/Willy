@@ -18,9 +18,8 @@ import {
   BackupDestinationsService,
   type DestinationConfig,
   type DestinationType,
-  type FileTransferConfig,
-  type S3Config,
 } from "./destinations.service";
+import { OffsiteService } from "./offsite/offsite.service";
 
 export class BackupError extends WillyError {}
 
@@ -55,6 +54,7 @@ export class BackupsService {
     private readonly deployments: DeploymentsService,
     private readonly containers: ContainersService,
     private readonly destinations: BackupDestinationsService,
+    private readonly offsite: OffsiteService,
     config: ConfigService,
   ) {
     this.dir = config.get<string>("BACKUPS_DIR") ?? "/var/lib/willy/backups";
@@ -110,8 +110,13 @@ export class BackupsService {
     this.queue.enqueue(target, () => this.pruneTarget(target, keep));
   }
 
-  // Push a finished artifact to an offsite destination (S3 / FTP / SFTP). Runs in the background;
-  // offsiteUrl is set on success.
+  // Probes a destination's connectivity + credentials before it's saved (delegated to the driver).
+  testConnection(type: DestinationType, config: DestinationConfig): Promise<void> {
+    return this.offsite.test(type, config);
+  }
+
+  // Push a finished artifact to an offsite destination (S3 / FTP / SFTP / SSH). Runs in the
+  // background; offsiteUrl is set on success.
   async pushOffsite(backupId: string, destinationId: string): Promise<void> {
     const backup = await this.get(backupId);
 
@@ -213,73 +218,11 @@ export class BackupsService {
     config: DestinationConfig,
   ): Promise<void> {
     try {
-      const url =
-        type === "S3"
-          ? await this.pushS3(file, config as S3Config)
-          : await this.pushFileTransfer(file, type, config as FileTransferConfig);
-
+      const url = await this.offsite.push(type, file, config);
       await this.db.update(backups).set({ offsiteUrl: url }).where(eq(backups.id, id));
     } catch (error) {
       this.logger.warn(`offsite push ${id} failed: ${describeError(error)}`);
     }
-  }
-
-  private async pushS3(file: string, config: S3Config): Promise<string> {
-    const key = `${config.prefix ? `${config.prefix.replace(/\/+$/, "")}/` : ""}${file}`;
-    const url = `s3://${config.bucket}/${key}`;
-
-    const result = await this.docker.runToCompletion({
-      image: "amazon/aws-cli:2.15.30",
-      binds: [`${this.volume}:/backup:ro`],
-      env: {
-        AWS_ACCESS_KEY_ID: config.accessKeyId,
-        AWS_SECRET_ACCESS_KEY: config.secretAccessKey,
-        AWS_DEFAULT_REGION: config.region ?? "us-east-1",
-      },
-      command: [
-        "s3",
-        "cp",
-        `/backup/${file}`,
-        url,
-        ...(config.endpoint ? ["--endpoint-url", config.endpoint] : []),
-      ],
-    });
-
-    if (result.exitCode !== 0) {
-      throw new BackupError(`s3 cp exited ${result.exitCode}: ${result.logs.slice(0, 300)}`);
-    }
-
-    return url;
-  }
-
-  private async pushFileTransfer(
-    file: string,
-    type: DestinationType,
-    config: FileTransferConfig,
-  ): Promise<string> {
-    const scheme = type === "SFTP" ? "sftp" : "ftp";
-    const port = config.port ?? (type === "SFTP" ? 22 : 21);
-    const dir = config.path ? `/${config.path.replace(/^\/+|\/+$/g, "")}/` : "/";
-    const base = `${scheme}://${config.host}:${port}${dir}`;
-    // SFTP can't verify the host key non-interactively here; FTP needs the dir created.
-    const flags = type === "SFTP" ? "--insecure" : "--ftp-create-dirs";
-
-    const result = await this.docker.runToCompletion({
-      image: "curlimages/curl:8.11.1",
-      binds: [`${this.volume}:/backup:ro`],
-      entrypoint: ["sh", "-c"],
-      // Credentials come via env so they never appear in the command line / logs.
-      env: { WILLY_USER: config.username, WILLY_PASS: config.password },
-      command: [`curl -fsS ${flags} -u "$WILLY_USER:$WILLY_PASS" -T /backup/${file} "${base}"`],
-    });
-
-    if (result.exitCode !== 0) {
-      throw new BackupError(
-        `${scheme} upload exited ${result.exitCode}: ${result.logs.slice(0, 300)}`,
-      );
-    }
-
-    return `${base}${file}`;
   }
 
   private async pruneTarget(target: string, keep: number): Promise<void> {

@@ -19,7 +19,7 @@ export interface S3Config {
   secretAccessKey: string;
 }
 
-// FTP and SFTP share the same connection shape.
+// FTP and SFTP share the same (password-based) connection shape.
 export interface FileTransferConfig {
   host: string;
   port?: number;
@@ -28,13 +28,17 @@ export interface FileTransferConfig {
   path?: string;
 }
 
-export type DestinationConfig = S3Config | FileTransferConfig;
-
-export interface CreateDestinationInput {
-  name: string;
-  type: DestinationType;
-  config: Record<string, unknown>;
+// SSH/SCP: a private key (git-over-ssh style) and/or a password.
+export interface SshConfig {
+  host: string;
+  port?: number;
+  username: string;
+  password?: string;
+  privateKey?: string;
+  path?: string;
 }
+
+export type DestinationConfig = S3Config | FileTransferConfig | SshConfig;
 
 function requireString(config: Record<string, unknown>, key: string): string {
   const value = config[key];
@@ -65,15 +69,24 @@ export class BackupDestinationsService {
     return this.db.select().from(backupDestinations).orderBy(desc(backupDestinations.createdAt));
   }
 
-  async create(input: CreateDestinationInput): Promise<DestinationRow> {
-    const config = this.normalise(input.type, input.config);
+  // Validates + normalises raw config for a type (throws on missing fields). Public so the
+  // controller can build the config once, test the connection, then persist it.
+  buildConfig(type: DestinationType, raw: Record<string, unknown>): DestinationConfig {
+    return this.normalise(type, raw);
+  }
+
+  async create(
+    name: string,
+    type: DestinationType,
+    config: DestinationConfig,
+  ): Promise<DestinationRow> {
     const sealed = this.crypto.encrypt(JSON.stringify(config));
 
     const [row] = await this.db
       .insert(backupDestinations)
       .values({
-        name: input.name,
-        type: input.type,
+        name,
+        type,
         cipherText: sealed.cipherText,
         nonce: sealed.nonce,
         authTag: sealed.authTag,
@@ -127,6 +140,24 @@ export class BackupDestinationsService {
 
     const port = config.port;
     const path = optionalString(config, "path");
+
+    if (type === "SSH") {
+      const password = optionalString(config, "password");
+      const privateKey = optionalString(config, "privateKey");
+
+      if (!password && !privateKey) {
+        throw new DestinationError("SSH destination needs a private key or a password");
+      }
+
+      return {
+        host: requireString(config, "host"),
+        username: requireString(config, "username"),
+        ...(typeof port === "number" ? { port } : {}),
+        ...(path ? { path } : {}),
+        ...(password ? { password } : {}),
+        ...(privateKey ? { privateKey } : {}),
+      };
+    }
 
     return {
       host: requireString(config, "host"),

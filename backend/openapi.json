@@ -1472,6 +1472,42 @@
         ]
       }
     },
+    "/backups/destinations/test": {
+      "post": {
+        "operationId": "BackupDestinationsController_test",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBackupDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
     "/backups/destinations/{id}": {
       "delete": {
         "operationId": "BackupDestinationsController_remove",
@@ -2505,7 +2541,8 @@
             "enum": [
               "S3",
               "FTP",
-              "SFTP"
+              "SFTP",
+              "SSH"
             ]
           },
           "createdAt": {
@@ -2532,7 +2569,8 @@
             "enum": [
               "S3",
               "FTP",
-              "SFTP"
+              "SFTP",
+              "SSH"
             ]
           },
           "bucket": {
@@ -2567,6 +2605,9 @@
             "type": "string"
           },
           "path": {
+            "type": "string"
+          },
+          "privateKey": {
             "type": "string"
           }
         },

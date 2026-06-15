@@ -1,0 +1,44 @@
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DockerService } from "../../docker/docker.service";
+import type { DestinationConfig, DestinationType } from "../destinations.service";
+import { FtpOffsiteDriver, SftpOffsiteDriver } from "./curl.driver";
+import { OffsiteError, type OffsiteDriver } from "./offsite-driver";
+import { S3OffsiteDriver } from "./s3.driver";
+import { SshOffsiteDriver } from "./ssh.driver";
+
+// Registry over the OffsiteDriver implementations — resolves one by destination type.
+@Injectable()
+export class OffsiteService {
+  private readonly drivers: Map<DestinationType, OffsiteDriver>;
+
+  constructor(docker: DockerService, config: ConfigService) {
+    const volume = config.get<string>("BACKUPS_VOLUME") ?? "willy_backups";
+    const drivers: OffsiteDriver[] = [
+      new S3OffsiteDriver(docker, volume),
+      new FtpOffsiteDriver(docker, volume),
+      new SftpOffsiteDriver(docker, volume),
+      new SshOffsiteDriver(docker, volume),
+    ];
+
+    this.drivers = new Map(drivers.map((driver) => [driver.type, driver]));
+  }
+
+  test(type: DestinationType, config: DestinationConfig): Promise<void> {
+    return this.driver(type).test(config);
+  }
+
+  push(type: DestinationType, file: string, config: DestinationConfig): Promise<string> {
+    return this.driver(type).push(file, config);
+  }
+
+  private driver(type: DestinationType): OffsiteDriver {
+    const driver = this.drivers.get(type);
+
+    if (!driver) {
+      throw new OffsiteError(`No offsite driver for ${type}`);
+    }
+
+    return driver;
+  }
+}

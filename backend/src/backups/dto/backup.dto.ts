@@ -36,7 +36,7 @@ export class BackupDto {
   finishedAt!: string | null;
 }
 
-const DESTINATION_TYPES = ["S3", "FTP", "SFTP"] as const;
+const DESTINATION_TYPES = ["S3", "FTP", "SFTP", "SSH"] as const;
 type DestinationType = (typeof DESTINATION_TYPES)[number];
 
 export class BackupDestinationDto {
@@ -118,6 +118,12 @@ export class CreateBackupDestinationDto {
   @IsOptional()
   @IsString()
   path?: string;
+
+  // SSH only: a PEM private key (git-over-ssh style); alternative to password.
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  privateKey?: string;
 }
 
 export class VolumesDto {

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."backup_destination_type" ADD VALUE 'SSH';

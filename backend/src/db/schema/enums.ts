@@ -44,7 +44,12 @@ export const databaseEngineEnum = pgEnum("database_engine", [
   "MONGO",
 ]);
 export const backupKindEnum = pgEnum("backup_kind", ["VOLUME_TAR", "PG_DUMP", "S3_SYNC"]);
-export const backupDestinationTypeEnum = pgEnum("backup_destination_type", ["S3", "FTP", "SFTP"]);
+export const backupDestinationTypeEnum = pgEnum("backup_destination_type", [
+  "S3",
+  "FTP",
+  "SFTP",
+  "SSH",
+]);
 export const backupStatusEnum = pgEnum("backup_status", [
   "PENDING",
   "RUNNING",
