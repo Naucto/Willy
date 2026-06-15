@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   CircularProgress,
@@ -16,10 +17,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useDeployment, useReleases } from "../api/hooks";
+import { useDeployment, useReleases, useRollback } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
+import { Console } from "../components/Console";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
@@ -27,7 +30,14 @@ import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
 
-type TabKey = "overview" | "build" | "runtime" | "env" | "settings";
+type TabKey = "overview" | "build" | "runtime" | "console" | "env" | "settings";
+
+function isRunning(deployment: Deployment): boolean {
+  return (
+    deployment.activeReleaseId !== null &&
+    ["RUNNING", "DEGRADED", "DEPLOYING"].includes(deployment.state)
+  );
+}
 
 function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
@@ -73,6 +83,7 @@ export function DeploymentDetailPage() {
         <Tab label="Overview" value="overview" />
         <Tab label="Build logs" value="build" />
         <Tab label="Runtime logs" value="runtime" />
+        <Tab label="Console" value="console" />
         <Tab label="Env" value="env" />
         <Tab label="Settings" value="settings" />
       </Tabs>
@@ -80,6 +91,12 @@ export function DeploymentDetailPage() {
       {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
       {tab === "build" && <BuildLogsTab deploymentId={id} />}
       {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
+      {tab === "console" &&
+        (isRunning(deployment) ? (
+          <Console deploymentId={id} />
+        ) : (
+          <Alert severity="info">Console is available while the deployment is running.</Alert>
+        ))}
       {tab === "env" && <EnvVarEditor deploymentId={id} />}
       {tab === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
@@ -118,16 +135,40 @@ function OverviewTab({
         <Typography variant="h6" sx={{ mb: 1 }}>
           Releases
         </Typography>
-        <ReleasesTable releases={releases} />
+        <ReleasesTable
+          releases={releases}
+          deploymentId={deploymentId}
+          activeReleaseId={deployment.activeReleaseId}
+        />
       </Box>
     </Stack>
   );
 }
 
-function ReleasesTable({ releases }: { releases: Release[] | undefined }) {
+function ReleasesTable({
+  releases,
+  deploymentId,
+  activeReleaseId,
+}: {
+  releases: Release[] | undefined;
+  deploymentId: string;
+  activeReleaseId: string | null;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const rollback = useRollback(deploymentId);
+
   if (!releases || releases.length === 0) {
     return <Alert severity="info">No releases yet. Trigger a deploy.</Alert>;
   }
+
+  const onRollback = async (releaseId: string) => {
+    try {
+      await rollback.mutateAsync(releaseId);
+      enqueueSnackbar("Rollback queued", { variant: "success" });
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
 
   return (
     <Table size="small">
@@ -137,11 +178,12 @@ function ReleasesTable({ releases }: { releases: Release[] | undefined }) {
           <TableCell>Commit</TableCell>
           <TableCell>Image</TableCell>
           <TableCell>Queued</TableCell>
+          <TableCell align="right" />
         </TableRow>
       </TableHead>
       <TableBody>
         {releases.map((release) => (
-          <TableRow key={release.id}>
+          <TableRow key={release.id} selected={release.id === activeReleaseId}>
             <TableCell>
               <StatusBadge status={release.status} />
             </TableCell>
@@ -150,6 +192,17 @@ function ReleasesTable({ releases }: { releases: Release[] | undefined }) {
             </TableCell>
             <TableCell sx={{ fontFamily: "monospace" }}>{release.imageTag ?? "—"}</TableCell>
             <TableCell>{new Date(release.queuedAt).toLocaleString()}</TableCell>
+            <TableCell align="right">
+              {release.imageTag && release.id !== activeReleaseId && (
+                <Button
+                  size="small"
+                  disabled={rollback.isPending}
+                  onClick={() => void onRollback(release.id)}
+                >
+                  Rollback
+                </Button>
+              )}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>

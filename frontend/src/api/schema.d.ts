@@ -180,6 +180,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/rollback/{releaseId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DeploymentActionsController_rollback"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/releases": {
     parameters: {
       query?: never;
@@ -222,6 +238,22 @@ export interface paths {
     get: operations["WebhooksController_status"];
     put?: never;
     post: operations["WebhooksController_rotate"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/streams/ticket": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ConsoleController_ticket"];
     delete?: never;
     options?: never;
     head?: never;
@@ -386,6 +418,9 @@ export interface components {
     WebhookSecretDto: {
       secret: string;
       path: string;
+    };
+    StreamTicketDto: {
+      ticket: string;
     };
   };
   responses: never;
@@ -713,6 +748,28 @@ export interface operations {
       };
     };
   };
+  DeploymentActionsController_rollback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        releaseId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
   DeploymentActionsController_listReleases: {
     parameters: {
       query?: never;
@@ -793,6 +850,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["WebhookSecretDto"];
+        };
+      };
+    };
+  };
+  ConsoleController_ticket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["StreamTicketDto"];
         };
       };
     };

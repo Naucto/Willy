@@ -96,6 +96,20 @@ export function useDeploy(id: string) {
   });
 }
 
+export function useRollback(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (releaseId: string) =>
+      unwrap(
+        await api.POST("/deployments/{id}/rollback/{releaseId}", {
+          params: { path: { id, releaseId } },
+        }),
+      ),
+    onSuccess: () => invalidateDeployment(queryClient, id),
+  });
+}
+
 export function useStop(id: string) {
   const queryClient = useQueryClient();
 
