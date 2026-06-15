@@ -1,9 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Build output (both workspaces emit to dist/; no bare build/ — it would shadow backend/src/build/)
 dist/
-build/
 *.tsbuildinfo
 
 # Test / coverage
