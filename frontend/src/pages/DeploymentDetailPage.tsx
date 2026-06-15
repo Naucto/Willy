@@ -33,6 +33,7 @@ import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelect
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
+import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
 import { NetworkingTab } from "../components/NetworkingTab";
@@ -40,6 +41,7 @@ import { ResourcesTab } from "../components/ResourcesTab";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
+import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
 
 function isRunning(deployment: Deployment): boolean {
@@ -133,12 +135,15 @@ export function DeploymentDetailPage() {
 
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+      {/* Single non-wrapping row so the actions area stays width-constrained and folds to icons
+          when cramped (a wrapping row would give it a full line and never fold). The name
+          ellipsizes to absorb the squeeze. */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "nowrap", minWidth: 0 }}>
+        <Typography variant="h4" noWrap sx={{ fontWeight: 700, minWidth: 0, flexShrink: 1 }}>
           {deployment.name}
         </Typography>
         <StatusBadge status={deployment.state} />
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
           {deployment.type}
         </Typography>
         {showSelector && containers && (
@@ -169,7 +174,9 @@ export function DeploymentDetailPage() {
       {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
       {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
       {active === "networking" && <NetworkingTab container={selected} />}
+      {active === "domains" && <DomainsManager deployment={deployment} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
+      {active === "webhook" && <WebhookTab deployment={deployment} />}
       {active === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );

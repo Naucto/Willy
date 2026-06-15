@@ -5,6 +5,7 @@ import DnsIcon from "@mui/icons-material/Dns";
 import HistoryIcon from "@mui/icons-material/History";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import LanguageIcon from "@mui/icons-material/Language";
 import MemoryIcon from "@mui/icons-material/Memory";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
@@ -14,6 +15,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import StorageIcon from "@mui/icons-material/Storage";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import TuneIcon from "@mui/icons-material/Tune";
+import WebhookIcon from "@mui/icons-material/Webhook";
 import {
   AppBar,
   Box,
@@ -61,7 +63,9 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   env: <TuneIcon />,
   volumes: <StorageIcon />,
   networking: <HubOutlinedIcon />,
+  domains: <LanguageIcon />,
   resources: <MemoryIcon />,
+  webhook: <WebhookIcon />,
   settings: <SettingsIcon />,
 };
 
@@ -184,7 +188,7 @@ export function AppShell() {
             <>
               {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
               <Divider sx={{ my: 1 }} />
-              {deploymentSections(deployment?.type === "CRON")
+              {deploymentSections(deployment?.type ?? "WEB")
                 .filter((section) => hasContainers || !CONTAINER_SCOPED.has(section.key))
                 .map((section) => {
                   const container = new URLSearchParams(location.search).get("container");

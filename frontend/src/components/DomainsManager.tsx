@@ -32,6 +32,14 @@ import type { Deployment, DeploymentDomain } from "../api/types";
 import { describeError } from "../errors";
 import { DomainPicker } from "./DomainPicker";
 
+// A valid FQDN: 2+ dot-separated labels, each 1-63 chars, no leading/trailing hyphen, ≤253 total.
+// Allows *.localhost (local dev) and real domains; rejects single labels and obviously bad input.
+const FQDN_RE = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/;
+
+function isValidFqdn(value: string): boolean {
+  return FQDN_RE.test(value.trim());
+}
+
 // Live multi-domain editor. Each domain can be pinned to a specific container/service (compose
 // only) and a specific port; blank falls back to the deployment default. Changes apply on the next
 // deploy/restart.
@@ -77,8 +85,12 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     }
   };
 
+  const fqdnInvalid = fqdn.trim().length > 0 && !isValidFqdn(fqdn);
+
   const onAdd = async () => {
-    if (!fqdn.trim()) {
+    if (!isValidFqdn(fqdn)) {
+      enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
+
       return;
     }
 
@@ -141,14 +153,13 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
       width: 110,
       editable: true,
       type: "number",
-      renderCell: ({ value }) =>
-        value ? (
-          String(value)
-        ) : (
-          <Typography variant="body2" color="text.disabled">
-            {defaultPort}
-          </Typography>
-        ),
+      // Inline span (not a block Typography) so the value stays vertically centred in the cell;
+      // the default is shown muted.
+      renderCell: ({ value }) => (
+        <Box component="span" sx={{ color: value ? "inherit" : "text.disabled" }}>
+          {value ?? defaultPort}
+        </Box>
+      ),
     },
     {
       field: "actions",
@@ -200,7 +211,14 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
           </Box>
 
           <Stack spacing={1.5}>
-            <DomainPicker value={fqdn} onChange={setFqdn} />
+            <Box>
+              <DomainPicker value={fqdn} onChange={setFqdn} />
+              {fqdnInvalid && (
+                <Typography variant="caption" color="error" sx={{ ml: 1.75, display: "block" }}>
+                  Enter a valid domain, e.g. app.example.com
+                </Typography>
+              )}
+            </Box>
             <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
               {isCompose && (
                 <TextField
@@ -230,7 +248,7 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
               <Box sx={{ flexGrow: 1 }} />
               <Button
                 variant="contained"
-                disabled={addDomain.isPending || !fqdn.trim()}
+                disabled={addDomain.isPending || !isValidFqdn(fqdn)}
                 onClick={() => void onAdd()}
               >
                 Add domain
