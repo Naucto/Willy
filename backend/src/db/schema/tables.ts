@@ -15,6 +15,7 @@ import {
   backupDestinationTypeEnum,
   backupKindEnum,
   backupStatusEnum,
+  cronRunStatusEnum,
   buildStrategyEnum,
   certStatusEnum,
   databaseEngineEnum,
@@ -228,6 +229,22 @@ export const backups = pgTable(
     createdAt,
   },
   (t) => [index("backups_deployment_created_idx").on(t.deploymentId, t.createdAt)],
+);
+
+export const cronRuns = pgTable(
+  "cron_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    deploymentId: uuid("deployment_id")
+      .notNull()
+      .references(() => deployments.id, { onDelete: "cascade" }),
+    status: cronRunStatusEnum("status").notNull().default("RUNNING"),
+    exitCode: integer("exit_code"),
+    logs: text("logs"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("cron_runs_deployment_started_idx").on(t.deploymentId, t.startedAt)],
 );
 
 export const backupDestinations = pgTable("backup_destinations", {

@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ScheduleModule } from "@nestjs/schedule";
 import { DeploymentsModule } from "../deployments/deployments.module";
 import { BackupQueue } from "./backup-queue";
 import { BackupsController } from "./backups.controller";
@@ -13,7 +12,7 @@ import { BackupSchedulesService } from "./schedules.service";
 import { DeploymentVolumesController } from "./volumes.controller";
 
 @Module({
-  imports: [DeploymentsModule, ScheduleModule.forRoot()],
+  imports: [DeploymentsModule],
   controllers: [
     BackupsController,
     BackupSchedulesController,

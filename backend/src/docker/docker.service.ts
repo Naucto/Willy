@@ -44,13 +44,16 @@ export interface ContainerStatus {
 
 export interface OneShotOptions {
   image: string;
-  command: string[];
+  // Omit to use the image's default CMD (e.g. a CRON image with a baked-in entrypoint).
+  command?: string[] | undefined;
   env?: Record<string, string> | undefined;
   // Docker bind specs, e.g. "volume-or-path:/data:ro".
   binds?: string[] | undefined;
   entrypoint?: string[] | undefined;
   // Network to join (e.g. so pg_dump can reach a database container).
   network?: string | undefined;
+  memoryMb?: number | undefined;
+  nanoCpus?: number | undefined;
 }
 
 export interface OneShotResult {
@@ -201,6 +204,8 @@ export class DockerService {
       HostConfig: {
         Binds: options.binds,
         NetworkMode: options.network,
+        Memory: options.memoryMb ? options.memoryMb * 1024 * 1024 : undefined,
+        NanoCpus: options.nanoCpus,
         LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "1" } },
       },
     });

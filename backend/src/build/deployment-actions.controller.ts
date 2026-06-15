@@ -6,8 +6,23 @@ import type { AuthUser } from "../auth/jwt-payload.interface";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { BuildOrchestrator } from "./build-orchestrator.service";
+import { type CronRun, CronRunsService } from "./cron-runs.service";
+import { CronService } from "./cron.service";
+import { CronRunDto } from "./dto/cron-run.dto";
 import { ReleaseDto } from "./dto/release.dto";
 import { type Release, ReleasesService } from "./releases.service";
+
+function cronRunToDto(row: CronRun): CronRunDto {
+  return {
+    id: row.id,
+    deploymentId: row.deploymentId,
+    status: row.status,
+    exitCode: row.exitCode,
+    logs: row.logs,
+    startedAt: row.startedAt.toISOString(),
+    finishedAt: row.finishedAt?.toISOString() ?? null,
+  };
+}
 
 @ApiTags("deployments")
 @ApiBearerAuth()
@@ -18,7 +33,25 @@ export class DeploymentActionsController {
     private readonly orchestrator: BuildOrchestrator,
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
+    private readonly cron: CronService,
+    private readonly cronRuns: CronRunsService,
   ) {}
+
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(202)
+  @ApiOkResponse({ type: OkResponseDto })
+  @Post("deployments/:id/run")
+  async run(@Param("id") id: string): Promise<{ ok: true }> {
+    await this.cron.runNow(id);
+
+    return { ok: true };
+  }
+
+  @ApiOkResponse({ type: [CronRunDto] })
+  @Get("deployments/:id/cron-runs")
+  async cronRunHistory(@Param("id") id: string): Promise<CronRunDto[]> {
+    return (await this.cronRuns.listForDeployment(id)).map(cronRunToDto);
+  }
 
   @Roles("ADMIN", "OPERATOR")
   @HttpCode(202)

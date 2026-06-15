@@ -8,6 +8,7 @@ import { GitService } from "../git/git.service";
 import { LabelGeneratorService, OWNER_LABEL } from "../traefik/label-generator.service";
 import { BuildLogStore } from "./build-log.store";
 import { BuildQueue } from "./build-queue";
+import { CronService } from "./cron.service";
 import type { Release } from "./releases.service";
 import { ReleasesService } from "./releases.service";
 import { ComposeService } from "./strategies/compose.service";
@@ -66,6 +67,7 @@ export class BuildOrchestrator {
     private readonly compose: ComposeService,
     private readonly buildLog: BuildLogStore,
     private readonly queue: BuildQueue,
+    private readonly cron: CronService,
   ) {}
 
   async deploy(deploymentId: string, actorId?: string): Promise<Release> {
@@ -103,6 +105,15 @@ export class BuildOrchestrator {
       throw new BadRequestException("no active release to start; deploy first");
     }
 
+    // CRON has no container to relaunch — re-arming the schedule is the "start".
+    if (deployment.type === "CRON") {
+      await this.deployments.setState(deploymentId, "RUNNING");
+      const armed = await this.requireDeployment(deploymentId);
+      this.cron.sync(armed);
+
+      return;
+    }
+
     await this.deployments.setState(deploymentId, "DEPLOYING");
     this.queue.enqueue(deploymentId, () => this.runRelaunch(deploymentId));
   }
@@ -118,6 +129,10 @@ export class BuildOrchestrator {
 
     if (deployment.buildStrategy === "COMPOSE") {
       throw new BadRequestException("rollback is not supported for compose deployments");
+    }
+
+    if (deployment.type === "CRON") {
+      throw new BadRequestException("rollback is not supported for CRON deployments");
     }
 
     const target = await this.releases.findById(releaseId);
@@ -161,6 +176,12 @@ export class BuildOrchestrator {
   async teardown(deploymentId: string): Promise<void> {
     const deployment = await this.requireDeployment(deploymentId);
 
+    if (deployment.type === "CRON") {
+      this.cron.unregister(deploymentId);
+
+      return;
+    }
+
     if (deployment.buildStrategy === "COMPOSE") {
       await this.compose.down(deployment);
 
@@ -174,7 +195,9 @@ export class BuildOrchestrator {
     try {
       const deployment = await this.requireDeployment(deploymentId);
 
-      if (deployment.buildStrategy === "COMPOSE") {
+      if (deployment.type === "CRON") {
+        this.cron.unregister(deploymentId);
+      } else if (deployment.buildStrategy === "COMPOSE") {
         await this.compose.down(deployment);
       } else {
         await this.removeAllContainers(deploymentId);
@@ -283,6 +306,31 @@ export class BuildOrchestrator {
         });
       } finally {
         await this.git.cleanup(dir);
+      }
+
+      // CRON deployments don't run a long-lived container — the image is run on a schedule.
+      if (deployment.type === "CRON") {
+        await this.releases.setStatus(releaseId, "LIVE", { imageTag });
+        await this.deployments.setActiveRelease(deployment.id, releaseId);
+        await this.deployments.setState(deployment.id, "RUNNING");
+
+        if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
+          await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
+        }
+
+        await this.cleanupImages(deployment.name, imageTag);
+        const scheduled = await this.deployments.findById(deployment.id);
+
+        if (scheduled) {
+          this.cron.sync(scheduled);
+        }
+
+        this.buildLog.append(
+          releaseId,
+          `cron scheduled (${deployment.cronExpr ?? "no expression"})`,
+        );
+
+        return;
       }
 
       await this.releases.setStatus(releaseId, "HEALTHCHECKING", { imageTag });

@@ -402,6 +402,79 @@
         ]
       }
     },
+    "/deployments/{id}/run": {
+      "post": {
+        "operationId": "DeploymentActionsController_run",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/cron-runs": {
+      "get": {
+        "operationId": "DeploymentActionsController_cronRunHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CronRunDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/deployments/{id}/deploy": {
       "post": {
         "operationId": "DeploymentActionsController_deploy",
@@ -2064,6 +2137,53 @@
         },
         "required": [
           "value"
+        ]
+      },
+      "CronRunDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ]
+          },
+          "exitCode": {
+            "type": "number",
+            "nullable": true
+          },
+          "logs": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "deploymentId",
+          "status",
+          "exitCode",
+          "logs",
+          "startedAt",
+          "finishedAt"
         ]
       },
       "ReleaseDto": {

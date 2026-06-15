@@ -6,6 +6,8 @@ import { TraefikModule } from "../traefik/traefik.module";
 import { BuildLogStore } from "./build-log.store";
 import { BuildOrchestrator } from "./build-orchestrator.service";
 import { BuildQueue } from "./build-queue";
+import { CronRunsService } from "./cron-runs.service";
+import { CronService } from "./cron.service";
 import { DeploymentActionsController } from "./deployment-actions.controller";
 import { ReleasesService } from "./releases.service";
 import { ComposeService } from "./strategies/compose.service";
@@ -23,6 +25,8 @@ import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
     DockerfileStrategy,
     NixpacksStrategy,
     ComposeService,
+    CronService,
+    CronRunsService,
   ],
   exports: [BuildOrchestrator, ReleasesService, BuildLogStore],
 })

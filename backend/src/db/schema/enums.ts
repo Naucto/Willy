@@ -50,6 +50,7 @@ export const backupDestinationTypeEnum = pgEnum("backup_destination_type", [
   "SFTP",
   "SSH",
 ]);
+export const cronRunStatusEnum = pgEnum("cron_run_status", ["RUNNING", "SUCCESS", "FAILED"]);
 export const backupStatusEnum = pgEnum("backup_status", [
   "PENDING",
   "RUNNING",

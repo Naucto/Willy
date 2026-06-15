@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AuthModule } from "./auth/auth.module";
 import { BackupsModule } from "./backups/backups.module";
 import { BuildModule } from "./build/build.module";
@@ -24,6 +25,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    ScheduleModule.forRoot(),
     DbModule,
     CryptoModule,
     DockerModule,
