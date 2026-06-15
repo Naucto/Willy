@@ -12,6 +12,7 @@ import {
   composeConfig,
 } from "../../deployments/deployments.service";
 import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
+import { EnvVarsService } from "../../env-vars/env-vars.service";
 import { DockerService } from "../../docker/docker.service";
 import {
   LabelGeneratorService,
@@ -88,6 +89,7 @@ export class ComposeService {
     private readonly docker: DockerService,
     private readonly deployments: DeploymentsService,
     private readonly labels: LabelGeneratorService,
+    private readonly envVars: EnvVarsService,
   ) {
     const host = config.get<string>("DOCKER_PROXY_HOST") ?? "docker-socket-proxy";
     const port = config.get<number>("DOCKER_PROXY_PORT") ?? 2375;
@@ -203,6 +205,21 @@ export class ComposeService {
 
       if (Object.keys(fragment).length > 0) {
         services[name] = { ...(services[name] ?? {}), ...fragment };
+      }
+    }
+
+    // Inject Willy's encrypted env per service: shared ("") vars plus each service's own. Covers the
+    // services Willy already writes (web/targeted/resourced) and any service with its own vars.
+    const envServices = new Set([
+      ...Object.keys(services),
+      ...(await this.envVars.servicesWithEnv(deployment.id)),
+    ]);
+
+    for (const name of envServices) {
+      const env = await this.envVars.resolveForInjection(deployment.id, "RUNTIME", name);
+
+      if (Object.keys(env).length > 0) {
+        services[name] = { ...(services[name] ?? {}), environment: env };
       }
     }
 

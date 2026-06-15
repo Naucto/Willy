@@ -157,10 +157,15 @@ export const envVars = pgTable(
     keyVersion: integer("key_version").notNull().default(1),
     scope: envScopeEnum("scope").notNull().default("RUNTIME"),
     isSecret: boolean("is_secret").notNull().default(true),
+    // Compose service this var is scoped to; "" = deployment-wide (single container, or shared
+    // across all compose services).
+    targetService: text("target_service").notNull().default(""),
     createdAt,
     updatedAt,
   },
-  (t) => [uniqueIndex("env_vars_deployment_key_idx").on(t.deploymentId, t.key)],
+  (t) => [
+    uniqueIndex("env_vars_deployment_service_key_idx").on(t.deploymentId, t.targetService, t.key),
+  ],
 );
 
 export const webhookSecrets = pgTable("webhook_secrets", {

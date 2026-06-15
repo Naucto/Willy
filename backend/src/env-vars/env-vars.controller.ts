@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Put, Query } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -20,14 +21,19 @@ export class EnvVarsController {
   constructor(private readonly envVars: EnvVarsService) {}
 
   @ApiOkResponse({ type: [MaskedEnvVarDto] })
+  @ApiQuery({ name: "service", required: false, type: String })
   @Get()
-  list(@Param("id") deploymentId: string): Promise<MaskedEnvVar[]> {
-    return this.envVars.listMasked(deploymentId);
+  list(
+    @Param("id") deploymentId: string,
+    @Query("service") service?: string,
+  ): Promise<MaskedEnvVar[]> {
+    return this.envVars.listMasked(deploymentId, service ?? "");
   }
 
   @Roles("ADMIN", "OPERATOR")
   @HttpCode(204)
   @ApiParam({ name: "key", type: String })
+  @ApiQuery({ name: "service", required: false, type: String })
   @ApiBody({ type: SetEnvVarDto })
   @ApiNoContentResponse()
   @Put(":key")
@@ -35,19 +41,26 @@ export class EnvVarsController {
     @Param("id") deploymentId: string,
     @Param("key") key: string,
     @Body() dto: SetEnvVarDto,
+    @Query("service") service?: string,
   ): Promise<void> {
     await this.envVars.set(deploymentId, key, dto.value, {
       scope: dto.scope,
       isSecret: dto.isSecret,
+      targetService: service ?? "",
     });
   }
 
   @Roles("ADMIN", "OPERATOR")
   @HttpCode(204)
   @ApiParam({ name: "key", type: String })
+  @ApiQuery({ name: "service", required: false, type: String })
   @ApiNoContentResponse()
   @Delete(":key")
-  async remove(@Param("id") deploymentId: string, @Param("key") key: string): Promise<void> {
-    await this.envVars.delete(deploymentId, key);
+  async remove(
+    @Param("id") deploymentId: string,
+    @Param("key") key: string,
+    @Query("service") service?: string,
+  ): Promise<void> {
+    await this.envVars.delete(deploymentId, key, service ?? "");
   }
 }

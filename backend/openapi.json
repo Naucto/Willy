@@ -789,6 +789,14 @@
         "operationId": "EnvVarsController_list",
         "parameters": [
           {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "id",
             "required": true,
             "in": "path",
@@ -826,6 +834,14 @@
       "put": {
         "operationId": "EnvVarsController_set",
         "parameters": [
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "key",
             "required": true,
@@ -870,6 +886,14 @@
       "delete": {
         "operationId": "EnvVarsController_remove",
         "parameters": [
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "key",
             "required": true,

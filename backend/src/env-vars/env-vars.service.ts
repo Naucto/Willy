@@ -16,6 +16,7 @@ export interface MaskedEnvVar {
 export interface SetEnvVarInput {
   scope?: EnvScope | undefined;
   isSecret?: boolean | undefined;
+  targetService?: string | undefined;
 }
 
 @Injectable()
@@ -32,6 +33,7 @@ export class EnvVarsService {
     input: SetEnvVarInput = {},
   ): Promise<void> {
     const sealed = this.crypto.encrypt(value);
+    const targetService = input.targetService ?? "";
     const fields = {
       cipherText: sealed.cipherText,
       nonce: sealed.nonce,
@@ -43,37 +45,62 @@ export class EnvVarsService {
 
     await this.db
       .insert(envVars)
-      .values({ deploymentId, key, ...fields })
+      .values({ deploymentId, key, targetService, ...fields })
       .onConflictDoUpdate({
-        target: [envVars.deploymentId, envVars.key],
+        target: [envVars.deploymentId, envVars.targetService, envVars.key],
         set: { ...fields, updatedAt: new Date() },
       });
   }
 
-  async delete(deploymentId: string, key: string): Promise<void> {
+  async delete(deploymentId: string, key: string, targetService = ""): Promise<void> {
     await this.db
       .delete(envVars)
-      .where(and(eq(envVars.deploymentId, deploymentId), eq(envVars.key, key)));
+      .where(
+        and(
+          eq(envVars.deploymentId, deploymentId),
+          eq(envVars.targetService, targetService),
+          eq(envVars.key, key),
+        ),
+      );
   }
 
-  // Reads never expose plaintext values.
-  async listMasked(deploymentId: string): Promise<MaskedEnvVar[]> {
+  // Reads never expose plaintext values. Scoped to a service ("" = deployment-wide/shared).
+  async listMasked(deploymentId: string, targetService = ""): Promise<MaskedEnvVar[]> {
     return this.db
       .select({ key: envVars.key, scope: envVars.scope, isSecret: envVars.isSecret })
       .from(envVars)
-      .where(eq(envVars.deploymentId, deploymentId));
+      .where(and(eq(envVars.deploymentId, deploymentId), eq(envVars.targetService, targetService)));
   }
 
-  // Decrypts only the vars relevant to a phase — used at build/run injection time.
+  // Distinct compose services that have service-specific vars (excludes the "" shared scope).
+  async servicesWithEnv(deploymentId: string): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ targetService: envVars.targetService })
+      .from(envVars)
+      .where(eq(envVars.deploymentId, deploymentId));
+
+    return rows.map((row) => row.targetService).filter((service) => service !== "");
+  }
+
+  // Decrypts only the vars relevant to a phase — used at build/run injection time. Merges shared
+  // ("") vars with the given service's, the service-specific ones taking precedence.
   async resolveForInjection(
     deploymentId: string,
     phase: InjectionPhase,
+    service = "",
   ): Promise<Record<string, string>> {
     const rows = await this.db.select().from(envVars).where(eq(envVars.deploymentId, deploymentId));
     const resolved: Record<string, string> = {};
 
-    for (const row of rows) {
-      if (row.scope === phase || row.scope === "BOTH") {
+    // Shared first, then service-specific so the latter overrides on key conflict.
+    const ordered = [...rows].sort(
+      (a, b) => Number(a.targetService !== "") - Number(b.targetService !== ""),
+    );
+
+    for (const row of ordered) {
+      const applies = row.targetService === "" || row.targetService === service;
+
+      if (applies && (row.scope === phase || row.scope === "BOTH")) {
         resolved[row.key] = this.crypto.decrypt({
           cipherText: row.cipherText,
           nonce: row.nonce,

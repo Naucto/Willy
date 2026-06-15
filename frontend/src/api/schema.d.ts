@@ -1658,7 +1658,9 @@ export interface operations {
   };
   EnvVarsController_list: {
     parameters: {
-      query?: never;
+      query?: {
+        service?: string;
+      };
       header?: never;
       path: {
         id: string;
@@ -1679,7 +1681,9 @@ export interface operations {
   };
   EnvVarsController_set: {
     parameters: {
-      query?: never;
+      query?: {
+        service?: string;
+      };
       header?: never;
       path: {
         key: string;
@@ -1703,7 +1707,9 @@ export interface operations {
   };
   EnvVarsController_remove: {
     parameters: {
-      query?: never;
+      query?: {
+        service?: string;
+      };
       header?: never;
       path: {
         key: string;
