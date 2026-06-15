@@ -23,18 +23,28 @@ interface VolumeRow {
   usedBy: string;
 }
 
-export function VolumesTab({ deploymentId }: { deploymentId: string }) {
+export function VolumesTab({
+  deploymentId,
+  containerId,
+}: {
+  deploymentId: string;
+  containerId?: string | undefined;
+}) {
   const { enqueueSnackbar } = useSnackbar();
   const { data: containers, isLoading } = useDeploymentContainers(deploymentId);
   const backup = useCreateBackupFor(deploymentId);
   const reset = useResetVolume(deploymentId);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
 
+  // Scope to the focused container when one is selected; otherwise show every container's volumes.
   // A volume can be mounted by several containers — collapse to one row per volume.
   const volumes = useMemo<VolumeRow[]>(() => {
+    const scoped = containerId
+      ? (containers ?? []).filter((container) => container.id === containerId)
+      : (containers ?? []);
     const byName = new Map<string, string[]>();
 
-    for (const container of containers ?? []) {
+    for (const container of scoped) {
       for (const mount of container.volumes) {
         const entries = byName.get(mount.name) ?? [];
         entries.push(`${container.name} → ${mount.destination}`);
@@ -43,7 +53,7 @@ export function VolumesTab({ deploymentId }: { deploymentId: string }) {
     }
 
     return [...byName.entries()].map(([name, uses]) => ({ name, usedBy: uses.join(", ") }));
-  }, [containers]);
+  }, [containers, containerId]);
 
   const onBackup = async (name: string) => {
     try {

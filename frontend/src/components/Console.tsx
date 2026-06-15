@@ -8,7 +8,13 @@ import { describeError } from "../errors";
 
 type Status = "connecting" | "open" | "closed" | "error";
 
-export function Console({ deploymentId }: { deploymentId: string }) {
+export function Console({
+  deploymentId,
+  container,
+}: {
+  deploymentId: string;
+  container?: string | undefined;
+}) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>("connecting");
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +53,8 @@ export function Console({ deploymentId }: { deploymentId: string }) {
       refit();
 
       const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-      const url = `${scheme}://${window.location.host}/api/console/${deploymentId}?ticket=${encodeURIComponent(ticket)}`;
+      const containerParam = container ? `&container=${encodeURIComponent(container)}` : "";
+      const url = `${scheme}://${window.location.host}/api/console/${deploymentId}?ticket=${encodeURIComponent(ticket)}${containerParam}`;
       socket = new WebSocket(url);
       socket.binaryType = "arraybuffer";
 
@@ -90,7 +97,7 @@ export function Console({ deploymentId }: { deploymentId: string }) {
       socket?.close();
       term?.dispose();
     };
-  }, [deploymentId]);
+  }, [deploymentId, container]);
 
   return (
     <Box>

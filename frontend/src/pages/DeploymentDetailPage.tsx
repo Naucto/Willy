@@ -19,10 +19,17 @@ import {
 import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useDeleteRelease, useDeployment, useReleases, useRollback } from "../api/hooks";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useDeleteRelease,
+  useDeployment,
+  useDeploymentContainers,
+  useReleases,
+  useRollback,
+} from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
+import { ContainerSelector } from "../components/ContainerSelector";
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
@@ -32,6 +39,10 @@ import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { describeError } from "../errors";
+
+// Tabs that act on a single container follow the ?container= selection; the rest are
+// deployment-scoped and ignore it.
+const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes"]);
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -75,7 +86,25 @@ function DetailRow({
 export function DeploymentDetailPage() {
   const { id = "", section } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: deployment, isLoading, error } = useDeployment(id);
+  const { data: containers } = useDeploymentContainers(id);
+
+  // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
+  const active = section ?? "overview";
+  const containerScoped = CONTAINER_SCOPED.has(active);
+
+  // Resolve the focused container from the URL, falling back to the first one. Persisted in the URL
+  // so switching tabs keeps focus on the same container.
+  const requested = searchParams.get("container");
+  const selected = containers?.find((container) => container.id === requested) ?? containers?.[0];
+  const selectedId = selected?.id;
+
+  const selectContainer = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("container", value);
+    setSearchParams(next, { replace: true });
+  };
 
   if (isLoading) {
     return (
@@ -89,8 +118,7 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
-  // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
-  const active = section ?? "overview";
+  const showSelector = containerScoped && (containers?.length ?? 0) > 1 && selectedId;
 
   return (
     <Stack spacing={3}>
@@ -103,21 +131,30 @@ export function DeploymentDetailPage() {
           {deployment.type}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
+        {showSelector && containers && (
+          <ContainerSelector
+            containers={containers}
+            value={selectedId}
+            onChange={selectContainer}
+          />
+        )}
         <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 
       {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
       {active === "build" && <BuildLogsTab deploymentId={id} />}
       {active === "runs" && <CronRunsTab deploymentId={id} />}
-      {active === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
+      {active === "runtime" && (
+        <RuntimeLogsTab deploymentId={id} deployment={deployment} container={selectedId} />
+      )}
       {active === "console" &&
         (isRunning(deployment) ? (
-          <Console deploymentId={id} />
+          <Console deploymentId={id} container={selectedId} />
         ) : (
           <Alert severity="info">Console is available while the deployment is running.</Alert>
         ))}
       {active === "env" && <EnvVarEditor deploymentId={id} />}
-      {active === "volumes" && <VolumesTab deploymentId={id} />}
+      {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
       {active === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );
@@ -404,9 +441,11 @@ function ReleasesGrid({
 function RuntimeLogsTab({
   deploymentId,
   deployment,
+  container,
 }: {
   deploymentId: string;
   deployment: Deployment;
+  container?: string | undefined;
 }) {
   if (!deployment.activeReleaseId) {
     return <Alert severity="info">No deployment yet — trigger a deploy to see runtime logs.</Alert>;
@@ -423,7 +462,12 @@ function RuntimeLogsTab({
     );
   }
 
-  return <LogViewer path={`/deployments/${deploymentId}/logs`} />;
+  const path = container
+    ? `/deployments/${deploymentId}/logs?container=${encodeURIComponent(container)}`
+    : `/deployments/${deploymentId}/logs`;
+
+  // Re-mount on container change so the viewer resets and re-tails the new container.
+  return <LogViewer key={container ?? "default"} path={path} />;
 }
 
 function releaseSummary(release: Release): string {
