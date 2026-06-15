@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { WillyError } from "../common/errors";
-import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
+import {
+  type Deployment,
+  DeploymentsService,
+  dockerfileConfig,
+  imageConfig,
+} from "../deployments/deployments.service";
 import type { RestartPolicyName } from "../docker/docker.service";
 import { DockerService } from "../docker/docker.service";
 import { EnvVarsService } from "../env-vars/env-vars.service";
@@ -265,11 +270,12 @@ export class BuildOrchestrator {
 
   // IMAGE strategy: run an existing image as-is (no clone/build), just ensure it's pulled.
   private async pullImageRelease(deployment: Deployment, releaseId: string): Promise<string> {
-    if (!deployment.imageRef) {
+    const imageTag = imageConfig(deployment)?.imageRef;
+
+    if (!imageTag) {
       throw new BadRequestException("image deployment requires an image reference");
     }
 
-    const imageTag = deployment.imageRef;
     await this.releases.setStatus(releaseId, "BUILDING", { imageTag });
     this.buildLog.append(releaseId, `pulling image ${imageTag}`);
     await this.docker.ensureImage(imageTag);
@@ -298,7 +304,7 @@ export class BuildOrchestrator {
       await this.buildImage(deployment, {
         contextDir: dir,
         imageTag,
-        dockerfilePath: deployment.dockerfilePath ?? undefined,
+        dockerfilePath: dockerfileConfig(deployment).dockerfilePath ?? undefined,
         buildArgs,
         onLog: (line) => this.buildLog.append(releaseId, line),
       });

@@ -1,0 +1,4 @@
+ALTER TABLE "deployments" ADD COLUMN "strategy_config" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+UPDATE "deployments" SET "strategy_config" = jsonb_strip_nulls(jsonb_build_object('dockerfilePath', "dockerfile_path")) WHERE "build_strategy" = 'DOCKERFILE';--> statement-breakpoint
+UPDATE "deployments" SET "strategy_config" = jsonb_strip_nulls(jsonb_build_object('composeFilePath', "compose_file_path", 'composeWebService', "compose_web_service")) WHERE "build_strategy" = 'COMPOSE';--> statement-breakpoint
+UPDATE "deployments" SET "strategy_config" = jsonb_strip_nulls(jsonb_build_object('imageRef', "image_ref")) WHERE "build_strategy" = 'IMAGE';

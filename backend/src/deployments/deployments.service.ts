@@ -4,11 +4,64 @@ import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
 import { deployments, domains, gitCredentials } from "../db/schema";
+import type {
+  ComposeConfig,
+  DockerfileConfig,
+  ImageConfig,
+  StrategyConfig,
+} from "./strategy-config";
 
 export type Deployment = typeof deployments.$inferSelect;
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type Domain = typeof domains.$inferSelect;
+
+// Raw per-strategy fields as they arrive from the API, normalised into the stored StrategyConfig.
+interface StrategyFields {
+  dockerfilePath?: string | null;
+  composeFilePath?: string | null;
+  composeWebService?: string | null;
+  imageRef?: string | null;
+}
+
+function buildStrategyConfig(
+  strategy: Deployment["buildStrategy"],
+  fields: StrategyFields,
+): StrategyConfig {
+  if (strategy === "DOCKERFILE") {
+    return fields.dockerfilePath ? { dockerfilePath: fields.dockerfilePath } : {};
+  }
+
+  if (strategy === "COMPOSE") {
+    return {
+      ...(fields.composeFilePath ? { composeFilePath: fields.composeFilePath } : {}),
+      ...(fields.composeWebService ? { composeWebService: fields.composeWebService } : {}),
+    };
+  }
+
+  if (strategy === "IMAGE") {
+    return { imageRef: fields.imageRef ?? "" };
+  }
+
+  return {};
+}
+
+// Typed views of strategyConfig, narrowed by the deployment's build strategy.
+export function dockerfileConfig(deployment: Deployment): DockerfileConfig {
+  return (
+    deployment.buildStrategy === "DOCKERFILE" ? deployment.strategyConfig : {}
+  ) as DockerfileConfig;
+}
+
+export function composeConfig(deployment: Deployment): ComposeConfig {
+  return (deployment.buildStrategy === "COMPOSE" ? deployment.strategyConfig : {}) as ComposeConfig;
+}
+
+export function imageConfig(deployment: Deployment): ImageConfig | undefined {
+  return deployment.buildStrategy === "IMAGE"
+    ? (deployment.strategyConfig as ImageConfig)
+    : undefined;
+}
 
 export interface CreateDeploymentInput {
   name: string;
@@ -62,10 +115,6 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitUrl",
   "gitRef",
   "buildStrategy",
-  "dockerfilePath",
-  "composeFilePath",
-  "composeWebService",
-  "imageRef",
   "webServicePort",
   "healthCheckPath",
   "runCommand",
@@ -104,10 +153,7 @@ export class DeploymentsService {
         gitUrl: input.gitUrl ?? "",
         gitRef: input.gitRef ?? "main",
         buildStrategy: input.buildStrategy ?? "DOCKERFILE",
-        dockerfilePath: input.dockerfilePath ?? null,
-        composeFilePath: input.composeFilePath ?? null,
-        composeWebService: input.composeWebService ?? null,
-        imageRef: input.imageRef ?? null,
+        strategyConfig: buildStrategyConfig(input.buildStrategy ?? "DOCKERFILE", input),
         webServicePort: input.webServicePort ?? null,
         healthCheckPath: input.healthCheckPath ?? "/",
         runCommand: input.runCommand ?? null,
@@ -175,6 +221,21 @@ export class DeploymentsService {
 
     for (const key of EDITABLE_FIELDS) {
       assign(key);
+    }
+
+    // Rebuild the per-strategy config when the strategy or any of its fields are touched. The
+    // settings form always submits the full set for the active strategy, so a full rebuild is safe.
+    const touchesStrategy =
+      input.buildStrategy !== undefined ||
+      input.dockerfilePath !== undefined ||
+      input.composeFilePath !== undefined ||
+      input.composeWebService !== undefined ||
+      input.imageRef !== undefined;
+
+    if (touchesStrategy) {
+      const current = await this.findById(id);
+      const strategy = input.buildStrategy ?? current?.buildStrategy ?? "DOCKERFILE";
+      fields.strategyConfig = buildStrategyConfig(strategy, input);
     }
 
     const rows = await this.db

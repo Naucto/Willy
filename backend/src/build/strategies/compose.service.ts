@@ -6,7 +6,11 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { stringify as toYaml } from "yaml";
 import { WillyError } from "../../common/errors";
-import { type Deployment, DeploymentsService } from "../../deployments/deployments.service";
+import {
+  type Deployment,
+  DeploymentsService,
+  composeConfig,
+} from "../../deployments/deployments.service";
 import { DockerService } from "../../docker/docker.service";
 import { OWNER_LABEL } from "../../traefik/label-generator.service";
 
@@ -44,14 +48,15 @@ export class ComposeService {
 
   // Build + (re)create the stack in place; returns the web service container id.
   async up(deployment: Deployment, dir: string, onLog: (line: string) => void): Promise<string> {
-    const webService = deployment.composeWebService;
+    const config = composeConfig(deployment);
+    const webService = config.composeWebService;
 
     if (!webService) {
       throw new ComposeError("compose deployment requires a web service name");
     }
 
     const project = this.projectName(deployment);
-    const composeFile = deployment.composeFilePath || "docker-compose.yml";
+    const composeFile = config.composeFilePath || "docker-compose.yml";
     const files = ["-f", composeFile, "-f", OVERRIDE_FILE];
 
     await this.writeOverride(deployment, dir, webService);

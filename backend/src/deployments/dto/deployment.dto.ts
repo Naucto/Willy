@@ -1,9 +1,24 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 const TYPES = ["WEB", "WORKER", "CRON"] as const;
 const STRATEGIES = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"] as const;
 const STATES = ["CREATED", "DEPLOYING", "RUNNING", "DEGRADED", "STOPPED", "ERROR"] as const;
 const RESTART_POLICIES = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"] as const;
+
+// Per-strategy settings; which fields are present depends on buildStrategy.
+export class StrategyConfigDto {
+  @ApiPropertyOptional({ type: String })
+  dockerfilePath?: string;
+
+  @ApiPropertyOptional({ type: String })
+  composeFilePath?: string;
+
+  @ApiPropertyOptional({ type: String })
+  composeWebService?: string;
+
+  @ApiPropertyOptional({ type: String })
+  imageRef?: string;
+}
 
 // OpenAPI projection of a deployments row. Source of truth for the generated client.
 export class DeploymentDto {
@@ -25,17 +40,8 @@ export class DeploymentDto {
   @ApiProperty({ enum: STRATEGIES })
   buildStrategy!: (typeof STRATEGIES)[number];
 
-  @ApiProperty({ type: String, nullable: true })
-  dockerfilePath!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  composeFilePath!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  composeWebService!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  imageRef!: string | null;
+  @ApiProperty({ type: StrategyConfigDto })
+  strategyConfig!: StrategyConfigDto;
 
   @ApiProperty({ type: String, nullable: true })
   runCommand!: string | null;

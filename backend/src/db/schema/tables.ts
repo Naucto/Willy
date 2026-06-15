@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { StrategyConfig } from "../../deployments/strategy-config";
 import {
   auditActionEnum,
   backupDestinationTypeEnum,
@@ -50,11 +51,9 @@ export const deployments = pgTable("deployments", {
   gitUrl: text("git_url").notNull(),
   gitRef: text("git_ref").notNull().default("main"),
   buildStrategy: buildStrategyEnum("build_strategy").notNull().default("NIXPACKS"),
-  dockerfilePath: text("dockerfile_path"),
-  composeFilePath: text("compose_file_path"),
-  composeWebService: text("compose_web_service"),
-  // For the IMAGE build strategy: an existing image reference to run as-is (no clone/build).
-  imageRef: text("image_ref"),
+  // Per-strategy settings (dockerfile path / compose file+service / image ref), shaped by
+  // build_strategy. See deployments/strategy-config.ts.
+  strategyConfig: jsonb("strategy_config").$type<StrategyConfig>().notNull().default({}),
   runCommand: text("run_command"),
   cronExpr: text("cron_expr"),
   webServicePort: integer("web_service_port"),

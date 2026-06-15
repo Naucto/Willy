@@ -2191,6 +2191,23 @@
           "type"
         ]
       },
+      "StrategyConfigDto": {
+        "type": "object",
+        "properties": {
+          "dockerfilePath": {
+            "type": "string"
+          },
+          "composeFilePath": {
+            "type": "string"
+          },
+          "composeWebService": {
+            "type": "string"
+          },
+          "imageRef": {
+            "type": "string"
+          }
+        }
+      },
       "DeploymentDto": {
         "type": "object",
         "properties": {
@@ -2224,21 +2241,8 @@
               "IMAGE"
             ]
           },
-          "dockerfilePath": {
-            "type": "string",
-            "nullable": true
-          },
-          "composeFilePath": {
-            "type": "string",
-            "nullable": true
-          },
-          "composeWebService": {
-            "type": "string",
-            "nullable": true
-          },
-          "imageRef": {
-            "type": "string",
-            "nullable": true
+          "strategyConfig": {
+            "$ref": "#/components/schemas/StrategyConfigDto"
           },
           "runCommand": {
             "type": "string",
@@ -2330,10 +2334,7 @@
           "gitUrl",
           "gitRef",
           "buildStrategy",
-          "dockerfilePath",
-          "composeFilePath",
-          "composeWebService",
-          "imageRef",
+          "strategyConfig",
           "runCommand",
           "cronExpr",
           "webServicePort",
