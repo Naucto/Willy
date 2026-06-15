@@ -263,6 +263,52 @@ export class BuildOrchestrator {
     await this.deployments.setState(deploymentId, containers.length > 0 ? "DEGRADED" : "ERROR");
   }
 
+  // IMAGE strategy: run an existing image as-is (no clone/build), just ensure it's pulled.
+  private async pullImageRelease(deployment: Deployment, releaseId: string): Promise<string> {
+    if (!deployment.imageRef) {
+      throw new BadRequestException("image deployment requires an image reference");
+    }
+
+    const imageTag = deployment.imageRef;
+    await this.releases.setStatus(releaseId, "BUILDING", { imageTag });
+    this.buildLog.append(releaseId, `pulling image ${imageTag}`);
+    await this.docker.ensureImage(imageTag);
+
+    return imageTag;
+  }
+
+  // Clone the repo and build an image (Dockerfile/Nixpacks), returning the built tag.
+  private async buildGitRelease(deployment: Deployment, releaseId: string): Promise<string> {
+    await this.releases.setStatus(releaseId, "CLONING");
+
+    const token = await this.deployments.resolveGitToken(deployment.id);
+    const { dir, sha } = await this.git.clone({
+      url: deployment.gitUrl,
+      ref: deployment.gitRef,
+      token,
+    });
+    const imageTag = `willy/${deployment.name}:${sha.slice(0, 12)}`;
+
+    await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha, imageTag });
+    this.buildLog.append(releaseId, `building ${imageTag} (${deployment.buildStrategy})`);
+
+    const buildArgs = await this.envVars.resolveForInjection(deployment.id, "BUILD");
+
+    try {
+      await this.buildImage(deployment, {
+        contextDir: dir,
+        imageTag,
+        dockerfilePath: deployment.dockerfilePath ?? undefined,
+        buildArgs,
+        onLog: (line) => this.buildLog.append(releaseId, line),
+      });
+    } finally {
+      await this.git.cleanup(dir);
+    }
+
+    return imageTag;
+  }
+
   private async runRelease(deployment: Deployment, releaseId: string): Promise<void> {
     if (deployment.buildStrategy === "COMPOSE") {
       await this.runComposeRelease(deployment, releaseId);
@@ -280,33 +326,11 @@ export class BuildOrchestrator {
       }
 
       this.buildLog.append(releaseId, `deploying ${deployment.name} (${deployment.type})`);
-      await this.releases.setStatus(releaseId, "CLONING");
 
-      const token = await this.deployments.resolveGitToken(deployment.id);
-      const { dir, sha } = await this.git.clone({
-        url: deployment.gitUrl,
-        ref: deployment.gitRef,
-        token,
-      });
-      const shortSha = sha.slice(0, 12);
-      const imageTag = `willy/${deployment.name}:${shortSha}`;
-
-      await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha, imageTag });
-      this.buildLog.append(releaseId, `building ${imageTag} (${deployment.buildStrategy})`);
-
-      const buildArgs = await this.envVars.resolveForInjection(deployment.id, "BUILD");
-
-      try {
-        await this.buildImage(deployment, {
-          contextDir: dir,
-          imageTag,
-          dockerfilePath: deployment.dockerfilePath ?? undefined,
-          buildArgs,
-          onLog: (line) => this.buildLog.append(releaseId, line),
-        });
-      } finally {
-        await this.git.cleanup(dir);
-      }
+      const imageTag =
+        deployment.buildStrategy === "IMAGE"
+          ? await this.pullImageRelease(deployment, releaseId)
+          : await this.buildGitRelease(deployment, releaseId);
 
       // CRON deployments don't run a long-lived container — the image is run on a schedule.
       if (deployment.type === "CRON") {

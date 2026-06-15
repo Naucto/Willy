@@ -2110,12 +2110,18 @@
             "type": "string",
             "example": "main"
           },
+          "imageRef": {
+            "type": "string",
+            "example": "nginx:1.27",
+            "description": "For the IMAGE strategy."
+          },
           "buildStrategy": {
             "type": "string",
             "enum": [
               "NIXPACKS",
               "DOCKERFILE",
-              "COMPOSE"
+              "COMPOSE",
+              "IMAGE"
             ]
           },
           "dockerfilePath": {
@@ -2182,8 +2188,7 @@
         },
         "required": [
           "name",
-          "type",
-          "gitUrl"
+          "type"
         ]
       },
       "DeploymentDto": {
@@ -2215,7 +2220,8 @@
             "enum": [
               "NIXPACKS",
               "DOCKERFILE",
-              "COMPOSE"
+              "COMPOSE",
+              "IMAGE"
             ]
           },
           "dockerfilePath": {
@@ -2227,6 +2233,10 @@
             "nullable": true
           },
           "composeWebService": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageRef": {
             "type": "string",
             "nullable": true
           },
@@ -2323,6 +2333,7 @@
           "dockerfilePath",
           "composeFilePath",
           "composeWebService",
+          "imageRef",
           "runCommand",
           "cronExpr",
           "webServicePort",
@@ -2347,6 +2358,10 @@
           "gitUrl": {
             "type": "string"
           },
+          "imageRef": {
+            "type": "string",
+            "example": "nginx:1.27"
+          },
           "gitRef": {
             "type": "string"
           },
@@ -2355,7 +2370,8 @@
             "enum": [
               "NIXPACKS",
               "DOCKERFILE",
-              "COMPOSE"
+              "COMPOSE",
+              "IMAGE"
             ]
           },
           "dockerfilePath": {

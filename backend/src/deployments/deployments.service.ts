@@ -13,12 +13,13 @@ export type Domain = typeof domains.$inferSelect;
 export interface CreateDeploymentInput {
   name: string;
   type: DeploymentType;
-  gitUrl: string;
+  gitUrl?: string;
   gitRef?: string;
   buildStrategy?: Deployment["buildStrategy"];
   dockerfilePath?: string;
   composeFilePath?: string;
   composeWebService?: string;
+  imageRef?: string;
   webServicePort?: number;
   healthCheckPath?: string;
   runCommand?: string;
@@ -39,6 +40,7 @@ export interface UpdateDeploymentInput {
   dockerfilePath?: string | null;
   composeFilePath?: string | null;
   composeWebService?: string | null;
+  imageRef?: string | null;
   webServicePort?: number | null;
   healthCheckPath?: string;
   runCommand?: string | null;
@@ -63,6 +65,7 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "dockerfilePath",
   "composeFilePath",
   "composeWebService",
+  "imageRef",
   "webServicePort",
   "healthCheckPath",
   "runCommand",
@@ -83,17 +86,28 @@ export class DeploymentsService {
   ) {}
 
   async create(input: CreateDeploymentInput): Promise<Deployment> {
+    const isImage = input.buildStrategy === "IMAGE";
+
+    if (isImage && !input.imageRef) {
+      throw new DatabaseError("image deployments require an image reference");
+    }
+
+    if (!isImage && !input.gitUrl) {
+      throw new DatabaseError("git-based deployments require a git URL");
+    }
+
     const rows = await this.db
       .insert(deployments)
       .values({
         name: input.name,
         type: input.type,
-        gitUrl: input.gitUrl,
+        gitUrl: input.gitUrl ?? "",
         gitRef: input.gitRef ?? "main",
         buildStrategy: input.buildStrategy ?? "DOCKERFILE",
         dockerfilePath: input.dockerfilePath ?? null,
         composeFilePath: input.composeFilePath ?? null,
         composeWebService: input.composeWebService ?? null,
+        imageRef: input.imageRef ?? null,
         webServicePort: input.webServicePort ?? null,
         healthCheckPath: input.healthCheckPath ?? "/",
         runCommand: input.runCommand ?? null,

@@ -3,7 +3,7 @@ import { IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from "c
 import type { Deployment, DeploymentType } from "../deployments.service";
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
-const STRATEGIES: Deployment["buildStrategy"][] = ["NIXPACKS", "DOCKERFILE", "COMPOSE"];
+const STRATEGIES: Deployment["buildStrategy"][] = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"];
 
 export class CreateDeploymentDto {
   @ApiProperty({ type: String, pattern: "^[a-z0-9][a-z0-9-]{0,40}$", example: "my-app" })
@@ -16,14 +16,24 @@ export class CreateDeploymentDto {
   @IsIn(TYPES)
   type!: DeploymentType;
 
-  @ApiProperty({ type: String, example: "https://github.com/owner/repo.git" })
+  @ApiPropertyOptional({ type: String, example: "https://github.com/owner/repo.git" })
+  @IsOptional()
   @IsString()
-  gitUrl!: string;
+  gitUrl?: string;
 
   @ApiPropertyOptional({ type: String, example: "main" })
   @IsOptional()
   @IsString()
   gitRef?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    example: "nginx:1.27",
+    description: "For the IMAGE strategy.",
+  })
+  @IsOptional()
+  @IsString()
+  imageRef?: string;
 
   @ApiPropertyOptional({ enum: STRATEGIES })
   @IsOptional()

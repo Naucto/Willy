@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 
 const TYPES = ["WEB", "WORKER", "CRON"] as const;
-const STRATEGIES = ["NIXPACKS", "DOCKERFILE", "COMPOSE"] as const;
+const STRATEGIES = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"] as const;
 const STATES = ["CREATED", "DEPLOYING", "RUNNING", "DEGRADED", "STOPPED", "ERROR"] as const;
 const RESTART_POLICIES = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"] as const;
 
@@ -33,6 +33,9 @@ export class DeploymentDto {
 
   @ApiProperty({ type: String, nullable: true })
   composeWebService!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  imageRef!: string | null;
 
   @ApiProperty({ type: String, nullable: true })
   runCommand!: string | null;

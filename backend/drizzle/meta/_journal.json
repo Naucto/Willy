@@ -36,6 +36,13 @@
       "when": 1781547059539,
       "tag": "0004_solid_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781549842244,
+      "tag": "0005_flowery_saracen",
+      "breakpoints": true
     }
   ]
 }

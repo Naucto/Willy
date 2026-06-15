@@ -53,6 +53,8 @@ export const deployments = pgTable("deployments", {
   dockerfilePath: text("dockerfile_path"),
   composeFilePath: text("compose_file_path"),
   composeWebService: text("compose_web_service"),
+  // For the IMAGE build strategy: an existing image reference to run as-is (no clone/build).
+  imageRef: text("image_ref"),
   runCommand: text("run_command"),
   cronExpr: text("cron_expr"),
   webServicePort: integer("web_service_port"),
