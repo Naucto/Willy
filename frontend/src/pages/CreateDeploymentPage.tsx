@@ -15,7 +15,6 @@ import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment } from "../api/hooks";
 import type { BuildStrategy, CreateDeploymentInput, DeploymentType } from "../api/types";
-import { DomainPicker } from "../components/DomainPicker";
 import { describeError } from "../errors";
 
 interface FormValues {
@@ -27,7 +26,6 @@ interface FormValues {
   buildStrategy: BuildStrategy;
   dockerfilePath: string;
   webServicePort: string;
-  domain: string;
   healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
@@ -48,7 +46,6 @@ const DEFAULTS: FormValues = {
   composeFilePath: "",
   composeWebService: "",
   webServicePort: "",
-  domain: "",
   healthCheckPath: "/",
   runCommand: "",
   cronExpr: "",
@@ -110,7 +107,6 @@ function toPayload(values: FormValues): CreateDeploymentInput {
 
   if (values.type === "WEB") {
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
-    set("domain", trimmed(values.domain));
     set("healthCheckPath", trimmed(values.healthCheckPath));
   }
 
@@ -277,13 +273,11 @@ export function CreateDeploymentPage() {
                 {type === "WEB" && (
                   <>
                     <TextField label="Service port" type="number" {...register("webServicePort")} />
-                    <Controller
-                      name="domain"
-                      control={control}
-                      render={({ field }) => (
-                        <DomainPicker value={field.value} onChange={field.onChange} />
-                      )}
-                    />
+                    {/* Domains are configured on the deployment's Domains page after creation. */}
+                    <Alert severity="info">
+                      Add domains from the deployment's <strong>Domains</strong> page after it's
+                      created.
+                    </Alert>
                     {/* Compose declares its own healthcheck — inferred, not asked here. */}
                     {strategy !== "COMPOSE" && (
                       <TextField label="Health check path" {...register("healthCheckPath")} />
