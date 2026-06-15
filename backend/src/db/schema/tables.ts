@@ -108,6 +108,11 @@ export const domains = pgTable(
     certStatus: certStatusEnum("cert_status").notNull().default("NONE"),
     certResolver: text("cert_resolver").notNull().default("ovh"),
     isPrimary: boolean("is_primary").notNull().default(false),
+    // Granular routing: a domain points at a specific container/service (compose service name;
+    // null = the deployment's single/default container) and an internal port (null = the
+    // deployment's webServicePort). Lets one stack route many domains to different services/ports.
+    targetService: text("target_service"),
+    targetPort: integer("target_port"),
     createdAt,
     updatedAt,
   },

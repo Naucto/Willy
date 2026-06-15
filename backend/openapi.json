@@ -553,9 +553,60 @@
         ]
       }
     },
-    "/deployments/{id}/domains/{domainId}/primary": {
+    "/deployments/{id}/domains/{domainId}": {
       "patch": {
-        "operationId": "DeploymentsController_makeDomainPrimary",
+        "operationId": "DeploymentsController_updateDomainTarget",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDomainTargetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "delete": {
+        "operationId": "DeploymentsController_removeDomain",
         "parameters": [
           {
             "name": "domainId",
@@ -596,9 +647,9 @@
         ]
       }
     },
-    "/deployments/{id}/domains/{domainId}": {
-      "delete": {
-        "operationId": "DeploymentsController_removeDomain",
+    "/deployments/{id}/domains/{domainId}/primary": {
+      "patch": {
+        "operationId": "DeploymentsController_makeDomainPrimary",
         "parameters": [
           {
             "name": "domainId",
@@ -2621,12 +2672,24 @@
           },
           "isPrimary": {
             "type": "boolean"
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "description": "Compose service this domain routes to; null = the deployment's default container."
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "description": "Internal port this domain routes to; null = the deployment's web service port."
           }
         },
         "required": [
           "id",
           "fqdn",
-          "isPrimary"
+          "isPrimary",
+          "targetService",
+          "targetPort"
         ]
       },
       "AddDomainDto": {
@@ -2635,11 +2698,36 @@
           "fqdn": {
             "type": "string",
             "example": "app.example.com"
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "frontend"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 8080
           }
         },
         "required": [
           "fqdn"
         ]
+      },
+      "UpdateDomainTargetDto": {
+        "type": "object",
+        "properties": {
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "frontend"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 8080
+          }
+        }
       },
       "MaskedEnvVarDto": {
         "type": "object",

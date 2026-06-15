@@ -2,40 +2,93 @@ import { Injectable } from "@nestjs/common";
 
 export const OWNER_LABEL = "willy.deploymentId";
 
-export interface WebLabelInput {
-  deploymentId: string;
-  routerName: string;
-  // One or more FQDNs; routed by a Host(`a`) || Host(`b`) rule (per-domain certs via the resolver).
-  hosts: string[];
-  port: number;
-  network: string;
-  // Lower priority loses to a higher one when two routers share a Host rule. During a
-  // swap the incoming (newer) container is given a *lower* priority than the one it
-  // replaces, so the old version keeps serving until it is removed at cutover.
-  priority: number;
+// A domain's routing target: the compose service it points at (null = the deployment's single
+// container) and the internal port (null = fall back to the deployment's default port).
+export interface DomainTarget {
+  fqdn: string;
+  targetService: string | null;
+  targetPort: number | null;
 }
 
-// Generates the literal Traefik labels for a WEB deployment's container. Router/service
-// names are namespaced per deployment + git SHA to avoid Traefik route shadowing across
-// versions. WORKER/CRON containers get only the owner label (no routing).
+// A set of FQDNs that share one (service, port) and so become a single Traefik router/service.
+export interface RouteGroup {
+  // Compose service name; null for a single-container deployment (one container, no service name).
+  service: string | null;
+  port: number;
+  hosts: string[];
+}
+
+export interface WebRoutesInput {
+  deploymentId: string;
+  // Router/service names are derived from this prefix + service + port to stay unique across
+  // deployments and across versions during a swap. Single-container callers fold the release id
+  // into the prefix; compose uses the deployment name (it recreates in place, no parallel old/new).
+  routerPrefix: string;
+  network: string;
+  // Lower priority loses to a higher one when two routers share a Host rule. During a swap the
+  // incoming (newer) container is given a *lower* priority than the one it replaces, so the old
+  // version keeps serving until it is removed at cutover.
+  priority: number;
+  groups: RouteGroup[];
+}
+
+function sanitize(value: string): string {
+  return value.replace(/[^a-zA-Z0-9-]/g, "-");
+}
+
+// Collapse per-domain targets into route groups keyed by (service, port). For single-container
+// deployments pass defaultService: null so every domain lands on the one container, grouped by
+// port; for compose pass the default web service so untargeted domains route there.
+export function groupRoutes(
+  targets: DomainTarget[],
+  defaults: { defaultService: string | null; defaultPort: number },
+): RouteGroup[] {
+  const groups = new Map<string, RouteGroup>();
+
+  for (const target of targets) {
+    const service =
+      defaults.defaultService === null ? null : (target.targetService ?? defaults.defaultService);
+    const port = target.targetPort ?? defaults.defaultPort;
+    const key = `${service ?? ""}:${port}`;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.hosts.push(target.fqdn);
+    } else {
+      groups.set(key, { service, port, hosts: [target.fqdn] });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+// Generates the literal Traefik labels for a WEB container. Each route group becomes its own
+// router (Host(`a`) || Host(`b`) over its FQDNs) + service (load-balanced to that port), so a
+// single container can serve several domains on different ports. WORKER/CRON containers get only
+// the owner label (no routing).
 @Injectable()
 export class LabelGeneratorService {
-  forWeb(input: WebLabelInput): Record<string, string> {
-    const router = input.routerName;
-    const rule = input.hosts.map((host) => `Host(\`${host}\`)`).join(" || ");
-
-    return {
+  forWebRoutes(input: WebRoutesInput): Record<string, string> {
+    const labels: Record<string, string> = {
       "traefik.enable": "true",
       "traefik.docker.network": input.network,
-      [`traefik.http.routers.${router}.rule`]: rule,
-      [`traefik.http.routers.${router}.entrypoints`]: "websecure",
-      [`traefik.http.routers.${router}.tls`]: "true",
-      [`traefik.http.routers.${router}.tls.certresolver`]: "ovh",
-      [`traefik.http.routers.${router}.middlewares`]: "sec-headers@file",
-      [`traefik.http.routers.${router}.priority`]: String(input.priority),
-      [`traefik.http.services.${router}.loadbalancer.server.port`]: String(input.port),
       [OWNER_LABEL]: input.deploymentId,
     };
+
+    for (const group of input.groups) {
+      const router = sanitize(`${input.routerPrefix}-${group.service ?? "app"}-${group.port}`);
+      const rule = group.hosts.map((host) => `Host(\`${host}\`)`).join(" || ");
+
+      labels[`traefik.http.routers.${router}.rule`] = rule;
+      labels[`traefik.http.routers.${router}.entrypoints`] = "websecure";
+      labels[`traefik.http.routers.${router}.tls`] = "true";
+      labels[`traefik.http.routers.${router}.tls.certresolver`] = "ovh";
+      labels[`traefik.http.routers.${router}.middlewares`] = "sec-headers@file";
+      labels[`traefik.http.routers.${router}.priority`] = String(input.priority);
+      labels[`traefik.http.services.${router}.loadbalancer.server.port`] = String(group.port);
+    }
+
+    return labels;
   }
 
   forNonWeb(deploymentId: string): Record<string, string> {

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
@@ -15,6 +15,20 @@ export type Deployment = typeof deployments.$inferSelect;
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type Domain = typeof domains.$inferSelect;
+
+// A domain with its routing target, ordered primary-first — consumed by the Traefik route grouping.
+export interface DomainRoute {
+  fqdn: string;
+  targetService: string | null;
+  targetPort: number | null;
+  isPrimary: boolean;
+}
+
+export interface DomainTargetInput {
+  fqdn: string;
+  targetService?: string | null;
+  targetPort?: number | null;
+}
 
 // Raw per-strategy fields as they arrive from the API, normalised into the stored StrategyConfig.
 interface StrategyFields {
@@ -281,14 +295,20 @@ export class DeploymentsService {
     return rows[0];
   }
 
-  // All FQDNs attached to a deployment (primary first), for multi-domain routing rules.
-  async allDomains(deploymentId: string): Promise<string[]> {
+  // All domains attached to a deployment (primary first) with their routing target, for building
+  // per-(service, port) Traefik routers.
+  async domainRoutes(deploymentId: string): Promise<DomainRoute[]> {
     const rows = await this.db
-      .select({ fqdn: domains.fqdn, isPrimary: domains.isPrimary })
+      .select({
+        fqdn: domains.fqdn,
+        targetService: domains.targetService,
+        targetPort: domains.targetPort,
+        isPrimary: domains.isPrimary,
+      })
       .from(domains)
       .where(eq(domains.deploymentId, deploymentId));
 
-    return rows.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)).map((row) => row.fqdn);
+    return rows.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   }
 
   // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.
@@ -315,16 +335,47 @@ export class DeploymentsService {
       .orderBy(desc(domains.isPrimary), domains.fqdn);
   }
 
-  // Adds an extra FQDN; becomes primary only if the deployment has none yet.
-  async addDomain(deploymentId: string, fqdn: string): Promise<Domain> {
+  // Adds an extra FQDN; becomes primary only if the deployment has none yet. Optionally pins the
+  // domain to a specific container/service + port (granular routing); omitted = deployment default.
+  async addDomain(deploymentId: string, input: DomainTargetInput): Promise<Domain> {
     const existing = await this.primaryDomain(deploymentId);
     const [row] = await this.db
       .insert(domains)
-      .values({ deploymentId, fqdn, isPrimary: !existing })
+      .values({
+        deploymentId,
+        fqdn: input.fqdn,
+        targetService: input.targetService ?? null,
+        targetPort: input.targetPort ?? null,
+        isPrimary: !existing,
+      })
       .returning();
 
     if (!row) {
       throw new DatabaseError("domain insert returned no row");
+    }
+
+    return row;
+  }
+
+  // Repoints a domain at a different container/service + port. null clears the override (back to
+  // the deployment default). Applies to routing on the next deploy/restart.
+  async updateDomainTarget(
+    deploymentId: string,
+    domainId: string,
+    target: { targetService: string | null; targetPort: number | null },
+  ): Promise<Domain> {
+    const [row] = await this.db
+      .update(domains)
+      .set({
+        targetService: target.targetService,
+        targetPort: target.targetPort,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException("domain not found for this deployment");
     }
 
     return row;

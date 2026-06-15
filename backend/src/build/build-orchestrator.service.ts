@@ -10,7 +10,11 @@ import type { RestartPolicyName } from "../docker/docker.service";
 import { DockerService } from "../docker/docker.service";
 import { EnvVarsService } from "../env-vars/env-vars.service";
 import { GitService } from "../git/git.service";
-import { LabelGeneratorService, OWNER_LABEL } from "../traefik/label-generator.service";
+import {
+  LabelGeneratorService,
+  OWNER_LABEL,
+  groupRoutes,
+} from "../traefik/label-generator.service";
 import { BuildLogStore } from "./build-log.store";
 import { BuildQueue } from "./build-queue";
 import { CronService } from "./cron.service";
@@ -434,7 +438,7 @@ export class BuildOrchestrator {
 
       const healthy =
         deployment.type === "WEB"
-          ? await this.probeWeb(webContainerId, deployment)
+          ? await this.probeWeb(webContainerId, deployment, deployment.webServicePort ?? 80)
           : await this.probeWorker(webContainerId);
 
       if (!healthy) {
@@ -496,23 +500,27 @@ export class BuildOrchestrator {
 
     await this.docker.removeByName(containerName);
 
+    const defaultPort = deployment.webServicePort ?? 80;
     let labels: Record<string, string>;
     let network: string | undefined;
+    // For a single-container deployment every domain routes to the one container; only the port
+    // can vary (no compose service name), so probe whichever port the primary domain points at.
+    let probePort = defaultPort;
 
     if (deployment.type === "WEB") {
-      const hosts = await this.deployments.allDomains(deployment.id);
+      const routes = await this.deployments.domainRoutes(deployment.id);
 
-      if (hosts.length === 0) {
+      if (routes.length === 0) {
         throw new BadRequestException("WEB deployment requires a domain");
       }
 
-      labels = this.labels.forWeb({
+      probePort = routes[0]?.targetPort ?? defaultPort;
+      labels = this.labels.forWebRoutes({
         deploymentId: deployment.id,
-        routerName: `${deployment.name}-${releaseShort}`,
-        hosts,
-        port: deployment.webServicePort ?? 80,
+        routerPrefix: `${deployment.name}-${releaseShort}`,
         network: EDGE_NETWORK,
         priority: PRIORITY_BASE - Date.now(),
+        groups: groupRoutes(routes, { defaultService: null, defaultPort }),
       });
       network = EDGE_NETWORK;
     } else {
@@ -536,7 +544,7 @@ export class BuildOrchestrator {
 
     const healthy =
       deployment.type === "WEB"
-        ? await this.probeWeb(containerId, deployment)
+        ? await this.probeWeb(containerId, deployment, probePort)
         : await this.probeWorker(containerId);
 
     if (!healthy) {
@@ -552,8 +560,11 @@ export class BuildOrchestrator {
   // image declares its own Docker HEALTHCHECK, also wait until it reports "healthy" — Traefik
   // refuses to route a "starting"/"unhealthy" container, so cutting over before then would
   // briefly drop traffic.
-  private async probeWeb(containerId: string, deployment: Deployment): Promise<boolean> {
-    const port = deployment.webServicePort ?? 80;
+  private async probeWeb(
+    containerId: string,
+    deployment: Deployment,
+    port: number,
+  ): Promise<boolean> {
     const path = deployment.healthCheckPath || "/";
     const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
 

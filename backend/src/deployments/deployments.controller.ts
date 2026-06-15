@@ -23,11 +23,17 @@ import { OkResponseDto } from "../common/dto/ok.dto";
 import { type Domain, type DeploymentView, DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
-import { AddDomainDto, DomainDto } from "./dto/domain.dto";
+import { AddDomainDto, DomainDto, UpdateDomainTargetDto } from "./dto/domain.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
 
 function domainToDto(row: Domain): DomainDto {
-  return { id: row.id, fqdn: row.fqdn, isPrimary: row.isPrimary };
+  return {
+    id: row.id,
+    fqdn: row.fqdn,
+    isPrimary: row.isPrimary,
+    targetService: row.targetService,
+    targetPort: row.targetPort,
+  };
 }
 
 @ApiTags("deployments")
@@ -84,7 +90,32 @@ export class DeploymentsController {
   @ApiCreatedResponse({ type: DomainDto })
   @Post(":id/domains")
   async addDomain(@Param("id") id: string, @Body() dto: AddDomainDto): Promise<DomainDto> {
-    return domainToDto(await this.deployments.addDomain(id, dto.fqdn.trim()));
+    return domainToDto(
+      await this.deployments.addDomain(id, {
+        fqdn: dto.fqdn.trim(),
+        targetService: dto.targetService?.trim() || null,
+        targetPort: dto.targetPort ?? null,
+      }),
+    );
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiBody({ type: UpdateDomainTargetDto })
+  @ApiOkResponse({ type: DomainDto })
+  @Patch(":id/domains/:domainId")
+  async updateDomainTarget(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+    @Body() dto: UpdateDomainTargetDto,
+  ): Promise<DomainDto> {
+    return domainToDto(
+      await this.deployments.updateDomainTarget(id, domainId, {
+        targetService: dto.targetService?.trim() || null,
+        targetPort: dto.targetPort ?? null,
+      }),
+    );
   }
 
   @Roles("ADMIN", "OPERATOR")

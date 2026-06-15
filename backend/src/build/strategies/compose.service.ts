@@ -12,7 +12,11 @@ import {
   composeConfig,
 } from "../../deployments/deployments.service";
 import { DockerService } from "../../docker/docker.service";
-import { OWNER_LABEL } from "../../traefik/label-generator.service";
+import {
+  LabelGeneratorService,
+  OWNER_LABEL,
+  groupRoutes,
+} from "../../traefik/label-generator.service";
 
 const exec = promisify(execFile);
 
@@ -36,6 +40,7 @@ export class ComposeService {
     config: ConfigService,
     private readonly docker: DockerService,
     private readonly deployments: DeploymentsService,
+    private readonly labels: LabelGeneratorService,
   ) {
     const host = config.get<string>("DOCKER_PROXY_HOST") ?? "docker-socket-proxy";
     const port = config.get<number>("DOCKER_PROXY_PORT") ?? 2375;
@@ -97,38 +102,54 @@ export class ComposeService {
     dir: string,
     webService: string,
   ): Promise<void> {
-    const labels: Record<string, string> = { [OWNER_LABEL]: deployment.id };
-    const service: Record<string, unknown> = { labels };
+    // The web service is always present so it can be located + health-checked after `up`, even if
+    // no domain happens to route to it.
+    const services: Record<string, Record<string, unknown>> = {
+      [webService]: { labels: { [OWNER_LABEL]: deployment.id } },
+    };
     const networks: Record<string, unknown> = {};
 
     if (deployment.type === "WEB") {
-      const hosts = await this.deployments.allDomains(deployment.id);
+      const routes = await this.deployments.domainRoutes(deployment.id);
 
-      if (hosts.length === 0) {
+      if (routes.length === 0) {
         throw new ComposeError("WEB compose deployment requires a domain");
       }
 
-      const router = deployment.name;
-      const rule = hosts.map((host) => `Host(\`${host}\`)`).join(" || ");
-      const port = deployment.webServicePort ?? 80;
+      const defaultPort = deployment.webServicePort ?? 80;
       const priority = PRIORITY_BASE - Date.now();
+      const groups = groupRoutes(routes, { defaultService: webService, defaultPort });
 
-      Object.assign(labels, {
-        "traefik.enable": "true",
-        "traefik.docker.network": EDGE_NETWORK,
-        [`traefik.http.routers.${router}.rule`]: rule,
-        [`traefik.http.routers.${router}.entrypoints`]: "websecure",
-        [`traefik.http.routers.${router}.tls`]: "true",
-        [`traefik.http.routers.${router}.tls.certresolver`]: "ovh",
-        [`traefik.http.routers.${router}.middlewares`]: "sec-headers@file",
-        [`traefik.http.routers.${router}.priority`]: String(priority),
-        [`traefik.http.services.${router}.loadbalancer.server.port`]: String(port),
-      });
-      service.networks = ["default", EDGE_NETWORK];
+      // Labels live on the targeted container, so split the groups back out per compose service:
+      // each service gets attached to the edge network and carries the routers/services for its
+      // own (service, port) groups.
+      const byService = new Map<string, typeof groups>();
+
+      for (const group of groups) {
+        const name = group.service ?? webService;
+        const bucket = byService.get(name) ?? [];
+
+        bucket.push(group);
+        byService.set(name, bucket);
+      }
+
+      for (const [name, serviceGroups] of byService) {
+        services[name] = {
+          labels: this.labels.forWebRoutes({
+            deploymentId: deployment.id,
+            routerPrefix: deployment.name,
+            network: EDGE_NETWORK,
+            priority,
+            groups: serviceGroups,
+          }),
+          networks: ["default", EDGE_NETWORK],
+        };
+      }
+
       networks[EDGE_NETWORK] = { external: true };
     }
 
-    const override: Record<string, unknown> = { services: { [webService]: service } };
+    const override: Record<string, unknown> = { services };
 
     if (Object.keys(networks).length > 0) {
       override.networks = networks;
