@@ -13,7 +13,7 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef, GridToolbarQuickFilter } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -179,21 +179,14 @@ function OverviewTab({
 }
 
 function PickerToolbar({ title }: { title: string }) {
+  // The new-style Toolbar provides the context GridToolbarQuickFilter needs in MUI X v9.
   return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 2,
-        p: 1.5,
-      }}
-    >
-      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+    <Toolbar>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, flexGrow: 1, pl: 1 }}>
         {title}
       </Typography>
       <GridToolbarQuickFilter />
-    </Box>
+    </Toolbar>
   );
 }
 
