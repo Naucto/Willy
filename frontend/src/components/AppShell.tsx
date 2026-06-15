@@ -30,9 +30,14 @@ export function AppShell() {
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       <AppBar
         position="fixed"
-        color="transparent"
+        color="default"
         elevation={0}
-        sx={{ borderBottom: 1, borderColor: "divider", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+        sx={{
+          bgcolor: "background.paper",
+          borderBottom: 1,
+          borderColor: "divider",
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
       >
         <Toolbar>
           <Typography

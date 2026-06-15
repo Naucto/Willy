@@ -17,6 +17,7 @@ import { Controller, useForm } from "react-hook-form";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { BuildStrategy, Deployment, UpdateDeploymentInput } from "../api/types";
 import { describeError } from "../errors";
+import { DomainPicker } from "./DomainPicker";
 
 const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE"];
 const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
@@ -126,11 +127,12 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
                 <TextField label="Git ref" {...register("gitRef")} />
 
                 {deployment.type === "WEB" && (
-                  <TextField
-                    label="Domain"
-                    placeholder="app.example.com"
-                    helperText="Applies on the next deploy or restart."
-                    {...register("domain")}
+                  <Controller
+                    name="domain"
+                    control={control}
+                    render={({ field }) => (
+                      <DomainPicker value={field.value} onChange={field.onChange} />
+                    )}
                   />
                 )}
 

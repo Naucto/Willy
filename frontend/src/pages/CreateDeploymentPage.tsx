@@ -15,6 +15,7 @@ import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment } from "../api/hooks";
 import type { BuildStrategy, CreateDeploymentInput, DeploymentType } from "../api/types";
+import { DomainPicker } from "../components/DomainPicker";
 import { describeError } from "../errors";
 
 interface FormValues {
@@ -253,10 +254,12 @@ export function CreateDeploymentPage() {
                 {type === "WEB" && (
                   <>
                     <TextField label="Service port" type="number" {...register("webServicePort")} />
-                    <TextField
-                      label="Domain"
-                      placeholder="app.example.com"
-                      {...register("domain")}
+                    <Controller
+                      name="domain"
+                      control={control}
+                      render={({ field }) => (
+                        <DomainPicker value={field.value} onChange={field.onChange} />
+                      )}
                     />
                     {/* Compose declares its own healthcheck — inferred, not asked here. */}
                     {strategy !== "COMPOSE" && (

@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCreateDnsRecord, useDeleteDnsRecord, useDnsRecords, useDnsZones } from "../api/hooks";
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
 import { describeError } from "../errors";
@@ -39,6 +39,16 @@ export function DnsPage() {
 
   const { data: zones, error: zonesError } = useDnsZones();
   const { data: records, isLoading, error } = useDnsRecords(zone);
+
+  // Auto-select the first discovered zone so records show without an extra click.
+  useEffect(() => {
+    const first = zones?.zones?.[0];
+
+    if (!zone && first) {
+      setZone(first);
+      setZoneInput(first);
+    }
+  }, [zones, zone]);
   const createRecord = useCreateDnsRecord(zone);
   const deleteRecord = useDeleteDnsRecord(zone);
 
