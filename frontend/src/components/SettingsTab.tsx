@@ -25,6 +25,7 @@ const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
 interface FormValues {
   gitUrl: string;
   gitRef: string;
+  domain: string;
   buildStrategy: BuildStrategy;
   dockerfilePath: string;
   webServicePort: string;
@@ -46,6 +47,7 @@ function initialValues(deployment: Deployment): FormValues {
   return {
     gitUrl: deployment.gitUrl,
     gitRef: deployment.gitRef,
+    domain: deployment.primaryDomain ?? "",
     buildStrategy: deployment.buildStrategy,
     dockerfilePath: deployment.dockerfilePath ?? "",
     webServicePort: deployment.webServicePort?.toString() ?? "",
@@ -92,6 +94,7 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("dockerfilePath", trimmed(values.dockerfilePath));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
+    set("domain", trimmed(values.domain));
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
     set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
 
@@ -115,6 +118,15 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
 
               <TextField label="Git URL" {...register("gitUrl")} />
               <TextField label="Git ref" {...register("gitRef")} />
+
+              {deployment.type === "WEB" && (
+                <TextField
+                  label="Domain"
+                  placeholder="app.example.com"
+                  helperText="Applies on the next deploy or restart."
+                  {...register("domain")}
+                />
+              )}
 
               <Controller
                 name="buildStrategy"

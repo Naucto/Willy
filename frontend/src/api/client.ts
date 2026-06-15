@@ -41,7 +41,11 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
-// Custom fetch: injects the access token and transparently refreshes once on 401.
+// Dispatched when the session can't be refreshed; the auth layer redirects to /login.
+export const AUTH_EXPIRED_EVENT = "willy:auth-expired";
+
+// Custom fetch: injects the access token and transparently refreshes once on 401. Each attempt
+// fetches a fresh clone so the original request body is never consumed across the retry.
 async function authFetch(input: Request): Promise<Response> {
   const withAuth = (token: string | null): Request => {
     const request = input.clone();
@@ -63,9 +67,13 @@ async function authFetch(input: Request): Promise<Response> {
     refreshInFlight = null;
   });
 
-  const refreshed = await refreshInFlight;
+  if (!(await refreshInFlight)) {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 
-  return refreshed ? fetch(withAuth(tokens.getAccess())) : response;
+    return response;
+  }
+
+  return fetch(withAuth(tokens.getAccess()));
 }
 
 export const api = createClient<paths>({ baseUrl: API_BASE, fetch: authFetch });

@@ -180,6 +180,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/restart": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DeploymentActionsController_restart"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/rollback/{releaseId}": {
     parameters: {
       query?: never;
@@ -254,6 +270,22 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ConsoleController_ticket"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/info": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_info"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -350,6 +382,7 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+      primaryDomain: string | null;
     };
     UpdateDeploymentDto: {
       gitUrl?: string;
@@ -365,6 +398,8 @@ export interface components {
       /** @enum {string} */
       restartPolicy?: "NO" | "ON_FAILURE" | "ALWAYS" | "UNLESS_STOPPED";
       memoryLimitMb?: number;
+      /** @example app.example.com */
+      domain?: string;
     };
     MaskedEnvVarDto: {
       key: string;
@@ -421,6 +456,15 @@ export interface components {
     };
     StreamTicketDto: {
       ticket: string;
+    };
+    SystemInfoDto: {
+      version: string;
+      commit: string;
+      distro: string;
+      kernel: string;
+      platform: string;
+      arch: string;
+      node: string;
     };
   };
   responses: never;
@@ -748,6 +792,27 @@ export interface operations {
       };
     };
   };
+  DeploymentActionsController_restart: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
   DeploymentActionsController_rollback: {
     parameters: {
       query?: never;
@@ -869,6 +934,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["StreamTicketDto"];
+        };
+      };
+    };
+  };
+  SystemController_info: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemInfoDto"];
         };
       };
     };

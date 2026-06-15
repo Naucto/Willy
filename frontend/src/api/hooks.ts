@@ -9,7 +9,16 @@ export const queryKeys = {
   release: (id: string) => ["releases", id] as const,
   env: (id: string) => ["deployments", id, "env"] as const,
   webhook: (id: string) => ["deployments", id, "webhook"] as const,
+  systemInfo: ["system", "info"] as const,
 };
+
+export function useSystemInfo() {
+  return useQuery({
+    queryKey: queryKeys.systemInfo,
+    queryFn: async () => unwrap(await api.GET("/system/info")),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
 
 export function useDeployments() {
   return useQuery({
@@ -106,6 +115,16 @@ export function useRollback(id: string) {
           params: { path: { id, releaseId } },
         }),
       ),
+    onSuccess: () => invalidateDeployment(queryClient, id),
+  });
+}
+
+export function useRestart(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.POST("/deployments/{id}/restart", { params: { path: { id } } })),
     onSuccess: () => invalidateDeployment(queryClient, id),
   });
 }

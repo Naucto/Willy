@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { api, unwrap } from "../api/client";
+import { AUTH_EXPIRED_EVENT, api, unwrap } from "../api/client";
 import { tokens } from "../api/tokens";
 import type { AuthUser } from "../api/types";
 
@@ -37,6 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((result) => setUser(result.data ?? null))
       .catch(() => tokens.clear())
       .finally(() => setLoading(false));
+  }, []);
+
+  // When a request can't refresh the session, drop the user so RequireAuth redirects to login.
+  useEffect(() => {
+    const onExpired = () => {
+      tokens.clear();
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {

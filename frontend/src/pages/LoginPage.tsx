@@ -2,6 +2,8 @@ import { Box, Button, Card, CardContent, Stack, TextField, Typography } from "@m
 import { useSnackbar } from "notistack";
 import { useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useSystemInfo } from "../api/hooks";
+import loginBg from "../assets/login-bg.jpg";
 import { useAuth } from "../auth/AuthContext";
 import { describeError } from "../errors";
 
@@ -19,6 +21,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
+  const { data: system } = useSystemInfo();
   const {
     register,
     handleSubmit,
@@ -41,9 +44,18 @@ export function LoginPage() {
 
   return (
     <Box
-      sx={{ display: "grid", placeItems: "center", height: "100vh", bgcolor: "background.default" }}
+      sx={{
+        position: "relative",
+        display: "grid",
+        placeItems: "center",
+        height: "100vh",
+        // Blue tint layered over the background photo.
+        backgroundImage: `linear-gradient(rgba(13,40,92,0.6), rgba(8,20,48,0.78)), url(${loginBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
-      <Card sx={{ width: 360 }}>
+      <Card sx={{ width: 360, backdropFilter: "blur(2px)", bgcolor: "rgba(22,27,34,0.9)" }}>
         <CardContent>
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
             Willy 🐋
@@ -73,6 +85,28 @@ export function LoginPage() {
           </form>
         </CardContent>
       </Card>
+
+      {system && (
+        <Box
+          sx={{
+            position: "absolute",
+            right: 16,
+            bottom: 12,
+            textAlign: "right",
+            color: "rgba(255,255,255,0.6)",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 11,
+            lineHeight: 1.6,
+          }}
+        >
+          <div>
+            Willy v{system.version} · {system.commit.slice(0, 12)}
+          </div>
+          <div>
+            {system.distro} · {system.kernel} · {system.arch}
+          </div>
+        </Box>
+      )}
     </Box>
   );
 }

@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useDeployment, useReleases, useRollback } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
@@ -50,6 +50,7 @@ function DetailRow({ label, value }: { label: string; value: string | number | n
 
 export function DeploymentDetailPage() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
   const { data: deployment, isLoading, error } = useDeployment(id);
   const [tab, setTab] = useState<TabKey>("overview");
 
@@ -76,7 +77,7 @@ export function DeploymentDetailPage() {
           {deployment.type}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
-        <DeployActions deployment={deployment} />
+        <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 
       <Tabs value={tab} onChange={(_, value: TabKey) => setTab(value)}>
@@ -120,6 +121,7 @@ function OverviewTab({
     <Stack spacing={3}>
       <Card variant="outlined">
         <CardContent>
+          <DetailRow label="Domain" value={deployment.primaryDomain} />
           <DetailRow label="Repository" value={deployment.gitUrl} />
           <DetailRow label="Ref" value={deployment.gitRef} />
           <DetailRow label="Build strategy" value={deployment.buildStrategy} />
