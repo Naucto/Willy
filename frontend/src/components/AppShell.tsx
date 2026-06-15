@@ -133,14 +133,18 @@ export function AppShell() {
             <MenuIcon />
           </IconButton>
 
-          <Typography
-            variant="h6"
+          <Box
             component={RouterLink}
             to="/deployments"
-            sx={{ color: "text.primary", textDecoration: "none", fontWeight: 700 }}
+            sx={{ display: "flex", alignItems: "center" }}
           >
-            Willy 🐋
-          </Typography>
+            <Box
+              component="img"
+              src="/willy-logo.svg"
+              alt="Willy"
+              sx={{ height: 34, display: "block" }}
+            />
+          </Box>
 
           <Box sx={{ flexGrow: 1 }} />
 

@@ -1,4 +1,4 @@
-import { Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Card, CardContent, Stack, TextField } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -58,9 +58,12 @@ export function LoginPage() {
     >
       <Card sx={{ width: 360, backdropFilter: "blur(2px)", bgcolor: "rgba(22,27,34,0.9)" }}>
         <CardContent>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
-            Willy 🐋
-          </Typography>
+          <Box
+            component="img"
+            src="/willy-logo.svg"
+            alt="Willy"
+            sx={{ height: 56, display: "block", mx: "auto", mb: 3 }}
+          />
 
           <form onSubmit={onSubmit}>
             <Stack spacing={2}>
