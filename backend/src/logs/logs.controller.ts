@@ -1,5 +1,6 @@
 import type { Readable } from "node:stream";
 import { Controller, NotFoundException, Param, Sse } from "@nestjs/common";
+import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
 import { ReleasesService } from "../build/releases.service";
@@ -10,6 +11,8 @@ interface LogEvent {
   data: string;
 }
 
+// SSE streams are consumed by a fetch-based reader on the client (so the bearer
+// token can be sent), not the generated OpenAPI client — hence excluded from the spec.
 @Controller()
 export class LogsController {
   constructor(
@@ -20,6 +23,7 @@ export class LogsController {
   ) {}
 
   // Live build log for a release: replays buffered lines then streams new ones.
+  @ApiExcludeEndpoint()
   @Sse("releases/:id/logs")
   buildLogs(@Param("id") id: string): Observable<LogEvent> {
     return new Observable<LogEvent>((subscriber) => {
@@ -34,6 +38,7 @@ export class LogsController {
   }
 
   // Live runtime logs of a deployment's active container.
+  @ApiExcludeEndpoint()
   @Sse("deployments/:id/logs")
   runtimeLogs(@Param("id") id: string): Observable<LogEvent> {
     return new Observable<LogEvent>((subscriber) => {

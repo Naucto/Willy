@@ -1,0 +1,999 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/deployments": {
+      "post": {
+        "operationId": "DeploymentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeploymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "get": {
+        "operationId": "DeploymentsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeploymentDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}": {
+      "get": {
+        "operationId": "DeploymentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "delete": {
+        "operationId": "DeploymentActionsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/env": {
+      "get": {
+        "operationId": "EnvVarsController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MaskedEnvVarDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "env"
+        ]
+      }
+    },
+    "/deployments/{id}/env/{key}": {
+      "put": {
+        "operationId": "EnvVarsController_set",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetEnvVarDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "env"
+        ]
+      },
+      "delete": {
+        "operationId": "EnvVarsController_remove",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "env"
+        ]
+      }
+    },
+    "/deployments/{id}/deploy": {
+      "post": {
+        "operationId": "DeploymentActionsController_deploy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/stop": {
+      "post": {
+        "operationId": "DeploymentActionsController_stop",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/start": {
+      "post": {
+        "operationId": "DeploymentActionsController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/releases": {
+      "get": {
+        "operationId": "DeploymentActionsController_listReleases",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReleaseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/releases/{id}": {
+      "get": {
+        "operationId": "DeploymentActionsController_getRelease",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Willy API",
+    "description": "",
+    "version": "0.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "SessionUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role"
+        ]
+      },
+      "SessionDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SessionUserDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
+      "OkResponseDto": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "AuthUserDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "role"
+        ]
+      },
+      "CreateDeploymentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,40}$",
+            "example": "my-app"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "WEB",
+              "WORKER",
+              "CRON"
+            ]
+          },
+          "gitUrl": {
+            "type": "string",
+            "example": "https://github.com/owner/repo.git"
+          },
+          "gitRef": {
+            "type": "string",
+            "example": "main"
+          },
+          "buildStrategy": {
+            "type": "string",
+            "enum": [
+              "NIXPACKS",
+              "DOCKERFILE",
+              "COMPOSE"
+            ]
+          },
+          "dockerfilePath": {
+            "type": "string"
+          },
+          "webServicePort": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "healthCheckPath": {
+            "type": "string",
+            "example": "/"
+          },
+          "runCommand": {
+            "type": "string"
+          },
+          "cronExpr": {
+            "type": "string",
+            "example": "0 3 * * *"
+          },
+          "domain": {
+            "type": "string",
+            "example": "app.example.com"
+          },
+          "gitToken": {
+            "type": "string",
+            "description": "Personal access token for a private repo (encrypted at rest)."
+          },
+          "memoryLimitMb": {
+            "type": "number",
+            "minimum": 16
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "gitUrl"
+        ]
+      },
+      "DeploymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "WEB",
+              "WORKER",
+              "CRON"
+            ]
+          },
+          "gitUrl": {
+            "type": "string"
+          },
+          "gitRef": {
+            "type": "string"
+          },
+          "buildStrategy": {
+            "type": "string",
+            "enum": [
+              "NIXPACKS",
+              "DOCKERFILE",
+              "COMPOSE"
+            ]
+          },
+          "dockerfilePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeFilePath": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeWebService": {
+            "type": "string",
+            "nullable": true
+          },
+          "runCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "cronExpr": {
+            "type": "string",
+            "nullable": true
+          },
+          "webServicePort": {
+            "type": "number",
+            "nullable": true
+          },
+          "healthCheckPath": {
+            "type": "string"
+          },
+          "autoDeploy": {
+            "type": "boolean"
+          },
+          "restartPolicy": {
+            "type": "string",
+            "enum": [
+              "NO",
+              "ON_FAILURE",
+              "ALWAYS",
+              "UNLESS_STOPPED"
+            ]
+          },
+          "memoryLimitMb": {
+            "type": "number",
+            "nullable": true
+          },
+          "nanoCpus": {
+            "type": "number",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "CREATED",
+              "DEPLOYING",
+              "RUNNING",
+              "DEGRADED",
+              "STOPPED",
+              "ERROR"
+            ]
+          },
+          "activeReleaseId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "gitCredentialId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "gitUrl",
+          "gitRef",
+          "buildStrategy",
+          "dockerfilePath",
+          "composeFilePath",
+          "composeWebService",
+          "runCommand",
+          "cronExpr",
+          "webServicePort",
+          "healthCheckPath",
+          "autoDeploy",
+          "restartPolicy",
+          "memoryLimitMb",
+          "nanoCpus",
+          "state",
+          "activeReleaseId",
+          "gitCredentialId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MaskedEnvVarDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "BUILD",
+              "RUNTIME",
+              "BOTH"
+            ]
+          },
+          "isSecret": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "scope",
+          "isSecret"
+        ]
+      },
+      "SetEnvVarDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "BUILD",
+              "RUNTIME",
+              "BOTH"
+            ]
+          },
+          "isSecret": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "ReleaseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "gitSha": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageTag": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "CLONING",
+              "BUILDING",
+              "HEALTHCHECKING",
+              "LIVE",
+              "SUPERSEDED",
+              "FAILED",
+              "ROLLEDBACK",
+              "INTERRUPTED"
+            ]
+          },
+          "containerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "composeProject": {
+            "type": "string",
+            "nullable": true
+          },
+          "logPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "queuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "deploymentId",
+          "gitSha",
+          "imageTag",
+          "status",
+          "containerId",
+          "composeProject",
+          "logPath",
+          "errorMessage",
+          "createdById",
+          "queuedAt",
+          "startedAt",
+          "finishedAt",
+          "createdAt"
+        ]
+      }
+    }
+  }
+}
