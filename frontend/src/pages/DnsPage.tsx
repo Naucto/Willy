@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef, type GridRowSelectionModel } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useCreateDnsRecord, useDeleteDnsRecord, useDnsRecords, useDnsZones } from "../api/hooks";
@@ -29,11 +29,16 @@ const EMPTY_RECORD: CreateDnsRecordInput = {
   ttl: 3600,
 };
 
+const emptySelection = (): GridRowSelectionModel => ({ type: "include", ids: new Set() });
+
 export function DnsPage() {
   const { enqueueSnackbar } = useSnackbar();
   const [zone, setZone] = useState("");
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<CreateDnsRecordInput>(EMPTY_RECORD);
+  const [selection, setSelection] = useState<GridRowSelectionModel>(emptySelection);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const { data: zones, error: zonesError } = useDnsZones();
   const zoneList = zones?.zones ?? [];
@@ -50,12 +55,38 @@ export function DnsPage() {
   const createRecord = useCreateDnsRecord(zone);
   const deleteRecord = useDeleteDnsRecord(zone);
 
+  // The grid selection is an include/exclude model; resolve it to concrete record ids.
+  const allIds = (records ?? []).map((record) => record.id);
+  const selectedIds =
+    selection.type === "include"
+      ? allIds.filter((id) => selection.ids.has(id))
+      : allIds.filter((id) => !selection.ids.has(id));
+
   const onDelete = async (record: DnsRecord) => {
     try {
       await deleteRecord.mutateAsync(record.id);
       enqueueSnackbar("Record deleted", { variant: "success" });
     } catch (caught) {
       enqueueSnackbar(describeError(caught), { variant: "error" });
+    }
+  };
+
+  const onBulkDelete = async () => {
+    setBulkBusy(true);
+
+    const results = await Promise.allSettled(selectedIds.map((id) => deleteRecord.mutateAsync(id)));
+    const failed = results.filter((result) => result.status === "rejected").length;
+
+    setBulkBusy(false);
+    setConfirmBulk(false);
+    setSelection(emptySelection());
+
+    if (failed > 0) {
+      enqueueSnackbar(`Deleted ${selectedIds.length - failed}, ${failed} failed`, {
+        variant: "warning",
+      });
+    } else {
+      enqueueSnackbar(`Deleted ${selectedIds.length} record(s)`, { variant: "success" });
     }
   };
 
@@ -112,7 +143,10 @@ export function DnsPage() {
           value={zone}
           disabled={zoneList.length === 0}
           sx={{ minWidth: 320 }}
-          onChange={(event) => setZone(event.target.value)}
+          onChange={(event) => {
+            setZone(event.target.value);
+            setSelection(emptySelection());
+          }}
         >
           {zoneList.map((name) => (
             <MenuItem key={name} value={name}>
@@ -123,6 +157,16 @@ export function DnsPage() {
         {zone && (
           <>
             <Box sx={{ flexGrow: 1 }} />
+            {selectedIds.length > 0 && (
+              <Button
+                color="error"
+                variant="outlined"
+                startIcon={<DeleteIcon />}
+                onClick={() => setConfirmBulk(true)}
+              >
+                Delete {selectedIds.length}
+              </Button>
+            )}
             <Button variant="contained" onClick={() => setAdding(true)}>
               Add record
             </Button>
@@ -147,7 +191,10 @@ export function DnsPage() {
             getRowId={(row) => row.id}
             showToolbar
             density="compact"
+            checkboxSelection
             disableRowSelectionOnClick
+            rowSelectionModel={selection}
+            onRowSelectionModelChange={(model) => setSelection(model)}
             pageSizeOptions={[25, 50, 100]}
             initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
             sx={{ border: 0 }}
@@ -204,6 +251,26 @@ export function DnsPage() {
             onClick={() => void onCreate()}
           >
             Create
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmBulk} onClose={() => setConfirmBulk(false)} maxWidth="xs">
+        <DialogTitle>Delete {selectedIds.length} record(s)?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This permanently removes the selected records from {zone}. This can't be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmBulk(false)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={bulkBusy}
+            onClick={() => void onBulkDelete()}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
