@@ -7,11 +7,13 @@ import { ConsoleModule } from "./console/console.module";
 import { CryptoModule } from "./crypto/crypto.module";
 import { DbModule } from "./db/db.module";
 import { DeploymentsModule } from "./deployments/deployments.module";
+import { DnsModule } from "./dns/dns.module";
 import { DockerModule } from "./docker/docker.module";
 import { EnvVarsModule } from "./env-vars/env-vars.module";
 import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
 import { LogsModule } from "./logs/logs.module";
+import { OvhModule } from "./ovh/ovh.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
 import { SystemModule } from "./system/system.module";
 import { TraefikModule } from "./traefik/traefik.module";
@@ -37,6 +39,8 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     WebhooksModule,
     ConsoleModule,
     SystemModule,
+    OvhModule,
+    DnsModule,
   ],
 })
 export class AppModule {}

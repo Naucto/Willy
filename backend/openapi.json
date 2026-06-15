@@ -772,6 +772,207 @@
           "system"
         ]
       }
+    },
+    "/dns/zones": {
+      "get": {
+        "operationId": "DnsController_zones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/dns/zones/{zone}/records": {
+      "get": {
+        "operationId": "DnsController_records",
+        "parameters": [
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DnsRecordDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      },
+      "post": {
+        "operationId": "DnsController_create",
+        "parameters": [
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDnsRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsRecordDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/dns/zones/{zone}/records/{id}": {
+      "put": {
+        "operationId": "DnsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDnsRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      },
+      "delete": {
+        "operationId": "DnsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
     }
   },
   "info": {
@@ -1379,6 +1580,102 @@
           "platform",
           "arch",
           "node"
+        ]
+      },
+      "ZonesDto": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "zones"
+        ]
+      },
+      "DnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "fieldType": {
+            "type": "string"
+          },
+          "subDomain": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "zone",
+          "fieldType",
+          "subDomain",
+          "target",
+          "ttl"
+        ]
+      },
+      "CreateDnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "fieldType": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CNAME",
+              "TXT",
+              "MX",
+              "NS",
+              "SRV"
+            ]
+          },
+          "subDomain": {
+            "type": "string",
+            "example": "app"
+          },
+          "target": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "ttl": {
+            "type": "number",
+            "default": 3600
+          }
+        },
+        "required": [
+          "fieldType",
+          "subDomain",
+          "target"
+        ]
+      },
+      "UpdateDnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "number"
+          },
+          "subDomain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
         ]
       }
     }
