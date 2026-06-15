@@ -1225,6 +1225,147 @@
         ]
       }
     },
+    "/backups/schedules": {
+      "get": {
+        "operationId": "BackupSchedulesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackupScheduleDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "operationId": "BackupSchedulesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBackupScheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupScheduleDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/backups/schedules/{id}": {
+      "patch": {
+        "operationId": "BackupSchedulesController_setEnabled",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBackupScheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupScheduleDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      },
+      "delete": {
+        "operationId": "BackupSchedulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
     "/deployments/{id}/containers": {
       "get": {
         "operationId": "DeploymentVolumesController_list",
@@ -2121,6 +2262,86 @@
         "required": [
           "kind",
           "target"
+        ]
+      },
+      "BackupScheduleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "deploymentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "target": {
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "retention": {
+            "type": "number"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "deploymentId",
+          "target",
+          "cron",
+          "retention",
+          "enabled",
+          "lastRunAt",
+          "createdAt"
+        ]
+      },
+      "CreateBackupScheduleDto": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "example": "willy_blog_data"
+          },
+          "cron": {
+            "type": "string",
+            "example": "0 3 * * *"
+          },
+          "retention": {
+            "type": "number",
+            "example": 7
+          },
+          "deploymentId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "target",
+          "cron"
+        ]
+      },
+      "UpdateBackupScheduleDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
         ]
       },
       "VolumeMountDto": {

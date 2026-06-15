@@ -6,7 +6,7 @@ import { type Readable, pipeline } from "node:stream";
 import { promisify } from "node:util";
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { WillyError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
@@ -32,8 +32,9 @@ function describeError(error: unknown): string {
 }
 
 // Backups run as throwaway helper containers that write artifacts into the willy_backups volume,
-// which is also mounted into this server so it can size/checksum/stream/delete them. Slice 1
-// supports VOLUME_TAR (tar a named volume); PG_DUMP / S3_SYNC come next.
+// which is also mounted into this server so it can size/checksum/stream/delete them. VOLUME_TAR
+// tars a named volume; S3_SYNC (offsite) comes next. Direct database dumps are intentionally out
+// of scope — apps persist through volumes, which the volume backup already covers.
 @Injectable()
 export class BackupsService {
   private readonly logger = new Logger(BackupsService.name);
@@ -94,6 +95,11 @@ export class BackupsService {
     this.queue.enqueue(input.target, () => this.runVolumeTar(row.id, input.target));
 
     return row;
+  }
+
+  // Prune a target's SUCCESS backups down to the newest `keep`, deleting artifacts + rows.
+  schedulePrune(target: string, keep: number): void {
+    this.queue.enqueue(target, () => this.pruneTarget(target, keep));
   }
 
   async remove(id: string): Promise<void> {
@@ -174,6 +180,20 @@ export class BackupsService {
         .update(backups)
         .set({ status: "FAILED", errorMessage: describeError(error), finishedAt: new Date() })
         .where(eq(backups.id, id));
+    }
+  }
+
+  private async pruneTarget(target: string, keep: number): Promise<void> {
+    const rows = await this.db
+      .select()
+      .from(backups)
+      .where(and(eq(backups.target, target), eq(backups.status, "SUCCESS")))
+      .orderBy(desc(backups.createdAt));
+
+    for (const row of rows.slice(Math.max(keep, 0))) {
+      await this.remove(row.id).catch((error) =>
+        this.logger.warn(`prune ${row.id} failed: ${describeError(error)}`),
+      );
     }
   }
 
