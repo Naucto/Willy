@@ -53,6 +53,13 @@ const DEFAULTS: FormValues = {
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
 const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE"];
 
+const MEMORY_MARKS = [
+  { value: 0, label: "Off" },
+  { value: 1024, label: "1G" },
+  { value: 2048, label: "2G" },
+  { value: 4096, label: "4G" },
+];
+
 function trimmed(value: string): string | undefined {
   const cleaned = value.trim();
 
@@ -113,6 +120,7 @@ export function CreateDeploymentPage() {
   } = useForm<FormValues>({ defaultValues: DEFAULTS });
 
   const type = watch("type");
+  const strategy = watch("buildStrategy");
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -201,17 +209,22 @@ export function CreateDeploymentPage() {
                 )}
               />
 
-              <TextField
-                label="Dockerfile path"
-                placeholder="Dockerfile"
-                {...register("dockerfilePath")}
-              />
+              {strategy === "DOCKERFILE" && (
+                <TextField
+                  label="Dockerfile path"
+                  placeholder="Dockerfile"
+                  {...register("dockerfilePath")}
+                />
+              )}
 
               {type === "WEB" && (
                 <>
                   <TextField label="Service port" type="number" {...register("webServicePort")} />
                   <TextField label="Domain" placeholder="app.example.com" {...register("domain")} />
-                  <TextField label="Health check path" {...register("healthCheckPath")} />
+                  {/* Compose declares its own healthcheck — inferred, not asked here. */}
+                  {strategy !== "COMPOSE" && (
+                    <TextField label="Health check path" {...register("healthCheckPath")} />
+                  )}
                 </>
               )}
 
@@ -235,26 +248,44 @@ export function CreateDeploymentPage() {
                   const current = field.value ? Number(field.value) : 0;
 
                   return (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        Memory limit: {current === 0 ? "none" : `${current} MB`}
-                      </Typography>
-                      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                    <Box
+                      sx={{
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        px: 2,
+                        pt: 1,
+                        pb: 0.5,
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Memory limit
+                        </Typography>
+                        <Box sx={{ flexGrow: 1 }} />
+                        <Typography variant="body2">
+                          {current === 0 ? "No limit" : `${current} MB`}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={3} sx={{ alignItems: "center", px: 1 }}>
                         <Slider
                           value={current}
                           min={0}
                           max={4096}
                           step={64}
+                          marks={MEMORY_MARKS}
                           valueLabelDisplay="auto"
+                          valueLabelFormat={(value) => (value === 0 ? "Off" : `${value} MB`)}
                           onChange={(_, value) => field.onChange(value === 0 ? "" : String(value))}
                           sx={{ flexGrow: 1 }}
                         />
                         <TextField
                           label="MB"
                           type="number"
+                          size="small"
                           value={field.value}
                           onChange={(event) => field.onChange(event.target.value)}
-                          sx={{ width: 110 }}
+                          sx={{ width: 96 }}
                         />
                       </Stack>
                     </Box>
