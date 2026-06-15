@@ -16,7 +16,14 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
-import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useDeploy, useRemoveDeployment, useRestart, useStart, useStop } from "../api/hooks";
 import type { Deployment } from "../api/types";
 import { describeError } from "../errors";
@@ -75,12 +82,16 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     }
   }, [deployment.updatedAt, deployment.state, pendingKey]);
 
-  useEffect(() => {
+  // useLayoutEffect so the first real measurement (and any fold) happens before paint — otherwise
+  // the buttons flash full on load, then collapse once the observer fires.
+  useLayoutEffect(() => {
     const el = rowRef.current;
 
     if (!el) {
       return;
     }
+
+    setAvailable(el.clientWidth);
 
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
