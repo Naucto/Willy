@@ -773,6 +773,27 @@
         ]
       }
     },
+    "/system/public-ip": {
+      "get": {
+        "operationId": "SystemController_publicIp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicIpDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/dns/zones": {
       "get": {
         "operationId": "DnsController_zones",
@@ -1580,6 +1601,18 @@
           "platform",
           "arch",
           "node"
+        ]
+      },
+      "PublicIpDto": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ip"
         ]
       },
       "ZonesDto": {
