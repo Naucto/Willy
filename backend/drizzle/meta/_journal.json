@@ -78,6 +78,13 @@
       "when": 1781559074313,
       "tag": "0010_boring_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781564314388,
+      "tag": "0011_remove_nixpacks_strategy",
+      "breakpoints": true
     }
   ]
 }

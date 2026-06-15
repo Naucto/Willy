@@ -8,7 +8,7 @@ This document will grow with ADRs and subsystem deep-dives as phases land. High 
 
 - **Traefik** (edge) routes each WEB deployment by `Host` rule on the `willy_edge` network and obtains
   Let's Encrypt certs via OVH DNS-01.
-- **willy-server** (NestJS) is the control plane: it builds git repos (Nixpacks / Dockerfile / compose),
+- **willy-server** (NestJS) is the control plane: it builds git repos (Dockerfile / compose) or runs prebuilt images,
   runs containers through `dockerode` (via a least-privilege docker-socket-proxy), manages env vars,
   domains/DNS, managed databases, backups, and streams logs/console.
 - **willy-web** (React + MUI) is the control panel.

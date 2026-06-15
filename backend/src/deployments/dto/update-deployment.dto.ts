@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from "@nestjs/swagger";
 import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import type { Deployment } from "../deployments.service";
 
-const STRATEGIES: Deployment["buildStrategy"][] = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"];
+const STRATEGIES: Deployment["buildStrategy"][] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
 const RESTART: Deployment["restartPolicy"][] = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"];
 
 // All optional — only provided fields are changed. name/type are immutable.

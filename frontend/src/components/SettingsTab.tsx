@@ -14,7 +14,7 @@ import { useUpdateDeployment } from "../api/hooks";
 import type { BuildStrategy, Deployment, UpdateDeploymentInput } from "../api/types";
 import { describeError } from "../errors";
 
-const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE", "IMAGE"];
+const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
 
 interface FormValues {
   gitUrl: string;

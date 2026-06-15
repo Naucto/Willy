@@ -12,7 +12,6 @@ import { DeploymentActionsController } from "./deployment-actions.controller";
 import { ReleasesService } from "./releases.service";
 import { ComposeService } from "./strategies/compose.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
-import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
 @Module({
   imports: [DeploymentsModule, EnvVarsModule, GitModule, TraefikModule],
@@ -23,7 +22,6 @@ import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
     ReleasesService,
     BuildLogStore,
     DockerfileStrategy,
-    NixpacksStrategy,
     ComposeService,
     CronService,
     CronRunsService,

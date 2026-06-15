@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 const TYPES = ["WEB", "WORKER", "CRON"] as const;
-const STRATEGIES = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"] as const;
+const STRATEGIES = ["DOCKERFILE", "COMPOSE", "IMAGE"] as const;
 const STATES = ["CREATED", "DEPLOYING", "RUNNING", "DEGRADED", "STOPPED", "ERROR"] as const;
 const RESTART_POLICIES = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"] as const;
 

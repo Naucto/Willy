@@ -22,7 +22,6 @@ import type { Release } from "./releases.service";
 import { ReleasesService } from "./releases.service";
 import { ComposeService } from "./strategies/compose.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
-import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
 const EDGE_NETWORK = "willy_edge";
 
@@ -72,7 +71,6 @@ export class BuildOrchestrator {
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
     private readonly dockerfile: DockerfileStrategy,
-    private readonly nixpacks: NixpacksStrategy,
     private readonly compose: ComposeService,
     private readonly buildLog: BuildLogStore,
     private readonly queue: BuildQueue,
@@ -287,7 +285,7 @@ export class BuildOrchestrator {
     return imageTag;
   }
 
-  // Clone the repo and build an image (Dockerfile/Nixpacks), returning the built tag.
+  // Clone the repo and build an image from its Dockerfile, returning the built tag.
   private async buildGitRelease(deployment: Deployment, releaseId: string): Promise<string> {
     await this.releases.setStatus(releaseId, "CLONING");
 
@@ -478,8 +476,6 @@ export class BuildOrchestrator {
     switch (deployment.buildStrategy) {
       case "DOCKERFILE":
         return this.dockerfile.build(context);
-      case "NIXPACKS":
-        return this.nixpacks.build(context);
       default:
         throw new BadRequestException(
           `build strategy ${deployment.buildStrategy} is not supported yet`,

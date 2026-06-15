@@ -3,7 +3,7 @@ import { IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from "c
 import type { Deployment, DeploymentType } from "../deployments.service";
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
-const STRATEGIES: Deployment["buildStrategy"][] = ["NIXPACKS", "DOCKERFILE", "COMPOSE", "IMAGE"];
+const STRATEGIES: Deployment["buildStrategy"][] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
 
 export class CreateDeploymentDto {
   @ApiProperty({ type: String, pattern: "^[a-z0-9][a-z0-9-]{0,40}$", example: "my-app" })

@@ -2,12 +2,7 @@ import { pgEnum } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["ADMIN", "OPERATOR", "VIEWER"]);
 export const deploymentTypeEnum = pgEnum("deployment_type", ["WEB", "WORKER", "CRON"]);
-export const buildStrategyEnum = pgEnum("build_strategy", [
-  "NIXPACKS",
-  "DOCKERFILE",
-  "COMPOSE",
-  "IMAGE",
-]);
+export const buildStrategyEnum = pgEnum("build_strategy", ["DOCKERFILE", "COMPOSE", "IMAGE"]);
 export const envScopeEnum = pgEnum("env_scope", ["BUILD", "RUNTIME", "BOTH"]);
 
 export const releaseStatusEnum = pgEnum("release_status", [

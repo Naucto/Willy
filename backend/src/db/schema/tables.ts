@@ -51,7 +51,7 @@ export const deployments = pgTable("deployments", {
   type: deploymentTypeEnum("type").notNull().default("WEB"),
   gitUrl: text("git_url").notNull(),
   gitRef: text("git_ref").notNull().default("main"),
-  buildStrategy: buildStrategyEnum("build_strategy").notNull().default("NIXPACKS"),
+  buildStrategy: buildStrategyEnum("build_strategy").notNull().default("DOCKERFILE"),
   // Per-strategy settings (dockerfile path / compose file+service / image ref), shaped by
   // build_strategy. See deployments/strategy-config.ts.
   strategyConfig: jsonb("strategy_config").$type<StrategyConfig>().notNull().default({}),

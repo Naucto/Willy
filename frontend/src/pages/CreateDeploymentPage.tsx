@@ -54,7 +54,7 @@ const DEFAULTS: FormValues = {
 };
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
-const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE", "IMAGE"];
+const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
 
 const MEMORY_MARKS = [
   { value: 0, label: "Off" },

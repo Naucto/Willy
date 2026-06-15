@@ -2,8 +2,6 @@
 // build strategy (a separate enum column) selects which shape applies — a base deployment plus a
 // strategy-specific config, rather than a flat column per strategy.
 
-export type NixpacksConfig = Record<string, never>;
-
 export interface DockerfileConfig {
   dockerfilePath?: string;
 }
@@ -17,4 +15,4 @@ export interface ImageConfig {
   imageRef: string;
 }
 
-export type StrategyConfig = NixpacksConfig | DockerfileConfig | ComposeConfig | ImageConfig;
+export type StrategyConfig = DockerfileConfig | ComposeConfig | ImageConfig;

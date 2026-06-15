@@ -812,7 +812,7 @@ export interface components {
        */
       imageRef?: string;
       /** @enum {string} */
-      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
+      buildStrategy?: "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath?: string;
       /** @example docker-compose.yml */
       composeFilePath?: string;
@@ -859,7 +859,7 @@ export interface components {
       gitUrl: string;
       gitRef: string;
       /** @enum {string} */
-      buildStrategy: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
+      buildStrategy: "DOCKERFILE" | "COMPOSE" | "IMAGE";
       strategyConfig: components["schemas"]["StrategyConfigDto"];
       runCommand: string | null;
       cronExpr: string | null;
@@ -892,7 +892,7 @@ export interface components {
       imageRef?: string;
       gitRef?: string;
       /** @enum {string} */
-      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
+      buildStrategy?: "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath?: string;
       composeFilePath?: string;
       composeWebService?: string;
