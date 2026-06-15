@@ -1,3 +1,4 @@
+import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import KeyIcon from "@mui/icons-material/Key";
 import {
@@ -123,7 +124,7 @@ export function UsersPage() {
         <Typography variant="h4" sx={{ fontWeight: 700, flexGrow: 1 }}>
           Users
         </Typography>
-        <Button variant="contained" onClick={() => setAdding(true)}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
           New user
         </Button>
       </Box>

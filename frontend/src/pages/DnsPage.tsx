@@ -1,3 +1,4 @@
+import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
@@ -176,7 +177,7 @@ export function DnsPage() {
                 Delete {selectedIds.length}
               </Button>
             )}
-            <Button variant="contained" onClick={() => setAdding(true)}>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
               Add record
             </Button>
           </>

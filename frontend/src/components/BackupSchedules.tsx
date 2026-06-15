@@ -1,3 +1,4 @@
+import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Box,
@@ -94,7 +95,12 @@ export function BackupSchedules() {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Schedules
         </Typography>
-        <Button size="small" variant="outlined" onClick={() => setAdding(true)}>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<AddIcon />}
+          onClick={() => setAdding(true)}
+        >
           New schedule
         </Button>
       </Box>

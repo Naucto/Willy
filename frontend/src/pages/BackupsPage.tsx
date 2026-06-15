@@ -1,3 +1,4 @@
+import AddIcon from "@mui/icons-material/Add";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -199,7 +200,7 @@ export function BackupsPage() {
         <Typography variant="h4" sx={{ fontWeight: 700, flexGrow: 1 }}>
           Backups
         </Typography>
-        <Button variant="contained" onClick={() => setAdding(true)}>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
           New backup
         </Button>
       </Box>
