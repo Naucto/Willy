@@ -338,6 +338,10 @@ export interface components {
       /** @enum {string} */
       buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
       dockerfilePath?: string;
+      /** @example docker-compose.yml */
+      composeFilePath?: string;
+      /** @description Compose service to route + monitor. */
+      composeWebService?: string;
       webServicePort?: number;
       /** @example / */
       healthCheckPath?: string;
@@ -390,6 +394,8 @@ export interface components {
       /** @enum {string} */
       buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
       dockerfilePath?: string;
+      composeFilePath?: string;
+      composeWebService?: string;
       webServicePort?: number;
       healthCheckPath?: string;
       runCommand?: string;

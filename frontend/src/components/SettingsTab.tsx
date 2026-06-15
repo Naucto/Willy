@@ -27,6 +27,8 @@ interface FormValues {
   domain: string;
   buildStrategy: BuildStrategy;
   dockerfilePath: string;
+  composeFilePath: string;
+  composeWebService: string;
   webServicePort: string;
   healthCheckPath: string;
   runCommand: string;
@@ -49,6 +51,8 @@ function initialValues(deployment: Deployment): FormValues {
     domain: deployment.primaryDomain ?? "",
     buildStrategy: deployment.buildStrategy,
     dockerfilePath: deployment.dockerfilePath ?? "",
+    composeFilePath: deployment.composeFilePath ?? "",
+    composeWebService: deployment.composeWebService ?? "",
     webServicePort: deployment.webServicePort?.toString() ?? "",
     healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
@@ -91,6 +95,8 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     };
 
     set("dockerfilePath", trimmed(values.dockerfilePath));
+    set("composeFilePath", trimmed(values.composeFilePath));
+    set("composeWebService", trimmed(values.composeWebService));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
     set("domain", trimmed(values.domain));
@@ -144,6 +150,17 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
 
                 {strategy === "DOCKERFILE" && (
                   <TextField label="Dockerfile path" {...register("dockerfilePath")} />
+                )}
+
+                {strategy === "COMPOSE" && (
+                  <>
+                    <TextField label="Compose file path" {...register("composeFilePath")} />
+                    <TextField
+                      label="Compose web service"
+                      helperText="The service Willy routes and health-checks."
+                      {...register("composeWebService")}
+                    />
+                  </>
                 )}
 
                 {deployment.type === "WEB" && (

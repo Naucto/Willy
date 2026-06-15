@@ -31,6 +31,8 @@ interface FormValues {
   cronExpr: string;
   gitToken: string;
   memoryLimitMb: string;
+  composeFilePath: string;
+  composeWebService: string;
 }
 
 const DEFAULTS: FormValues = {
@@ -40,6 +42,8 @@ const DEFAULTS: FormValues = {
   gitRef: "main",
   buildStrategy: "DOCKERFILE",
   dockerfilePath: "",
+  composeFilePath: "",
+  composeWebService: "",
   webServicePort: "",
   domain: "",
   healthCheckPath: "/",
@@ -84,9 +88,17 @@ function toPayload(values: FormValues): CreateDeploymentInput {
   };
 
   set("gitRef", trimmed(values.gitRef));
-  set("dockerfilePath", trimmed(values.dockerfilePath));
   set("gitToken", trimmed(values.gitToken));
   set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
+
+  if (values.buildStrategy === "DOCKERFILE") {
+    set("dockerfilePath", trimmed(values.dockerfilePath));
+  }
+
+  if (values.buildStrategy === "COMPOSE") {
+    set("composeFilePath", trimmed(values.composeFilePath));
+    set("composeWebService", trimmed(values.composeWebService));
+  }
 
   if (values.type === "WEB") {
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
@@ -220,6 +232,22 @@ export function CreateDeploymentPage() {
                     placeholder="Dockerfile"
                     {...register("dockerfilePath")}
                   />
+                )}
+
+                {strategy === "COMPOSE" && (
+                  <>
+                    <TextField
+                      label="Compose file path"
+                      placeholder="docker-compose.yml"
+                      {...register("composeFilePath")}
+                    />
+                    <TextField
+                      label="Compose web service"
+                      placeholder="frontend"
+                      helperText="The service Willy routes to the domain and health-checks."
+                      {...register("composeWebService")}
+                    />
+                  </>
                 )}
 
                 {type === "WEB" && (
