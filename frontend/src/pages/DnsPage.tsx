@@ -1,7 +1,6 @@
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -32,23 +31,22 @@ const EMPTY_RECORD: CreateDnsRecordInput = {
 
 export function DnsPage() {
   const { enqueueSnackbar } = useSnackbar();
-  const [zoneInput, setZoneInput] = useState("");
   const [zone, setZone] = useState("");
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<CreateDnsRecordInput>(EMPTY_RECORD);
 
   const { data: zones, error: zonesError } = useDnsZones();
+  const zoneList = zones?.zones ?? [];
   const { data: records, isLoading, error } = useDnsRecords(zone);
 
   // Auto-select the first discovered zone so records show without an extra click.
   useEffect(() => {
-    const first = zones?.zones?.[0];
+    const first = zoneList[0];
 
     if (!zone && first) {
       setZone(first);
-      setZoneInput(first);
     }
-  }, [zones, zone]);
+  }, [zoneList, zone]);
   const createRecord = useCreateDnsRecord(zone);
   const deleteRecord = useDeleteDnsRecord(zone);
 
@@ -107,30 +105,21 @@ export function DnsPage() {
         DNS
       </Typography>
 
-      <Box
-        component="form"
-        sx={{ display: "flex", gap: 2, alignItems: "center" }}
-        onSubmit={(event) => {
-          event.preventDefault();
-          setZone(zoneInput.trim());
-        }}
-      >
-        <Autocomplete
-          freeSolo
-          options={zones?.zones ?? []}
-          value={zoneInput}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+        <TextField
+          select
+          label="Zone"
+          value={zone}
+          disabled={zoneList.length === 0}
           sx={{ minWidth: 320 }}
-          onInputChange={(_, value) => setZoneInput(value)}
-          onChange={(_, value) => {
-            const next = (value ?? "").trim();
-            setZoneInput(next);
-            setZone(next);
-          }}
-          renderInput={(params) => <TextField {...params} label="Zone" placeholder="example.com" />}
-        />
-        <Button type="submit" variant="outlined">
-          Load records
-        </Button>
+          onChange={(event) => setZone(event.target.value)}
+        >
+          {zoneList.map((name) => (
+            <MenuItem key={name} value={name}>
+              {name}
+            </MenuItem>
+          ))}
+        </TextField>
         {zone && (
           <>
             <Box sx={{ flexGrow: 1 }} />
@@ -141,12 +130,10 @@ export function DnsPage() {
         )}
       </Box>
 
-      {!zone && !zonesError && (
-        <Alert severity="info">
-          {zones?.zones?.length
-            ? "Pick a zone to manage its records."
-            : "Select or type a DNS zone to manage its records."}
-        </Alert>
+      {zonesError && <Alert severity="warning">{describeError(zonesError)}</Alert>}
+
+      {!zonesError && zoneList.length === 0 && (
+        <Alert severity="info">No DNS zones available.</Alert>
       )}
 
       {zone && error && <Alert severity="error">{describeError(error)}</Alert>}

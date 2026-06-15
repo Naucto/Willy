@@ -1,3 +1,5 @@
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import TrackChangesIcon from "@mui/icons-material/TrackChanges";
 import {
   Alert,
   Box,
@@ -5,8 +7,10 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  IconButton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
@@ -86,24 +90,38 @@ export function DomainPicker({
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
         <TextField
           label="Domain"
           value={value}
           placeholder="No domain set"
           fullWidth
           slotProps={{ input: { readOnly: true } }}
-          helperText="Applies on the next deploy or restart."
         />
-        <Button variant="outlined" onClick={openPicker} disabled={disabled}>
-          Choose
-        </Button>
+        <Tooltip title="Choose domain">
+          <span>
+            <IconButton onClick={openPicker} disabled={disabled}>
+              <TrackChangesIcon />
+            </IconButton>
+          </span>
+        </Tooltip>
         {value && (
-          <Button color="inherit" onClick={() => onChange("")} disabled={disabled}>
-            Clear
-          </Button>
+          <Tooltip title="Clear domain">
+            <span>
+              <IconButton onClick={() => onChange("")} disabled={disabled}>
+                <DeleteIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
         )}
       </Box>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ ml: 1.75, mt: 0.5, display: "block" }}
+      >
+        Applies on the next deploy or restart.
+      </Typography>
 
       <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth="md">
         <DialogContent>
