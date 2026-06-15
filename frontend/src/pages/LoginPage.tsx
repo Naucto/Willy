@@ -22,6 +22,7 @@ export function LoginPage() {
   const location = useLocation();
   const { enqueueSnackbar } = useSnackbar();
   const { data: system } = useSystemInfo();
+  const backendReady = Boolean(system);
   const {
     register,
     handleSubmit,
@@ -78,35 +79,39 @@ export function LoginPage() {
                 {...register("password", { required: "Password is required" })}
                 helperText={errors.password?.message}
               />
-              <Button type="submit" variant="contained" disabled={isSubmitting}>
-                Sign in
+              <Button type="submit" variant="contained" disabled={isSubmitting || !backendReady}>
+                {backendReady ? "Sign in" : "Waiting for backend…"}
               </Button>
             </Stack>
           </form>
         </CardContent>
       </Card>
 
-      {system && (
-        <Box
-          sx={{
-            position: "absolute",
-            right: 16,
-            bottom: 12,
-            textAlign: "right",
-            color: "rgba(255,255,255,0.6)",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 11,
-            lineHeight: 1.6,
-          }}
-        >
-          <div>
-            Willy v{system.version} · {system.commit.slice(0, 12)}
-          </div>
-          <div>
-            {system.distro} · {system.kernel} · {system.arch}
-          </div>
-        </Box>
-      )}
+      <Box
+        sx={{
+          position: "absolute",
+          right: 16,
+          bottom: 12,
+          textAlign: "right",
+          color: "rgba(255,255,255,0.6)",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+          fontSize: 11,
+          lineHeight: 1.6,
+        }}
+      >
+        {system ? (
+          <>
+            <div>
+              Willy v{system.version} · {system.commit.slice(0, 12)}
+            </div>
+            <div>
+              {system.distro} · {system.kernel} · {system.arch}
+            </div>
+          </>
+        ) : (
+          <div>Backend not ready — retrying…</div>
+        )}
+      </Box>
     </Box>
   );
 }

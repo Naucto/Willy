@@ -107,7 +107,7 @@ export function AppShell() {
                 component={RouterLink}
                 to={item.to}
                 selected={location.pathname.startsWith(item.to)}
-                sx={{ justifyContent: open ? "initial" : "center", px: 2.5 }}
+                sx={{ minHeight: 48, justifyContent: open ? "initial" : "center", px: 2.5 }}
               >
                 <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 0, justifyContent: "center" }}>
                   {item.icon}

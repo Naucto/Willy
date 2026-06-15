@@ -76,6 +76,17 @@ export function useSystemInfo() {
     queryKey: queryKeys.systemInfo,
     queryFn: async () => unwrap(await api.GET("/system/info")),
     staleTime: Number.POSITIVE_INFINITY,
+    // Keep retrying while the backend is unreachable so the login screen recovers on its own.
+    retry: true,
+    refetchInterval: (query) => (query.state.data ? false : 5000),
+  });
+}
+
+export function useHostPublicIp() {
+  return useQuery({
+    queryKey: ["system", "public-ip"],
+    queryFn: async () => unwrap(await api.GET("/system/public-ip")),
+    staleTime: 5 * 60 * 1000,
   });
 }
 

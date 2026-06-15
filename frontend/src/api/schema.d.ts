@@ -292,6 +292,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/system/public-ip": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_publicIp"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/dns/zones": {
     parameters: {
       query?: never;
@@ -519,6 +535,9 @@ export interface components {
       platform: string;
       arch: string;
       node: string;
+    };
+    PublicIpDto: {
+      ip: string | null;
     };
     ZonesDto: {
       zones: string[];
@@ -1033,6 +1052,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SystemInfoDto"];
+        };
+      };
+    };
+  };
+  SystemController_publicIp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PublicIpDto"];
         };
       };
     };

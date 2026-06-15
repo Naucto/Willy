@@ -16,7 +16,13 @@ import {
 import { DataGrid, type GridColDef, type GridRowSelectionModel } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
-import { useCreateDnsRecord, useDeleteDnsRecord, useDnsRecords, useDnsZones } from "../api/hooks";
+import {
+  useCreateDnsRecord,
+  useDeleteDnsRecord,
+  useDnsRecords,
+  useDnsZones,
+  useHostPublicIp,
+} from "../api/hooks";
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
 import { describeError } from "../errors";
 
@@ -43,6 +49,9 @@ export function DnsPage() {
   const { data: zones, error: zonesError } = useDnsZones();
   const zoneList = zones?.zones ?? [];
   const { data: records, isLoading, error } = useDnsRecords(zone);
+  const { data: hostIp } = useHostPublicIp();
+
+  const isAddressRecord = draft.fieldType === "A" || draft.fieldType === "AAAA";
 
   // Auto-select the first discovered zone so records show without an extra click.
   useEffect(() => {
@@ -235,6 +244,15 @@ export function DnsPage() {
               value={draft.target}
               onChange={(event) => setDraft({ ...draft, target: event.target.value })}
             />
+            {isAddressRecord && hostIp?.ip && (
+              <Button
+                size="small"
+                sx={{ alignSelf: "flex-start" }}
+                onClick={() => setDraft({ ...draft, target: hostIp.ip ?? "" })}
+              >
+                Use this host ({hostIp.ip})
+              </Button>
+            )}
             <TextField
               label="TTL (seconds)"
               type="number"
