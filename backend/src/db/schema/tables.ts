@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   auditActionEnum,
+  backupDestinationTypeEnum,
   backupKindEnum,
   backupStatusEnum,
   buildStrategyEnum,
@@ -228,6 +229,18 @@ export const backups = pgTable(
   },
   (t) => [index("backups_deployment_created_idx").on(t.deploymentId, t.createdAt)],
 );
+
+export const backupDestinations = pgTable("backup_destinations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  type: backupDestinationTypeEnum("type").notNull(),
+  // The connection config (bucket/host/credentials) as an AES-256-GCM sealed JSON blob.
+  cipherText: text("cipher_text").notNull(),
+  nonce: text("nonce").notNull(),
+  authTag: text("auth_tag").notNull(),
+  keyVersion: integer("key_version").notNull().default(1),
+  createdAt,
+});
 
 export const backupSchedules = pgTable("backup_schedules", {
   id: uuid("id").primaryKey().defaultRandom(),

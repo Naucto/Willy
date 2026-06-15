@@ -1162,6 +1162,49 @@
         ]
       }
     },
+    "/backups/{id}/push/{destinationId}": {
+      "post": {
+        "operationId": "BackupsController_push",
+        "parameters": [
+          {
+            "name": "destinationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
     "/backups/{id}/download": {
       "get": {
         "operationId": "BackupsController_download",
@@ -1334,6 +1377,104 @@
       },
       "delete": {
         "operationId": "BackupSchedulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/backups/destinations": {
+      "get": {
+        "operationId": "BackupDestinationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BackupDestinationDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "operationId": "BackupDestinationsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBackupDestinationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupDestinationDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/backups/destinations/{id}": {
+      "delete": {
+        "operationId": "BackupDestinationsController_remove",
         "parameters": [
           {
             "name": "id",
@@ -2203,6 +2344,10 @@
             "type": "string",
             "nullable": true
           },
+          "offsiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -2221,6 +2366,7 @@
           "target",
           "sizeBytes",
           "errorMessage",
+          "offsiteUrl",
           "createdAt",
           "finishedAt"
         ]
@@ -2342,6 +2488,91 @@
         },
         "required": [
           "enabled"
+        ]
+      },
+      "BackupDestinationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "S3",
+              "FTP",
+              "SFTP"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "createdAt"
+        ]
+      },
+      "CreateBackupDestinationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "offsite-s3"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "S3",
+              "FTP",
+              "SFTP"
+            ]
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string",
+            "example": "https://s3.example.com"
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "secretAccessKey": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "number"
+          },
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
         ]
       },
       "VolumeMountDto": {

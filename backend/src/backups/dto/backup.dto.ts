@@ -26,11 +26,98 @@ export class BackupDto {
   @ApiProperty({ type: String, nullable: true })
   errorMessage!: string | null;
 
+  @ApiProperty({ type: String, nullable: true })
+  offsiteUrl!: string | null;
+
   @ApiProperty({ type: String, format: "date-time" })
   createdAt!: string;
 
   @ApiProperty({ type: String, format: "date-time", nullable: true })
   finishedAt!: string | null;
+}
+
+const DESTINATION_TYPES = ["S3", "FTP", "SFTP"] as const;
+type DestinationType = (typeof DESTINATION_TYPES)[number];
+
+export class BackupDestinationDto {
+  @ApiProperty({ type: String, format: "uuid" })
+  id!: string;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ enum: DESTINATION_TYPES })
+  type!: string;
+
+  @ApiProperty({ type: String, format: "date-time" })
+  createdAt!: string;
+}
+
+export class CreateBackupDestinationDto {
+  @ApiProperty({ type: String, example: "offsite-s3" })
+  @IsString()
+  name!: string;
+
+  @ApiProperty({ enum: DESTINATION_TYPES })
+  @IsIn(DESTINATION_TYPES)
+  type!: DestinationType;
+
+  // S3 fields.
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  bucket?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  prefix?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @ApiPropertyOptional({ type: String, example: "https://s3.example.com" })
+  @IsOptional()
+  @IsString()
+  endpoint?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  accessKeyId?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  secretAccessKey?: string;
+
+  // FTP / SFTP fields.
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  host?: string;
+
+  @ApiPropertyOptional({ type: Number })
+  @IsOptional()
+  @IsInt()
+  port?: number;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  username?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  password?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  path?: string;
 }
 
 export class VolumesDto {

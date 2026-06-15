@@ -24,6 +24,7 @@ function toDto(row: Backup): BackupDto {
     target: row.target,
     sizeBytes: row.sizeBytes,
     errorMessage: row.errorMessage,
+    offsiteUrl: row.offsiteUrl,
     createdAt: row.createdAt.toISOString(),
     finishedAt: row.finishedAt?.toISOString() ?? null,
   };
@@ -68,6 +69,21 @@ export class BackupsController {
   @Post(":id/restore")
   async restore(@Param("id", ParseUUIDPipe) id: string): Promise<{ ok: true }> {
     await this.backups.restore(id);
+
+    return { ok: true };
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(202)
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "destinationId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Post(":id/push/:destinationId")
+  async push(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("destinationId", ParseUUIDPipe) destinationId: string,
+  ): Promise<{ ok: true }> {
+    await this.backups.pushOffsite(id, destinationId);
 
     return { ok: true };
   }
