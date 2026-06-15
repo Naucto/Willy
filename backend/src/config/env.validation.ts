@@ -50,6 +50,16 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   BASE_DOMAIN?: string;
+
+  // Where backup artifacts live inside willy-server (the willy_backups volume) + the volume name
+  // that backup helper containers bind by.
+  @IsOptional()
+  @IsString()
+  BACKUPS_DIR?: string;
+
+  @IsOptional()
+  @IsString()
+  BACKUPS_VOLUME?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

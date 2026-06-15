@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
+import { BackupsModule } from "./backups/backups.module";
 import { BuildModule } from "./build/build.module";
 import { validateEnv } from "./config/env.validation";
 import { ConsoleModule } from "./console/console.module";
@@ -41,6 +42,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     SystemModule,
     OvhModule,
     DnsModule,
+    BackupsModule,
   ],
 })
 export class AppModule {}

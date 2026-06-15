@@ -33,6 +33,37 @@ export interface ContainerStatus {
   ip: string | undefined;
 }
 
+export interface OneShotOptions {
+  image: string;
+  command: string[];
+  env?: Record<string, string> | undefined;
+  // Docker bind specs, e.g. "volume-or-path:/data:ro".
+  binds?: string[] | undefined;
+  entrypoint?: string[] | undefined;
+  // Network to join (e.g. so pg_dump can reach a database container).
+  network?: string | undefined;
+}
+
+export interface OneShotResult {
+  exitCode: number;
+  logs: string;
+}
+
+// De-multiplexes a non-TTY Docker log buffer (8-byte frame headers) into plain text.
+function demuxLogBuffer(raw: Buffer): string {
+  let text = "";
+  let offset = 0;
+
+  while (offset + 8 <= raw.length) {
+    const size = raw.readUInt32BE(offset + 4);
+    const start = offset + 8;
+    text += raw.subarray(start, start + size).toString("utf8");
+    offset = start + size;
+  }
+
+  return text || raw.toString("utf8");
+}
+
 interface BuildEvent {
   stream?: string;
   error?: string;
@@ -129,6 +160,66 @@ export class DockerService {
     await container.start();
 
     return container.id;
+  }
+
+  // Pulls an image if it isn't present locally (helper images for backups, etc.).
+  async ensureImage(image: string): Promise<void> {
+    const present = await this.docker.listImages({ filters: { reference: [image] } });
+
+    if (present.length > 0) {
+      return;
+    }
+
+    const stream = await this.docker.pull(image);
+
+    await new Promise<void>((resolve, reject) => {
+      this.docker.modem.followProgress(stream, (error) =>
+        error ? reject(error instanceof Error ? error : new Error(String(error))) : resolve(),
+      );
+    });
+  }
+
+  // Runs a one-shot helper container to completion, returning its exit code + combined logs.
+  // Used for backups (tar a volume, pg_dump, aws s3 sync) via throwaway containers.
+  async runToCompletion(options: OneShotOptions): Promise<OneShotResult> {
+    await this.ensureImage(options.image);
+
+    const container = await this.docker.createContainer({
+      Image: options.image,
+      Cmd: options.command,
+      ...(options.entrypoint ? { Entrypoint: options.entrypoint } : {}),
+      Env: Object.entries(options.env ?? {}).map(([key, value]) => `${key}=${value}`),
+      HostConfig: {
+        Binds: options.binds,
+        NetworkMode: options.network,
+        LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "1" } },
+      },
+    });
+
+    try {
+      await container.start();
+      const result = (await container.wait()) as { StatusCode: number };
+      const raw = (await container.logs({
+        stdout: true,
+        stderr: true,
+        follow: false,
+        timestamps: false,
+      })) as unknown as Buffer;
+
+      return { exitCode: result.StatusCode, logs: demuxLogBuffer(raw) };
+    } finally {
+      try {
+        await container.remove({ force: true, v: false });
+      } catch (error) {
+        this.logger.warn(`failed to remove helper container: ${describeError(error)}`);
+      }
+    }
+  }
+
+  async listVolumes(): Promise<string[]> {
+    const { Volumes } = await this.docker.listVolumes();
+
+    return (Volumes ?? []).map((volume) => volume.Name).sort();
   }
 
   async inspectContainer(id: string, network?: string): Promise<ContainerStatus | undefined> {
