@@ -75,33 +75,30 @@ export class BuildOrchestrator {
     return release;
   }
 
+  // The lifecycle actions below validate synchronously (so the caller gets 400/404 right away)
+  // then run on the per-deployment queue and return immediately — a relaunch can wait up to the
+  // health-check timeout, far longer than an HTTP request should stay open. The UI tracks the
+  // outcome via the deployment state (polled).
+
   async stop(deploymentId: string): Promise<void> {
     await this.requireDeployment(deploymentId);
-    await this.removeAllContainers(deploymentId);
-    await this.deployments.setState(deploymentId, "STOPPED");
+    this.queue.enqueue(deploymentId, () => this.runStop(deploymentId));
   }
 
   async start(deploymentId: string): Promise<void> {
-    const deployment = await this.requireDeployment(deploymentId);
+    await this.requireActiveImage(deploymentId);
+    await this.deployments.setState(deploymentId, "DEPLOYING");
+    this.queue.enqueue(deploymentId, () => this.runRelaunch(deploymentId));
+  }
 
-    if (!deployment.activeReleaseId) {
-      throw new BadRequestException("no active release to start; deploy first");
-    }
-
-    const release = await this.releases.findById(deployment.activeReleaseId);
-
-    if (!release?.imageTag) {
-      throw new BadRequestException("active release has no built image");
-    }
-
-    const containerId = await this.launchAndHealthCheck(deployment, release.imageTag, release);
-    await this.removeStaleContainers(deploymentId, containerId);
-    await this.deployments.setState(deploymentId, "RUNNING");
+  // Recreate the active release's container (picks up current env/config) via the swap.
+  async restart(deploymentId: string): Promise<void> {
+    await this.start(deploymentId);
   }
 
   // Re-launch a previously built release's image (no rebuild) and make it active.
   async rollback(deploymentId: string, releaseId: string): Promise<void> {
-    const deployment = await this.requireDeployment(deploymentId);
+    await this.requireDeployment(deploymentId);
     const target = await this.releases.findById(releaseId);
 
     if (!target || target.deploymentId !== deploymentId) {
@@ -112,26 +109,83 @@ export class BuildOrchestrator {
       throw new BadRequestException("release has no built image to roll back to");
     }
 
-    const priorActiveReleaseId = deployment.activeReleaseId;
-    const containerId = await this.launchAndHealthCheck(deployment, target.imageTag, target);
-
-    await this.removeStaleContainers(deploymentId, containerId);
-    await this.releases.setStatus(releaseId, "LIVE", { containerId });
-    await this.deployments.setActiveRelease(deploymentId, releaseId);
-    await this.deployments.setState(deploymentId, "RUNNING");
-
-    if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
-      await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
-    }
-  }
-
-  // Recreate the active release's container (picks up current env/config) via the swap.
-  async restart(deploymentId: string): Promise<void> {
-    await this.start(deploymentId);
+    await this.deployments.setState(deploymentId, "DEPLOYING");
+    this.queue.enqueue(deploymentId, () => this.runRollback(deploymentId, releaseId));
   }
 
   async teardown(deploymentId: string): Promise<void> {
     await this.removeAllContainers(deploymentId);
+  }
+
+  private async runStop(deploymentId: string): Promise<void> {
+    try {
+      await this.removeAllContainers(deploymentId);
+      await this.deployments.setState(deploymentId, "STOPPED");
+    } catch (error) {
+      this.logger.warn(`stop failed for ${deploymentId}: ${describeError(error)}`);
+      await this.markActionFailed(deploymentId);
+    }
+  }
+
+  private async runRelaunch(deploymentId: string): Promise<void> {
+    try {
+      const deployment = await this.requireDeployment(deploymentId);
+      const release = deployment.activeReleaseId
+        ? await this.releases.findById(deployment.activeReleaseId)
+        : undefined;
+
+      if (!release?.imageTag) {
+        throw new BadRequestException("active release has no built image");
+      }
+
+      const containerId = await this.launchAndHealthCheck(deployment, release.imageTag, release);
+      await this.removeStaleContainers(deploymentId, containerId);
+      await this.deployments.setState(deploymentId, "RUNNING");
+    } catch (error) {
+      this.logger.warn(`relaunch failed for ${deploymentId}: ${describeError(error)}`);
+      await this.markActionFailed(deploymentId);
+    }
+  }
+
+  private async runRollback(deploymentId: string, releaseId: string): Promise<void> {
+    try {
+      const deployment = await this.requireDeployment(deploymentId);
+      const target = await this.releases.findById(releaseId);
+
+      if (!target?.imageTag) {
+        throw new BadRequestException("release has no built image to roll back to");
+      }
+
+      const priorActiveReleaseId = deployment.activeReleaseId;
+      const containerId = await this.launchAndHealthCheck(deployment, target.imageTag, target);
+
+      await this.removeStaleContainers(deploymentId, containerId);
+      await this.releases.setStatus(releaseId, "LIVE", { containerId });
+      await this.deployments.setActiveRelease(deploymentId, releaseId);
+      await this.deployments.setState(deploymentId, "RUNNING");
+
+      if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
+        await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
+      }
+    } catch (error) {
+      this.logger.warn(`rollback failed for ${deploymentId}: ${describeError(error)}`);
+      await this.markActionFailed(deploymentId);
+    }
+  }
+
+  private async requireActiveImage(deploymentId: string): Promise<void> {
+    const deployment = await this.requireDeployment(deploymentId);
+
+    if (!deployment.activeReleaseId) {
+      throw new BadRequestException("no active release to start; deploy first");
+    }
+  }
+
+  // A failed background action leaves the old container running (the swap only removes it on
+  // success), so reflect "still up" vs "nothing running".
+  private async markActionFailed(deploymentId: string): Promise<void> {
+    const containers = await this.docker.listByLabel(OWNER_LABEL, deploymentId);
+    await this.deployments.setState(deploymentId, containers.length > 0 ? "DEGRADED" : "ERROR");
   }
 
   private async runRelease(deployment: Deployment, releaseId: string): Promise<void> {
