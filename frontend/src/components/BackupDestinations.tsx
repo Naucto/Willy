@@ -15,11 +15,16 @@ import {
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import { useBackupDestinations, useCreateDestination, useDeleteDestination } from "../api/hooks";
+import {
+  useBackupDestinations,
+  useCreateDestination,
+  useDeleteDestination,
+  useTestDestination,
+} from "../api/hooks";
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
 import { describeError } from "../errors";
 
-const TYPES = ["S3", "FTP", "SFTP"] as const;
+const TYPES = ["S3", "FTP", "SFTP", "SSH"] as const;
 type DestType = (typeof TYPES)[number];
 
 export function BackupDestinations() {
@@ -93,6 +98,7 @@ export function BackupDestinations() {
 function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { enqueueSnackbar } = useSnackbar();
   const create = useCreateDestination();
+  const test = useTestDestination();
   const [type, setType] = useState<DestType>("S3");
   const [fields, setFields] = useState<Record<string, string>>({});
 
@@ -103,17 +109,30 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
     setFields({});
   };
 
-  const onCreate = async () => {
+  const buildBody = (): CreateBackupDestinationInput => {
     const { port, ...rest } = fields;
-    const body = {
+
+    return {
       ...rest,
       name: fields.name ?? "",
       type,
       ...(port ? { port: Number(port) } : {}),
     } as CreateBackupDestinationInput;
+  };
 
+  const onTest = async () => {
     try {
-      await create.mutateAsync(body);
+      await test.mutateAsync(buildBody());
+      enqueueSnackbar("Connection OK", { variant: "success" });
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
+
+  const onCreate = async () => {
+    try {
+      // Server re-tests the connection on create, so a bad destination is never saved.
+      await create.mutateAsync(buildBody());
       enqueueSnackbar("Destination created", { variant: "success" });
       reset();
       onClose();
@@ -135,7 +154,9 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
     Boolean(fields.name) &&
     (type === "S3"
       ? Boolean(fields.bucket && fields.accessKeyId && fields.secretAccessKey)
-      : Boolean(fields.host && fields.username && fields.password));
+      : type === "SSH"
+        ? Boolean(fields.host && fields.username && (fields.password || fields.privateKey))
+        : Boolean(fields.host && fields.username && fields.password));
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -156,7 +177,7 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
             ))}
           </TextField>
 
-          {type === "S3" ? (
+          {type === "S3" && (
             <>
               {field("bucket", "Bucket")}
               {field("prefix", "Prefix (optional)")}
@@ -165,7 +186,9 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
               {field("accessKeyId", "Access key ID")}
               {field("secretAccessKey", "Secret access key", true)}
             </>
-          ) : (
+          )}
+
+          {(type === "FTP" || type === "SFTP") && (
             <>
               {field("host", "Host")}
               {field("port", "Port (optional)")}
@@ -174,10 +197,31 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
               {field("path", "Remote path (optional)")}
             </>
           )}
+
+          {type === "SSH" && (
+            <>
+              {field("host", "Host")}
+              {field("port", "Port (optional, default 22)")}
+              {field("username", "Username")}
+              {field("path", "Remote path (optional)")}
+              <TextField
+                label="Private key (PEM)"
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                value={fields.privateKey ?? ""}
+                onChange={(event) => set("privateKey", event.target.value)}
+                multiline
+                minRows={3}
+              />
+              {field("password", "Password (if no key)", true)}
+            </>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
+        <Button disabled={test.isPending || !ready} onClick={() => void onTest()}>
+          {test.isPending ? "Testing…" : "Test connection"}
+        </Button>
         <Button
           variant="contained"
           disabled={create.isPending || !ready}

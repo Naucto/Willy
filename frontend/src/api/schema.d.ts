@@ -516,6 +516,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/backups/destinations/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BackupDestinationsController_test"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/backups/destinations/{id}": {
     parameters: {
       query?: never;
@@ -832,7 +848,7 @@ export interface components {
       id: string;
       name: string;
       /** @enum {string} */
-      type: "S3" | "FTP" | "SFTP";
+      type: "S3" | "FTP" | "SFTP" | "SSH";
       /** Format: date-time */
       createdAt: string;
     };
@@ -840,7 +856,7 @@ export interface components {
       /** @example offsite-s3 */
       name: string;
       /** @enum {string} */
-      type: "S3" | "FTP" | "SFTP";
+      type: "S3" | "FTP" | "SFTP" | "SSH";
       bucket?: string;
       prefix?: string;
       region?: string;
@@ -853,6 +869,7 @@ export interface components {
       username?: string;
       password?: string;
       path?: string;
+      privateKey?: string;
     };
     VolumeMountDto: {
       name: string;
@@ -1781,6 +1798,29 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["BackupDestinationDto"];
+        };
+      };
+    };
+  };
+  BackupDestinationsController_test: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBackupDestinationDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
         };
       };
     };
