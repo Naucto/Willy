@@ -5,7 +5,12 @@ import {
   Card,
   CardContent,
   CircularProgress,
-  MenuItem,
+  Dialog,
+  DialogTitle,
+  Link,
+  List,
+  ListItemButton,
+  ListItemText,
   Stack,
   Tab,
   Table,
@@ -14,7 +19,6 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  TextField,
   Typography,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
@@ -23,6 +27,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useDeployment, useReleases, useRollback } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
+import { CopyButton } from "../components/CopyButton";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
@@ -39,11 +44,34 @@ function isRunning(deployment: Deployment): boolean {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+function DetailRow({
+  label,
+  value,
+  href,
+  copyLabel,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  href?: string | undefined;
+  copyLabel?: string | undefined;
+}) {
+  const present = value !== null && value !== undefined && value !== "";
+
   return (
-    <Box sx={{ display: "flex", gap: 2, py: 0.5 }}>
-      <Box sx={{ width: 160, color: "text.secondary" }}>{label}</Box>
-      <Box sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{value ?? "—"}</Box>
+    <Box sx={{ display: "flex", gap: 2, py: 0.5, alignItems: "center", minHeight: 32 }}>
+      <Box sx={{ width: 160, color: "text.secondary", flexShrink: 0 }}>{label}</Box>
+      <Box sx={{ fontFamily: "monospace", wordBreak: "break-all", flexGrow: 1 }}>
+        {present && href ? (
+          <Link href={href} target="_blank" rel="noopener noreferrer">
+            {value}
+          </Link>
+        ) : present ? (
+          value
+        ) : (
+          "—"
+        )}
+      </Box>
+      {present && copyLabel && <CopyButton value={String(value)} label={copyLabel} />}
     </Box>
   );
 }
@@ -109,27 +137,32 @@ function OverviewTab({
   deployment,
 }: {
   deploymentId: string;
-  deployment: ReturnType<typeof useDeployment>["data"];
+  deployment: Deployment;
 }) {
   const { data: releases } = useReleases(deploymentId);
-
-  if (!deployment) {
-    return null;
-  }
 
   return (
     <Stack spacing={3}>
       <Card variant="outlined">
         <CardContent>
-          <DetailRow label="Domain" value={deployment.primaryDomain} />
-          <DetailRow label="Repository" value={deployment.gitUrl} />
+          <DetailRow
+            label="Domain"
+            value={deployment.primaryDomain}
+            href={deployment.primaryDomain ? `https://${deployment.primaryDomain}` : undefined}
+            copyLabel="domain"
+          />
+          <DetailRow
+            label="Repository"
+            value={deployment.gitUrl}
+            href={deployment.gitUrl}
+            copyLabel="repository URL"
+          />
           <DetailRow label="Ref" value={deployment.gitRef} />
           <DetailRow label="Build strategy" value={deployment.buildStrategy} />
           <DetailRow label="Service port" value={deployment.webServicePort} />
           <DetailRow label="Health check" value={deployment.healthCheckPath} />
           <DetailRow label="Restart policy" value={deployment.restartPolicy} />
           <DetailRow label="Memory limit (MB)" value={deployment.memoryLimitMb} />
-          <DetailRow label="Active release" value={deployment.activeReleaseId} />
         </CardContent>
       </Card>
 
@@ -190,9 +223,25 @@ function ReleasesTable({
               <StatusBadge status={release.status} />
             </TableCell>
             <TableCell sx={{ fontFamily: "monospace" }}>
-              {release.gitSha?.slice(0, 8) ?? "—"}
+              {release.gitSha ? (
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  {release.gitSha.slice(0, 8)}
+                  <CopyButton value={release.gitSha} label="commit" />
+                </Box>
+              ) : (
+                "—"
+              )}
             </TableCell>
-            <TableCell sx={{ fontFamily: "monospace" }}>{release.imageTag ?? "—"}</TableCell>
+            <TableCell sx={{ fontFamily: "monospace" }}>
+              {release.imageTag ? (
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  {release.imageTag}
+                  <CopyButton value={release.imageTag} label="image" />
+                </Box>
+              ) : (
+                "—"
+              )}
+            </TableCell>
             <TableCell>{new Date(release.queuedAt).toLocaleString()}</TableCell>
             <TableCell align="right">
               {release.imageTag && release.id !== activeReleaseId && (
@@ -237,9 +286,16 @@ function RuntimeLogsTab({
   return <LogViewer path={`/deployments/${deploymentId}/logs`} />;
 }
 
+function releaseSummary(release: Release): string {
+  const ref = release.gitSha?.slice(0, 8) ?? release.id.slice(0, 8);
+
+  return `${release.status} · ${ref} · ${new Date(release.queuedAt).toLocaleString()}`;
+}
+
 function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
   const { data: releases } = useReleases(deploymentId);
   const [releaseId, setReleaseId] = useState<string>("");
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Default to the most recent release once they load.
   useEffect(() => {
@@ -254,24 +310,47 @@ function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
     return <Alert severity="info">No releases yet. Trigger a deploy to see build logs.</Alert>;
   }
 
+  const current = releases.find((release) => release.id === releaseId);
+
   return (
     <Stack spacing={2}>
-      <TextField
-        select
-        label="Release"
-        value={releaseId}
-        onChange={(event) => setReleaseId(event.target.value)}
-        sx={{ maxWidth: 360 }}
-      >
-        {releases.map((release) => (
-          <MenuItem key={release.id} value={release.id}>
-            {release.status} · {release.gitSha?.slice(0, 8) ?? release.id.slice(0, 8)} ·{" "}
-            {new Date(release.queuedAt).toLocaleString()}
-          </MenuItem>
-        ))}
-      </TextField>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Button variant="outlined" onClick={() => setPickerOpen(true)}>
+          Choose release
+        </Button>
+        {current && (
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
+            {releaseSummary(current)}
+          </Typography>
+        )}
+      </Box>
 
       {releaseId && <LogViewer key={releaseId} path={`/releases/${releaseId}/logs`} />}
+
+      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Select a release</DialogTitle>
+        <List sx={{ pt: 0 }}>
+          {releases.map((release) => (
+            <ListItemButton
+              key={release.id}
+              selected={release.id === releaseId}
+              onClick={() => {
+                setReleaseId(release.id);
+                setPickerOpen(false);
+              }}
+            >
+              <ListItemText
+                primary={releaseSummary(release)}
+                secondary={release.imageTag ?? undefined}
+                slotProps={{
+                  primary: { sx: { fontFamily: "monospace", fontSize: 13 } },
+                  secondary: { sx: { fontFamily: "monospace", fontSize: 12 } },
+                }}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+      </Dialog>
     </Stack>
   );
 }

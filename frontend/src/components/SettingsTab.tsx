@@ -4,7 +4,7 @@ import {
   Button,
   Card,
   CardContent,
-  Divider,
+  CardHeader,
   FormControlLabel,
   MenuItem,
   Stack,
@@ -109,100 +109,107 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
   return (
     <Stack spacing={3} sx={{ maxWidth: 640 }}>
       <form onSubmit={onSubmit}>
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="overline" color="text.secondary">
-                Source &amp; build
-              </Typography>
+        <Stack spacing={3}>
+          <Card variant="outlined">
+            <CardHeader
+              title="Source & build"
+              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
+            />
+            <CardContent sx={{ pt: 0 }}>
+              <Stack spacing={2}>
+                <TextField label="Git URL" {...register("gitUrl")} />
+                <TextField label="Git ref" {...register("gitRef")} />
 
-              <TextField label="Git URL" {...register("gitUrl")} />
-              <TextField label="Git ref" {...register("gitRef")} />
-
-              {deployment.type === "WEB" && (
-                <TextField
-                  label="Domain"
-                  placeholder="app.example.com"
-                  helperText="Applies on the next deploy or restart."
-                  {...register("domain")}
-                />
-              )}
-
-              <Controller
-                name="buildStrategy"
-                control={control}
-                render={({ field }) => (
-                  <TextField select label="Build strategy" {...field}>
-                    {STRATEGIES.map((value) => (
-                      <MenuItem key={value} value={value}>
-                        {value}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-
-              {strategy === "DOCKERFILE" && (
-                <TextField label="Dockerfile path" {...register("dockerfilePath")} />
-              )}
-
-              {deployment.type === "WEB" && (
-                <>
-                  <TextField label="Service port" type="number" {...register("webServicePort")} />
-                  {strategy !== "COMPOSE" && (
-                    <TextField label="Health check path" {...register("healthCheckPath")} />
-                  )}
-                </>
-              )}
-
-              {(deployment.type === "WORKER" || deployment.type === "CRON") && (
-                <TextField label="Run command" {...register("runCommand")} />
-              )}
-
-              {deployment.type === "CRON" && (
-                <TextField label="Cron expression" {...register("cronExpr")} />
-              )}
-
-              <Divider />
-              <Typography variant="overline" color="text.secondary">
-                Runtime
-              </Typography>
-
-              <Controller
-                name="restartPolicy"
-                control={control}
-                render={({ field }) => (
-                  <TextField select label="Restart policy" {...field}>
-                    {RESTART.map((value) => (
-                      <MenuItem key={value} value={value}>
-                        {value}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-
-              <TextField label="Memory limit (MB)" type="number" {...register("memoryLimitMb")} />
-
-              <Controller
-                name="autoDeploy"
-                control={control}
-                render={({ field }) => (
-                  <FormControlLabel
-                    control={<Switch checked={field.value} onChange={field.onChange} />}
-                    label="Auto-deploy on webhook push"
+                {deployment.type === "WEB" && (
+                  <TextField
+                    label="Domain"
+                    placeholder="app.example.com"
+                    helperText="Applies on the next deploy or restart."
+                    {...register("domain")}
                   />
                 )}
-              />
 
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Button type="submit" variant="contained" disabled={update.isPending || !isDirty}>
-                  Save changes
-                </Button>
-              </Box>
-            </Stack>
-          </CardContent>
-        </Card>
+                <Controller
+                  name="buildStrategy"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField select label="Build strategy" {...field}>
+                      {STRATEGIES.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+
+                {strategy === "DOCKERFILE" && (
+                  <TextField label="Dockerfile path" {...register("dockerfilePath")} />
+                )}
+
+                {deployment.type === "WEB" && (
+                  <>
+                    <TextField label="Service port" type="number" {...register("webServicePort")} />
+                    {strategy !== "COMPOSE" && (
+                      <TextField label="Health check path" {...register("healthCheckPath")} />
+                    )}
+                  </>
+                )}
+
+                {(deployment.type === "WORKER" || deployment.type === "CRON") && (
+                  <TextField label="Run command" {...register("runCommand")} />
+                )}
+
+                {deployment.type === "CRON" && (
+                  <TextField label="Cron expression" {...register("cronExpr")} />
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card variant="outlined">
+            <CardHeader
+              title="Runtime"
+              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
+            />
+            <CardContent sx={{ pt: 0 }}>
+              <Stack spacing={2}>
+                <Controller
+                  name="restartPolicy"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField select label="Restart policy" {...field}>
+                      {RESTART.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+
+                <TextField label="Memory limit (MB)" type="number" {...register("memoryLimitMb")} />
+
+                <Controller
+                  name="autoDeploy"
+                  control={control}
+                  render={({ field }) => (
+                    <FormControlLabel
+                      control={<Switch checked={field.value} onChange={field.onChange} />}
+                      label="Auto-deploy on webhook push"
+                    />
+                  )}
+                />
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button type="submit" variant="contained" disabled={update.isPending || !isDirty}>
+              Save changes
+            </Button>
+          </Box>
+        </Stack>
       </form>
 
       <WebhookCard deploymentId={deployment.id} autoDeploy={deployment.autoDeploy} />

@@ -4,7 +4,7 @@ import {
   Button,
   Card,
   CardContent,
-  Divider,
+  CardHeader,
   MenuItem,
   Slider,
   Stack,
@@ -139,174 +139,187 @@ export function CreateDeploymentPage() {
       </Typography>
 
       <form onSubmit={onSubmit}>
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="overline" color="text.secondary">
-                Source
-              </Typography>
-
-              <TextField
-                label="Name"
-                placeholder="my-app"
-                error={Boolean(errors.name)}
-                helperText={errors.name?.message ?? "Lowercase letters, digits and hyphens"}
-                {...register("name", {
-                  required: "Name is required",
-                  pattern: {
-                    value: /^[a-z0-9][a-z0-9-]{0,40}$/,
-                    message: "lowercase alphanumeric/hyphen, 1-41 chars",
-                  },
-                })}
-              />
-
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <TextField select label="Type" {...field}>
-                    {TYPES.map((value) => (
-                      <MenuItem key={value} value={value}>
-                        {value}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-
-              <TextField
-                label="Git URL"
-                placeholder="https://github.com/owner/repo.git"
-                error={Boolean(errors.gitUrl)}
-                helperText={errors.gitUrl?.message}
-                {...register("gitUrl", { required: "Git URL is required" })}
-              />
-
-              <TextField label="Git ref" {...register("gitRef")} />
-
-              <TextField
-                label="Git token (private repos)"
-                type="password"
-                {...register("gitToken")}
-              />
-
-              <Divider />
-              <Typography variant="overline" color="text.secondary">
-                Build &amp; run
-              </Typography>
-
-              <Controller
-                name="buildStrategy"
-                control={control}
-                render={({ field }) => (
-                  <TextField select label="Build strategy" {...field}>
-                    {STRATEGIES.map((value) => (
-                      <MenuItem key={value} value={value}>
-                        {value}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-
-              {strategy === "DOCKERFILE" && (
+        <Stack spacing={3}>
+          <Card variant="outlined">
+            <CardHeader
+              title="Source"
+              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
+            />
+            <CardContent sx={{ pt: 0 }}>
+              <Stack spacing={2}>
                 <TextField
-                  label="Dockerfile path"
-                  placeholder="Dockerfile"
-                  {...register("dockerfilePath")}
+                  label="Name"
+                  placeholder="my-app"
+                  error={Boolean(errors.name)}
+                  helperText={errors.name?.message ?? "Lowercase letters, digits and hyphens"}
+                  {...register("name", {
+                    required: "Name is required",
+                    pattern: {
+                      value: /^[a-z0-9][a-z0-9-]{0,40}$/,
+                      message: "lowercase alphanumeric/hyphen, 1-41 chars",
+                    },
+                  })}
                 />
-              )}
 
-              {type === "WEB" && (
-                <>
-                  <TextField label="Service port" type="number" {...register("webServicePort")} />
-                  <TextField label="Domain" placeholder="app.example.com" {...register("domain")} />
-                  {/* Compose declares its own healthcheck — inferred, not asked here. */}
-                  {strategy !== "COMPOSE" && (
-                    <TextField label="Health check path" {...register("healthCheckPath")} />
+                <Controller
+                  name="type"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField select label="Type" {...field}>
+                      {TYPES.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   )}
-                </>
-              )}
+                />
 
-              {type === "WORKER" && <TextField label="Run command" {...register("runCommand")} />}
+                <TextField
+                  label="Git URL"
+                  placeholder="https://github.com/owner/repo.git"
+                  error={Boolean(errors.gitUrl)}
+                  helperText={errors.gitUrl?.message}
+                  {...register("gitUrl", { required: "Git URL is required" })}
+                />
 
-              {type === "CRON" && (
-                <>
+                <TextField label="Git ref" {...register("gitRef")} />
+
+                <TextField
+                  label="Git token (private repos)"
+                  type="password"
+                  {...register("gitToken")}
+                />
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card variant="outlined">
+            <CardHeader
+              title="Build & run"
+              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
+            />
+            <CardContent sx={{ pt: 0 }}>
+              <Stack spacing={2}>
+                <Controller
+                  name="buildStrategy"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField select label="Build strategy" {...field}>
+                      {STRATEGIES.map((value) => (
+                        <MenuItem key={value} value={value}>
+                          {value}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
+
+                {strategy === "DOCKERFILE" && (
                   <TextField
-                    label="Cron expression"
-                    placeholder="0 3 * * *"
-                    {...register("cronExpr")}
+                    label="Dockerfile path"
+                    placeholder="Dockerfile"
+                    {...register("dockerfilePath")}
                   />
-                  <TextField label="Run command" {...register("runCommand")} />
-                </>
-              )}
+                )}
 
-              <Controller
-                name="memoryLimitMb"
-                control={control}
-                render={({ field }) => {
-                  const current = field.value ? Number(field.value) : 0;
+                {type === "WEB" && (
+                  <>
+                    <TextField label="Service port" type="number" {...register("webServicePort")} />
+                    <TextField
+                      label="Domain"
+                      placeholder="app.example.com"
+                      {...register("domain")}
+                    />
+                    {/* Compose declares its own healthcheck — inferred, not asked here. */}
+                    {strategy !== "COMPOSE" && (
+                      <TextField label="Health check path" {...register("healthCheckPath")} />
+                    )}
+                  </>
+                )}
 
-                  return (
-                    <Box
-                      sx={{
-                        border: 1,
-                        borderColor: "divider",
-                        borderRadius: 1,
-                        px: 2,
-                        pt: 1,
-                        pb: 0.5,
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Memory limit
-                        </Typography>
-                        <Box sx={{ flexGrow: 1 }} />
-                        <Typography variant="body2">
-                          {current === 0 ? "No limit" : `${current} MB`}
-                        </Typography>
+                {type === "WORKER" && <TextField label="Run command" {...register("runCommand")} />}
+
+                {type === "CRON" && (
+                  <>
+                    <TextField
+                      label="Cron expression"
+                      placeholder="0 3 * * *"
+                      {...register("cronExpr")}
+                    />
+                    <TextField label="Run command" {...register("runCommand")} />
+                  </>
+                )}
+
+                <Controller
+                  name="memoryLimitMb"
+                  control={control}
+                  render={({ field }) => {
+                    const current = field.value ? Number(field.value) : 0;
+
+                    return (
+                      <Box
+                        sx={{
+                          border: 1,
+                          borderColor: "divider",
+                          borderRadius: 1,
+                          px: 2,
+                          pt: 1,
+                          pb: 0.5,
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Memory limit
+                          </Typography>
+                          <Box sx={{ flexGrow: 1 }} />
+                          <Typography variant="body2">
+                            {current === 0 ? "No limit" : `${current} MB`}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={3} sx={{ alignItems: "center", px: 1 }}>
+                          <Slider
+                            value={current}
+                            min={0}
+                            max={4096}
+                            step={64}
+                            marks={MEMORY_MARKS}
+                            valueLabelDisplay="auto"
+                            valueLabelFormat={(value) => (value === 0 ? "Off" : `${value} MB`)}
+                            onChange={(_, value) =>
+                              field.onChange(value === 0 ? "" : String(value))
+                            }
+                            sx={{ flexGrow: 1 }}
+                          />
+                          <TextField
+                            label="MB"
+                            type="number"
+                            size="small"
+                            value={field.value}
+                            onChange={(event) => field.onChange(event.target.value)}
+                            sx={{ width: 96 }}
+                          />
+                        </Stack>
                       </Box>
-                      <Stack direction="row" spacing={3} sx={{ alignItems: "center", px: 1 }}>
-                        <Slider
-                          value={current}
-                          min={0}
-                          max={4096}
-                          step={64}
-                          marks={MEMORY_MARKS}
-                          valueLabelDisplay="auto"
-                          valueLabelFormat={(value) => (value === 0 ? "Off" : `${value} MB`)}
-                          onChange={(_, value) => field.onChange(value === 0 ? "" : String(value))}
-                          sx={{ flexGrow: 1 }}
-                        />
-                        <TextField
-                          label="MB"
-                          type="number"
-                          size="small"
-                          value={field.value}
-                          onChange={(event) => field.onChange(event.target.value)}
-                          sx={{ width: 96 }}
-                        />
-                      </Stack>
-                    </Box>
-                  );
-                }}
-              />
+                    );
+                  }}
+                />
+              </Stack>
+            </CardContent>
+          </Card>
 
-              <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-                <Button onClick={() => navigate("/deployments")}>Cancel</Button>
-                <Button type="submit" variant="contained" disabled={createDeployment.isPending}>
-                  Create
-                </Button>
-              </Box>
-            </Stack>
-          </CardContent>
-        </Card>
+          <Alert severity="info">
+            After creating, open the deployment to set environment variables and trigger the first
+            deploy.
+          </Alert>
 
-        <Alert severity="info" sx={{ mt: 2 }}>
-          After creating, open the deployment to set environment variables and trigger the first
-          deploy.
-        </Alert>
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+            <Button onClick={() => navigate("/deployments")}>Cancel</Button>
+            <Button type="submit" variant="contained" disabled={createDeployment.isPending}>
+              Create
+            </Button>
+          </Box>
+        </Stack>
       </form>
     </Stack>
   );

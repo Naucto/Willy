@@ -13,6 +13,7 @@ import {
   Menu,
   MenuItem,
   Stack,
+  Tooltip,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { type MouseEvent, type ReactNode, useState } from "react";
@@ -31,6 +32,7 @@ interface DeployActionsProps {
 interface Action {
   key: string;
   label: string;
+  tip: string;
   icon: ReactNode;
   pending: boolean;
   run: () => void;
@@ -64,6 +66,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     {
       key: "deploy",
       label: "Deploy",
+      tip: "Clone the latest commit, build it, and roll it out — the new version only takes over once it passes its health check.",
       icon: <RocketLaunchIcon fontSize="small" />,
       pending: deploy.isPending,
       run: () => void run(() => deploy.mutateAsync(), "Deploy queued")(),
@@ -74,6 +77,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     actions.push({
       key: "restart",
       label: "Restart",
+      tip: "Recreate the container from the current release — applies env/setting changes without rebuilding.",
       icon: <RestartAltIcon fontSize="small" />,
       pending: restart.isPending,
       run: () => void run(() => restart.mutateAsync(), "Restarting")(),
@@ -81,6 +85,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     actions.push({
       key: "stop",
       label: "Stop",
+      tip: "Stop and remove the running container (the build/image is kept; Start brings it back).",
       icon: <StopIcon fontSize="small" />,
       pending: stop.isPending,
       run: () => void run(() => stop.mutateAsync(), "Stopping")(),
@@ -89,6 +94,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     actions.push({
       key: "start",
       label: "Start",
+      tip: "Start the active release's container again (no rebuild).",
       icon: <PlayArrowIcon fontSize="small" />,
       pending: start.isPending,
       run: () => void run(() => start.mutateAsync(), "Starting")(),
@@ -98,6 +104,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   actions.push({
     key: "delete",
     label: "Delete",
+    tip: "Tear down the container and permanently remove this deployment.",
     icon: <DeleteIcon fontSize="small" color="error" />,
     pending: remove.isPending,
     run: () => setConfirmDelete(true),
@@ -165,18 +172,21 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     <>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
         {actions.map((action) => (
-          <Button
-            key={action.key}
-            variant={action.key === "deploy" ? "contained" : "outlined"}
-            color={action.destructive ? "error" : "primary"}
-            disabled={busy}
-            startIcon={
-              action.pending ? <CircularProgress size={18} color="inherit" /> : action.icon
-            }
-            onClick={action.run}
-          >
-            {action.label}
-          </Button>
+          <Tooltip key={action.key} title={action.tip}>
+            <span>
+              <Button
+                variant={action.key === "deploy" ? "contained" : "outlined"}
+                color={action.destructive ? "error" : "primary"}
+                disabled={busy}
+                startIcon={
+                  action.pending ? <CircularProgress size={18} color="inherit" /> : action.icon
+                }
+                onClick={action.run}
+              >
+                {action.label}
+              </Button>
+            </span>
+          </Tooltip>
         ))}
       </Stack>
       {confirmDialog}
