@@ -134,6 +134,30 @@ export class BuildOrchestrator {
     this.queue.enqueue(deploymentId, () => this.runRollback(deploymentId, releaseId));
   }
 
+  // Permanently delete a non-active release: remove its container + image, then the row.
+  async deleteRelease(deploymentId: string, releaseId: string): Promise<void> {
+    const deployment = await this.requireDeployment(deploymentId);
+    const release = await this.releases.findById(releaseId);
+
+    if (!release || release.deploymentId !== deploymentId) {
+      throw new NotFoundException("release not found for this deployment");
+    }
+
+    if (deployment.activeReleaseId === releaseId) {
+      throw new BadRequestException("cannot delete the active release");
+    }
+
+    if (release.containerId) {
+      await this.docker.stopAndRemove(release.containerId);
+    }
+
+    if (release.imageTag) {
+      await this.docker.removeImage(release.imageTag);
+    }
+
+    await this.releases.delete(releaseId);
+  }
+
   async teardown(deploymentId: string): Promise<void> {
     const deployment = await this.requireDeployment(deploymentId);
 

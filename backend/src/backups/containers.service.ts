@@ -1,0 +1,58 @@
+import { Injectable } from "@nestjs/common";
+import type { Deployment } from "../deployments/deployments.service";
+import { DockerService, type VolumeMount } from "../docker/docker.service";
+import { OWNER_LABEL } from "../traefik/label-generator.service";
+
+const COMPOSE_PROJECT_LABEL = "com.docker.compose.project";
+
+export interface DeploymentContainer {
+  id: string;
+  name: string;
+  image: string;
+  running: boolean;
+  volumes: VolumeMount[];
+}
+
+// Discovers the live containers (and their named volumes) belonging to a deployment: compose stacks
+// by their project label, everything else by Willy's owner label.
+@Injectable()
+export class ContainersService {
+  constructor(private readonly docker: DockerService) {}
+
+  async listForDeployment(deployment: Deployment): Promise<DeploymentContainer[]> {
+    const ids = await this.discover(deployment);
+    const containers: DeploymentContainer[] = [];
+
+    for (const id of ids) {
+      const info = await this.docker.inspectContainer(id);
+
+      if (info) {
+        containers.push({
+          id: info.id,
+          name: info.name ?? info.id.slice(0, 12),
+          image: info.image ?? "",
+          running: info.running,
+          volumes: info.mounts,
+        });
+      }
+    }
+
+    return containers;
+  }
+
+  async containersUsingVolume(deployment: Deployment, volume: string): Promise<string[]> {
+    const containers = await this.listForDeployment(deployment);
+
+    return containers
+      .filter((container) => container.volumes.some((mount) => mount.name === volume))
+      .map((container) => container.id);
+  }
+
+  private discover(deployment: Deployment): Promise<string[]> {
+    if (deployment.buildStrategy === "COMPOSE") {
+      return this.docker.listByLabel(COMPOSE_PROJECT_LABEL, `willy_${deployment.name}`);
+    }
+
+    return this.docker.listByLabel(OWNER_LABEL, deployment.id);
+  }
+}

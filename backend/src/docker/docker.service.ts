@@ -26,11 +26,20 @@ export interface RunContainerOptions {
   command?: string[] | undefined;
 }
 
+export interface VolumeMount {
+  name: string;
+  destination: string;
+  rw: boolean;
+}
+
 export interface ContainerStatus {
   id: string;
+  name: string | undefined;
+  image: string | undefined;
   running: boolean;
   health: string | undefined;
   ip: string | undefined;
+  mounts: VolumeMount[];
 }
 
 export interface OneShotOptions {
@@ -226,15 +235,37 @@ export class DockerService {
     try {
       const info = await this.docker.getContainer(id).inspect();
       const ip = network ? info.NetworkSettings.Networks[network]?.IPAddress : undefined;
+      const mounts: VolumeMount[] = (info.Mounts ?? [])
+        .filter((mount) => mount.Type === "volume" && Boolean(mount.Name))
+        .map((mount) => ({
+          name: mount.Name ?? "",
+          destination: mount.Destination,
+          rw: mount.RW,
+        }));
 
       return {
         id: info.Id,
+        name: info.Name?.replace(/^\//, "") || undefined,
+        image: info.Config?.Image || undefined,
         running: info.State.Running,
         health: info.State.Health?.Status,
         ip: ip || undefined,
+        mounts,
       };
     } catch {
       return undefined;
+    }
+  }
+
+  async startContainer(id: string): Promise<void> {
+    await this.docker.getContainer(id).start();
+  }
+
+  async stopContainer(id: string, drainSeconds = 10): Promise<void> {
+    try {
+      await this.docker.getContainer(id).stop({ t: drainSeconds });
+    } catch {
+      // Already stopped — fine for the stop → volume-op → start flow.
     }
   }
 

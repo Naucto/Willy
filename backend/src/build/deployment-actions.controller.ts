@@ -88,6 +88,19 @@ export class DeploymentActionsController {
     return this.releases.listForDeployment(id);
   }
 
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "releaseId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Delete("deployments/:id/releases/:releaseId")
+  async deleteRelease(
+    @Param("id") id: string,
+    @Param("releaseId") releaseId: string,
+  ): Promise<{ ok: true }> {
+    await this.orchestrator.deleteRelease(id, releaseId);
+
+    return { ok: true };
+  }
+
   @ApiOkResponse({ type: ReleaseDto })
   @Get("releases/:id")
   async getRelease(@Param("id") id: string): Promise<Release> {

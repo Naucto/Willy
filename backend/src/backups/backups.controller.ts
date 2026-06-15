@@ -61,6 +61,17 @@ export class BackupsController {
     );
   }
 
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(202)
+  @ApiParam({ name: "id", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Post(":id/restore")
+  async restore(@Param("id", ParseUUIDPipe) id: string): Promise<{ ok: true }> {
+    await this.backups.restore(id);
+
+    return { ok: true };
+  }
+
   @ApiParam({ name: "id", type: String })
   @Get(":id/download")
   async download(@Param("id", ParseUUIDPipe) id: string): Promise<StreamableFile> {

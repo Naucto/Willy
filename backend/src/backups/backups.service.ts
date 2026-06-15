@@ -9,9 +9,11 @@ import { ConfigService } from "@nestjs/config";
 import { desc, eq } from "drizzle-orm";
 import { WillyError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
+import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
 import { backups } from "../db/schema";
 import { BackupQueue } from "./backup-queue";
+import { ContainersService } from "./containers.service";
 
 export class BackupError extends WillyError {}
 
@@ -42,6 +44,8 @@ export class BackupsService {
     @Inject(DB) private readonly db: Database,
     private readonly docker: DockerService,
     private readonly queue: BackupQueue,
+    private readonly deployments: DeploymentsService,
+    private readonly containers: ContainersService,
     config: ConfigService,
   ) {
     this.dir = config.get<string>("BACKUPS_DIR") ?? "/var/lib/willy/backups";
@@ -112,6 +116,27 @@ export class BackupsService {
     return { stream: createReadStream(join(this.dir, row.location)), filename: row.location };
   }
 
+  // Restore an artifact back into the volume it came from, on the deployment it belongs to.
+  async restore(id: string): Promise<void> {
+    const row = await this.get(id);
+
+    if (row.status !== "SUCCESS" || !row.location || !row.target || !row.deploymentId) {
+      throw new BackupError("Backup cannot be restored (missing artifact, volume, or deployment)");
+    }
+
+    const deployment = await this.requireDeployment(row.deploymentId);
+    const { target, location } = row;
+
+    this.queue.enqueue(target, () => this.runVolumeOp(deployment, target, location));
+  }
+
+  // Wipe a deployment volume back to empty.
+  async resetVolume(deploymentId: string, volume: string): Promise<void> {
+    const deployment = await this.requireDeployment(deploymentId);
+
+    this.queue.enqueue(volume, () => this.runVolumeOp(deployment, volume));
+  }
+
   private async runVolumeTar(id: string, target: string): Promise<void> {
     const file = `${id}.tar.gz`;
 
@@ -150,6 +175,55 @@ export class BackupsService {
         .set({ status: "FAILED", errorMessage: describeError(error), finishedAt: new Date() })
         .where(eq(backups.id, id));
     }
+  }
+
+  // Stop the containers using the volume, wipe it (and optionally extract an archive into it),
+  // then start them again — so a live container never sees a half-written volume.
+  private async runVolumeOp(
+    deployment: Deployment,
+    volume: string,
+    restoreFile?: string,
+  ): Promise<void> {
+    const ids = await this.containers.containersUsingVolume(deployment, volume);
+
+    for (const id of ids) {
+      await this.docker.stopContainer(id);
+    }
+
+    try {
+      const command = restoreFile
+        ? `find /data -mindepth 1 -delete && tar -xzf /backup/${restoreFile} -C /data`
+        : "find /data -mindepth 1 -delete";
+      const binds = restoreFile
+        ? [`${volume}:/data`, `${this.volume}:/backup:ro`]
+        : [`${volume}:/data`];
+
+      const result = await this.docker.runToCompletion({
+        image: "alpine:3.20",
+        binds,
+        command: ["sh", "-c", command],
+      });
+
+      if (result.exitCode !== 0) {
+        throw new BackupError(`volume op exited ${result.exitCode}: ${result.logs.slice(0, 300)}`);
+      }
+    } catch (error) {
+      this.logger.warn(`volume op on ${volume} failed: ${describeError(error)}`);
+    } finally {
+      for (const id of ids) {
+        await this.docker.startContainer(id).catch(() => undefined);
+      }
+    }
+  }
+
+  private async requireDeployment(id: string): Promise<Deployment> {
+    const deployment = await this.deployments.findById(id);
+
+    if (!deployment) {
+      throw new BackupError(`Deployment ${id} not found`);
+    }
+
+    return deployment;
   }
 
   private async measure(file: string): Promise<{ size: number; checksum: string }> {

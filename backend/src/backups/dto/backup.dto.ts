@@ -38,6 +38,34 @@ export class VolumesDto {
   volumes!: string[];
 }
 
+export class VolumeMountDto {
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String })
+  destination!: string;
+
+  @ApiProperty({ type: Boolean })
+  rw!: boolean;
+}
+
+export class ContainerDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String })
+  image!: string;
+
+  @ApiProperty({ type: Boolean })
+  running!: boolean;
+
+  @ApiProperty({ type: [VolumeMountDto] })
+  volumes!: VolumeMountDto[];
+}
+
 export class CreateBackupDto {
   @ApiProperty({ enum: BACKUP_KINDS })
   @IsIn(BACKUP_KINDS)

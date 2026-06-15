@@ -623,6 +623,49 @@
         ]
       }
     },
+    "/deployments/{id}/releases/{releaseId}": {
+      "delete": {
+        "operationId": "DeploymentActionsController_deleteRelease",
+        "parameters": [
+          {
+            "name": "releaseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/releases/{id}": {
       "get": {
         "operationId": "DeploymentActionsController_getRelease",
@@ -1084,6 +1127,41 @@
         ]
       }
     },
+    "/backups/{id}/restore": {
+      "post": {
+        "operationId": "BackupsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "backups"
+        ]
+      }
+    },
     "/backups/{id}/download": {
       "get": {
         "operationId": "BackupsController_download",
@@ -1144,6 +1222,87 @@
         ],
         "tags": [
           "backups"
+        ]
+      }
+    },
+    "/deployments/{id}/containers": {
+      "get": {
+        "operationId": "DeploymentVolumesController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContainerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/volumes/{name}/reset": {
+      "post": {
+        "operationId": "DeploymentVolumesController_reset",
+        "parameters": [
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
         ]
       }
     }
@@ -1962,6 +2121,55 @@
         "required": [
           "kind",
           "target"
+        ]
+      },
+      "VolumeMountDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          },
+          "rw": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "destination",
+          "rw"
+        ]
+      },
+      "ContainerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VolumeMountDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "image",
+          "running",
+          "volumes"
         ]
       }
     }

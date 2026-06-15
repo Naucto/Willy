@@ -72,4 +72,8 @@ export class ReleasesService {
       .where(eq(releases.deploymentId, deploymentId))
       .orderBy(desc(releases.createdAt));
   }
+
+  async delete(id: string): Promise<void> {
+    await this.db.delete(releases).where(eq(releases.id, id));
+  }
 }
