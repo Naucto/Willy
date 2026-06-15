@@ -164,6 +164,54 @@ export interface paths {
     patch: operations["DeploymentsController_update"];
     trace?: never;
   };
+  "/deployments/{id}/domains": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentsController_domains"];
+    put?: never;
+    post: operations["DeploymentsController_addDomain"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/domains/{domainId}/primary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["DeploymentsController_makeDomainPrimary"];
+    trace?: never;
+  };
+  "/deployments/{id}/domains/{domainId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["DeploymentsController_removeDomain"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/env": {
     parameters: {
       query?: never;
@@ -855,6 +903,16 @@ export interface components {
       /** @example app.example.com */
       domain?: string;
     };
+    DomainDto: {
+      /** Format: uuid */
+      id: string;
+      fqdn: string;
+      isPrimary: boolean;
+    };
+    AddDomainDto: {
+      /** @example app.example.com */
+      fqdn: string;
+    };
     MaskedEnvVarDto: {
       key: string;
       /** @enum {string} */
@@ -1364,6 +1422,96 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DeploymentDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_domains: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DomainDto"][];
+        };
+      };
+    };
+  };
+  DeploymentsController_addDomain: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AddDomainDto"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DomainDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_makeDomainPrimary: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_removeDomain: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
         };
       };
     };

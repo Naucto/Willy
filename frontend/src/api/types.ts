@@ -29,6 +29,8 @@ export type CreateBackupScheduleInput = components["schemas"]["CreateBackupSched
 export type BackupDestination = components["schemas"]["BackupDestinationDto"];
 export type CreateBackupDestinationInput = components["schemas"]["CreateBackupDestinationDto"];
 
+export type DeploymentDomain = components["schemas"]["DomainDto"];
+
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type BuildStrategy = Deployment["buildStrategy"];

@@ -19,7 +19,7 @@ import { Controller, useForm } from "react-hook-form";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { BuildStrategy, Deployment, UpdateDeploymentInput } from "../api/types";
 import { describeError } from "../errors";
-import { DomainPicker } from "./DomainPicker";
+import { DomainsManager } from "./DomainsManager";
 
 const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE", "IMAGE"];
 const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
@@ -58,7 +58,6 @@ interface FormValues {
   gitUrl: string;
   gitRef: string;
   imageRef: string;
-  domain: string;
   buildStrategy: BuildStrategy;
   dockerfilePath: string;
   composeFilePath: string;
@@ -94,7 +93,6 @@ function initialValues(deployment: Deployment): FormValues {
     gitUrl: deployment.gitUrl,
     gitRef: deployment.gitRef,
     imageRef: deployment.strategyConfig.imageRef ?? "",
-    domain: deployment.primaryDomain ?? "",
     buildStrategy: deployment.buildStrategy,
     dockerfilePath: deployment.strategyConfig.dockerfilePath ?? "",
     composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
@@ -153,7 +151,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("composeWebService", trimmed(values.composeWebService));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
-    set("domain", trimmed(values.domain));
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
     set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
     set("nanoCpus", values.cpuCores ? Math.round(Number(values.cpuCores) * 1e9) : undefined);
@@ -190,16 +187,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
                     <TextField label="Git URL" {...register("gitUrl")} />
                     <TextField label="Git ref" {...register("gitRef")} />
                   </>
-                )}
-
-                {deployment.type === "WEB" && (
-                  <Controller
-                    name="domain"
-                    control={control}
-                    render={({ field }) => (
-                      <DomainPicker value={field.value} onChange={field.onChange} />
-                    )}
-                  />
                 )}
 
                 <Controller
@@ -351,6 +338,8 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
           </Box>
         </Stack>
       </form>
+
+      {deployment.type === "WEB" && <DomainsManager deploymentId={deployment.id} />}
 
       <WebhookCard deploymentId={deployment.id} autoDeploy={deployment.autoDeploy} />
     </Stack>

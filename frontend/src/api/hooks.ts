@@ -340,6 +340,62 @@ export function useDeploymentContainers(id: string) {
   });
 }
 
+export function useDeploymentDomains(id: string) {
+  return useQuery({
+    queryKey: ["deployments", id, "domains"],
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/domains", { params: { path: { id } } })),
+  });
+}
+
+// Domain changes affect the deployment's primaryDomain (shown in the header/overview), so refresh
+// the detail + list alongside the domains query.
+function invalidateDomains(queryClient: ReturnType<typeof useQueryClient>, id: string): void {
+  void queryClient.invalidateQueries({ queryKey: ["deployments", id, "domains"] });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.deployment(id) });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
+}
+
+export function useAddDomain(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (fqdn: string) =>
+      unwrap(
+        await api.POST("/deployments/{id}/domains", { params: { path: { id } }, body: { fqdn } }),
+      ),
+    onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function useMakeDomainPrimary(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (domainId: string) =>
+      unwrap(
+        await api.PATCH("/deployments/{id}/domains/{domainId}/primary", {
+          params: { path: { id, domainId } },
+        }),
+      ),
+    onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function useRemoveDomain(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (domainId: string) =>
+      unwrap(
+        await api.DELETE("/deployments/{id}/domains/{domainId}", {
+          params: { path: { id, domainId } },
+        }),
+      ),
+    onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
 export function useResetVolume(id: string) {
   const queryClient = useQueryClient();
 
