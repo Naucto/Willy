@@ -3,6 +3,7 @@ import { api, unwrap } from "./client";
 import { tokens } from "./tokens";
 import type {
   CreateBackupInput,
+  CreateBackupScheduleInput,
   CreateDeploymentInput,
   CreateDnsRecordInput,
   SetEnvVarInput,
@@ -136,6 +137,48 @@ export function useRestoreBackup() {
     mutationFn: async (id: string) =>
       unwrap(await api.POST("/backups/{id}/restore", { params: { path: { id } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
+export function useBackupSchedules() {
+  return useQuery({
+    queryKey: ["backups", "schedules"],
+    queryFn: async () => unwrap(await api.GET("/backups/schedules")),
+  });
+}
+
+export function useCreateSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: CreateBackupScheduleInput) =>
+      unwrap(await api.POST("/backups/schedules", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups", "schedules"] }),
+  });
+}
+
+export function useSetScheduleEnabled() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; enabled: boolean }) =>
+      unwrap(
+        await api.PATCH("/backups/schedules/{id}", {
+          params: { path: { id: input.id } },
+          body: { enabled: input.enabled },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups", "schedules"] }),
+  });
+}
+
+export function useDeleteSchedule() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/backups/schedules/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups", "schedules"] }),
   });
 }
 

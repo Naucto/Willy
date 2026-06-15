@@ -30,6 +30,7 @@ import {
   useRestoreBackup,
 } from "../api/hooks";
 import type { Backup } from "../api/types";
+import { BackupSchedules } from "../components/BackupSchedules";
 import { describeError } from "../errors";
 
 const STATUS_COLOR: Record<string, "default" | "info" | "success" | "error"> = {
@@ -188,6 +189,8 @@ export function BackupsPage() {
           sx={{ border: 0 }}
         />
       </Box>
+
+      <BackupSchedules />
 
       <NewBackupDialog open={adding} onClose={() => setAdding(false)} />
 

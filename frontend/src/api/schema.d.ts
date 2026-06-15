@@ -452,6 +452,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/backups/schedules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["BackupSchedulesController_list"];
+    put?: never;
+    post: operations["BackupSchedulesController_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/backups/schedules/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["BackupSchedulesController_remove"];
+    options?: never;
+    head?: never;
+    patch: operations["BackupSchedulesController_setEnabled"];
+    trace?: never;
+  };
   "/deployments/{id}/containers": {
     parameters: {
       query?: never;
@@ -719,6 +751,32 @@ export interface components {
       target: string;
       /** Format: uuid */
       deploymentId?: string;
+    };
+    BackupScheduleDto: {
+      /** Format: uuid */
+      id: string;
+      deploymentId: string | null;
+      target: string;
+      cron: string;
+      retention: number;
+      enabled: boolean;
+      /** Format: date-time */
+      lastRunAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    CreateBackupScheduleDto: {
+      /** @example willy_blog_data */
+      target: string;
+      /** @example 0 3 * * * */
+      cron: string;
+      /** @example 7 */
+      retention?: number;
+      /** Format: uuid */
+      deploymentId?: string;
+    };
+    UpdateBackupScheduleDto: {
+      enabled: boolean;
     };
     VolumeMountDto: {
       name: string;
@@ -1495,6 +1553,94 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  BackupSchedulesController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupScheduleDto"][];
+        };
+      };
+    };
+  };
+  BackupSchedulesController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBackupScheduleDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupScheduleDto"];
+        };
+      };
+    };
+  };
+  BackupSchedulesController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  BackupSchedulesController_setEnabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateBackupScheduleDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupScheduleDto"];
         };
       };
     };
