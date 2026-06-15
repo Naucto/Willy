@@ -507,6 +507,41 @@
         ]
       }
     },
+    "/deployments/{id}/restart": {
+      "post": {
+        "operationId": "DeploymentActionsController_restart",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/deployments/{id}/rollback/{releaseId}": {
       "post": {
         "operationId": "DeploymentActionsController_rollback",
@@ -714,6 +749,27 @@
         ],
         "tags": [
           "console"
+        ]
+      }
+    },
+    "/system/info": {
+      "get": {
+        "operationId": "SystemController_info",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfoDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "system"
         ]
       }
     }
@@ -1011,6 +1067,10 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "primaryDomain": {
+            "type": "string",
+            "nullable": true
           }
         },
         "required": [
@@ -1035,7 +1095,8 @@
           "activeReleaseId",
           "gitCredentialId",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "primaryDomain"
         ]
       },
       "UpdateDeploymentDto": {
@@ -1087,6 +1148,10 @@
           "memoryLimitMb": {
             "type": "number",
             "minimum": 16
+          },
+          "domain": {
+            "type": "string",
+            "example": "app.example.com"
           }
         }
       },
@@ -1265,6 +1330,41 @@
         },
         "required": [
           "ticket"
+        ]
+      },
+      "SystemInfoDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "distro": {
+            "type": "string"
+          },
+          "kernel": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "commit",
+          "distro",
+          "kernel",
+          "platform",
+          "arch",
+          "node"
         ]
       }
     }

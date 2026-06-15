@@ -8,7 +8,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { type Deployment, DeploymentsService } from "./deployments.service";
+import { type DeploymentView, DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
@@ -23,27 +23,23 @@ export class DeploymentsController {
   @ApiBody({ type: CreateDeploymentDto })
   @ApiCreatedResponse({ type: DeploymentDto })
   @Post()
-  create(@Body() dto: CreateDeploymentDto): Promise<Deployment> {
-    return this.deployments.create(dto);
+  async create(@Body() dto: CreateDeploymentDto): Promise<DeploymentView> {
+    const created = await this.deployments.create(dto);
+
+    return this.requireForApi(created.id);
   }
 
   @ApiOkResponse({ type: [DeploymentDto] })
   @Get()
-  list(): Promise<Deployment[]> {
-    return this.deployments.findAll();
+  list(): Promise<DeploymentView[]> {
+    return this.deployments.findAllForApi();
   }
 
   @ApiParam({ name: "id", type: String })
   @ApiOkResponse({ type: DeploymentDto })
   @Get(":id")
-  async get(@Param("id") id: string): Promise<Deployment> {
-    const deployment = await this.deployments.findById(id);
-
-    if (!deployment) {
-      throw new NotFoundException("deployment not found");
-    }
-
-    return deployment;
+  get(@Param("id") id: string): Promise<DeploymentView> {
+    return this.requireForApi(id);
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -51,13 +47,20 @@ export class DeploymentsController {
   @ApiBody({ type: UpdateDeploymentDto })
   @ApiOkResponse({ type: DeploymentDto })
   @Patch(":id")
-  async update(@Param("id") id: string, @Body() dto: UpdateDeploymentDto): Promise<Deployment> {
-    const existing = await this.deployments.findById(id);
+  async update(@Param("id") id: string, @Body() dto: UpdateDeploymentDto): Promise<DeploymentView> {
+    await this.requireForApi(id);
+    await this.deployments.update(id, dto);
 
-    if (!existing) {
+    return this.requireForApi(id);
+  }
+
+  private async requireForApi(id: string): Promise<DeploymentView> {
+    const deployment = await this.deployments.findByIdForApi(id);
+
+    if (!deployment) {
       throw new NotFoundException("deployment not found");
     }
 
-    return this.deployments.update(id, dto);
+    return deployment;
   }
 }

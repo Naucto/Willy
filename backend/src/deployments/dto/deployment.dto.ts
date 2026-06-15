@@ -72,4 +72,7 @@ export class DeploymentDto {
 
   @ApiProperty({ type: String, format: "date-time" })
   updatedAt!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  primaryDomain!: string | null;
 }

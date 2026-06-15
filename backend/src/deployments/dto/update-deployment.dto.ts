@@ -64,4 +64,9 @@ export class UpdateDeploymentDto {
   @IsInt()
   @Min(16)
   memoryLimitMb?: number;
+
+  @ApiPropertyOptional({ type: String, example: "app.example.com" })
+  @IsOptional()
+  @IsString()
+  domain?: string;
 }

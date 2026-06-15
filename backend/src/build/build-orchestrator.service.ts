@@ -125,6 +125,11 @@ export class BuildOrchestrator {
     }
   }
 
+  // Recreate the active release's container (picks up current env/config) via the swap.
+  async restart(deploymentId: string): Promise<void> {
+    await this.start(deploymentId);
+  }
+
   async teardown(deploymentId: string): Promise<void> {
     await this.removeAllContainers(deploymentId);
   }

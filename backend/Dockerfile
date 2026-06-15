@@ -26,6 +26,9 @@ COPY frontend/package.json ./frontend/
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/backend/dist ./backend/dist
 COPY backend/drizzle ./backend/drizzle
+# Surfaced on the login screen via /api/system/info.
+ARG GIT_COMMIT=dev
+ENV GIT_COMMIT=$GIT_COMMIT
 WORKDIR /app/backend
 # Apply migrations (one-shot) before starting the server.
 CMD ["sh", "-c", "node dist/db/migrate.js && node dist/main.js"]

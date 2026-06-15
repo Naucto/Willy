@@ -50,6 +50,16 @@ export class DeploymentActionsController {
 
   @Roles("ADMIN", "OPERATOR")
   @HttpCode(202)
+  @ApiOkResponse({ type: OkResponseDto })
+  @Post("deployments/:id/restart")
+  async restart(@Param("id") id: string): Promise<{ ok: true }> {
+    await this.orchestrator.restart(id);
+
+    return { ok: true };
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(202)
   @ApiParam({ name: "releaseId", type: String })
   @ApiOkResponse({ type: OkResponseDto })
   @Post("deployments/:id/rollback/:releaseId")

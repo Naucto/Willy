@@ -26,7 +26,7 @@ export interface CreateDeploymentInput {
   gitToken?: string;
 }
 
-// Fields editable after creation (name/type are immutable; domain/token have their own flows).
+// Fields editable after creation (name/type are immutable; the git token has its own flow).
 export interface UpdateDeploymentInput {
   gitUrl?: string;
   gitRef?: string;
@@ -39,7 +39,12 @@ export interface UpdateDeploymentInput {
   autoDeploy?: boolean;
   restartPolicy?: Deployment["restartPolicy"];
   memoryLimitMb?: number | null;
+  // The primary domain lives in a separate table; handled out-of-band in update().
+  domain?: string;
 }
+
+// A deployment plus its primary domain, for API responses.
+export type DeploymentView = Deployment & { primaryDomain: string | null };
 
 const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitUrl",
@@ -119,6 +124,11 @@ export class DeploymentsService {
   }
 
   async update(id: string, input: UpdateDeploymentInput): Promise<Deployment> {
+    // Domain lives in its own table; apply it separately (takes effect on next deploy/restart).
+    if (input.domain !== undefined) {
+      await this.setPrimaryDomain(id, input.domain);
+    }
+
     const fields: Partial<typeof deployments.$inferInsert> = { updatedAt: new Date() };
 
     const assign = <K extends keyof UpdateDeploymentInput>(key: K): void => {
@@ -174,6 +184,46 @@ export class DeploymentsService {
       .limit(1);
 
     return rows[0];
+  }
+
+  // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.
+  async setPrimaryDomain(deploymentId: string, fqdn: string): Promise<void> {
+    const existing = await this.primaryDomain(deploymentId);
+
+    if (existing) {
+      await this.db
+        .update(domains)
+        .set({ fqdn, updatedAt: new Date() })
+        .where(eq(domains.id, existing.id));
+
+      return;
+    }
+
+    await this.db.insert(domains).values({ deploymentId, fqdn, isPrimary: true });
+  }
+
+  // List/get enriched with the primary domain fqdn for API responses.
+  async findAllForApi(): Promise<DeploymentView[]> {
+    const rows = await this.db.select().from(deployments);
+    const primary = await this.db
+      .select({ deploymentId: domains.deploymentId, fqdn: domains.fqdn })
+      .from(domains)
+      .where(eq(domains.isPrimary, true));
+    const byDeployment = new Map(primary.map((row) => [row.deploymentId, row.fqdn]));
+
+    return rows.map((row) => ({ ...row, primaryDomain: byDeployment.get(row.id) ?? null }));
+  }
+
+  async findByIdForApi(id: string): Promise<DeploymentView | undefined> {
+    const deployment = await this.findById(id);
+
+    if (!deployment) {
+      return undefined;
+    }
+
+    const domain = await this.primaryDomain(id);
+
+    return { ...deployment, primaryDomain: domain?.fqdn ?? null };
   }
 
   async resolveGitToken(deploymentId: string): Promise<string | undefined> {

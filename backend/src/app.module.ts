@@ -13,6 +13,7 @@ import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
 import { LogsModule } from "./logs/logs.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
+import { SystemModule } from "./system/system.module";
 import { TraefikModule } from "./traefik/traefik.module";
 import { UsersModule } from "./users/users.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
@@ -35,6 +36,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     ReconcileModule,
     WebhooksModule,
     ConsoleModule,
+    SystemModule,
   ],
 })
 export class AppModule {}
