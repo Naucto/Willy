@@ -85,6 +85,13 @@
       "when": 1781564314388,
       "tag": "0011_remove_nixpacks_strategy",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781566505303,
+      "tag": "0012_managed_zones",
+      "breakpoints": true
     }
   ]
 }

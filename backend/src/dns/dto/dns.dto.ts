@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { IsIn, IsInt, IsOptional, IsString, Matches, Min } from "class-validator";
 
 const RECORD_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX", "NS", "SRV"] as const;
 type RecordType = (typeof RECORD_TYPES)[number];
@@ -7,6 +7,15 @@ type RecordType = (typeof RECORD_TYPES)[number];
 export class ZonesDto {
   @ApiProperty({ type: [String] })
   zones!: string[];
+}
+
+export class RegisterZoneDto {
+  @ApiProperty({ type: String, example: "example.com" })
+  @IsString()
+  @Matches(/^([a-z0-9-]+\.)+[a-z]{2,}$/i, {
+    message: "zone must be a valid domain (e.g. example.com)",
+  })
+  zone!: string;
 }
 
 export class DnsRecordDto {

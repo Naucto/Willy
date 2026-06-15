@@ -43,6 +43,26 @@ export function useDnsRecords(zone: string) {
   });
 }
 
+// Registers a zone for Willy to manage (the zone-registration config surface).
+export function useRegisterZone() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (zone: string) => unwrap(await api.POST("/dns/zones", { body: { zone } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns", "zones"] }),
+  });
+}
+
+export function useUnregisterZone() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (zone: string) =>
+      unwrap(await api.DELETE("/dns/zones/{zone}", { params: { path: { zone } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns", "zones"] }),
+  });
+}
+
 export function useCreateDnsRecord(zone: string) {
   const queryClient = useQueryClient();
 

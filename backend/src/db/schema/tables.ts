@@ -143,6 +143,15 @@ export const dnsRecords = pgTable(
   (t) => [uniqueIndex("dns_records_zone_sub_type_idx").on(t.zone, t.subDomain, t.type)],
 );
 
+// Zones the operator has registered for Willy to manage, merged with the provider's auto-discovered
+// zones. Lets a zone be used even when the OVH token can't list zones (lacks the GET /domain/zone
+// grant), and is the backing store for the "register a zone" config surface.
+export const managedZones = pgTable("managed_zones", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  zone: text("zone").notNull().unique(),
+  createdAt,
+});
+
 export const envVars = pgTable(
   "env_vars",
   {

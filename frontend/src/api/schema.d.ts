@@ -228,6 +228,134 @@ export interface paths {
     patch: operations["DeploymentsController_setServiceResources"];
     trace?: never;
   };
+  "/dns/zones": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DnsController_zones"];
+    put?: never;
+    post: operations["DnsController_registerZone"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/dns/zones/{zone}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["DnsController_unregisterZone"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/dns/zones/{zone}/records": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DnsController_records"];
+    put?: never;
+    post: operations["DnsController_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/dns/zones/{zone}/records/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["DnsController_update"];
+    post?: never;
+    delete: operations["DnsController_remove"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/info": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_info"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/resources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_resources"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_images"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/public-ip": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_publicIp"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/env": {
     parameters: {
       query?: never;
@@ -463,118 +591,6 @@ export interface paths {
     put?: never;
     post: operations["ConsoleController_ticket"];
     delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/system/info": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["SystemController_info"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/system/resources": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["SystemController_resources"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/system/images": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["SystemController_images"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/system/public-ip": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["SystemController_publicIp"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/dns/zones": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["DnsController_zones"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/dns/zones/{zone}/records": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["DnsController_records"];
-    put?: never;
-    post: operations["DnsController_create"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/dns/zones/{zone}/records/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put: operations["DnsController_update"];
-    post?: never;
-    delete: operations["DnsController_remove"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1021,6 +1037,56 @@ export interface components {
       /** @example 3 */
       logMaxFiles?: number | null;
     };
+    ZonesDto: {
+      zones: string[];
+    };
+    RegisterZoneDto: {
+      /** @example example.com */
+      zone: string;
+    };
+    DnsRecordDto: {
+      id: number;
+      zone: string;
+      fieldType: string;
+      subDomain: string;
+      target: string;
+      ttl: number;
+    };
+    CreateDnsRecordDto: {
+      /** @enum {string} */
+      fieldType: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "SRV";
+      /** @example app */
+      subDomain: string;
+      /** @example 203.0.113.10 */
+      target: string;
+      /** @default 3600 */
+      ttl: number;
+    };
+    UpdateDnsRecordDto: {
+      target: string;
+      ttl?: number;
+      subDomain?: string;
+    };
+    SystemInfoDto: {
+      version: string;
+      commit: string;
+      kernel: string;
+      platform: string;
+      arch: string;
+      node: string;
+    };
+    HostResourcesDto: {
+      /** @description Logical CPU count reported by the Docker daemon. */
+      cpus: number;
+      /** @description Total host memory in MB. */
+      memoryMb: number;
+    };
+    DockerImagesDto: {
+      images: string[];
+    };
+    PublicIpDto: {
+      ip: string | null;
+    };
     MaskedEnvVarDto: {
       key: string;
       /** @enum {string} */
@@ -1099,52 +1165,6 @@ export interface components {
     };
     StreamTicketDto: {
       ticket: string;
-    };
-    SystemInfoDto: {
-      version: string;
-      commit: string;
-      kernel: string;
-      platform: string;
-      arch: string;
-      node: string;
-    };
-    HostResourcesDto: {
-      /** @description Logical CPU count reported by the Docker daemon. */
-      cpus: number;
-      /** @description Total host memory in MB. */
-      memoryMb: number;
-    };
-    DockerImagesDto: {
-      images: string[];
-    };
-    PublicIpDto: {
-      ip: string | null;
-    };
-    ZonesDto: {
-      zones: string[];
-    };
-    DnsRecordDto: {
-      id: number;
-      zone: string;
-      fieldType: string;
-      subDomain: string;
-      target: string;
-      ttl: number;
-    };
-    CreateDnsRecordDto: {
-      /** @enum {string} */
-      fieldType: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "SRV";
-      /** @example app */
-      subDomain: string;
-      /** @example 203.0.113.10 */
-      target: string;
-      /** @default 3600 */
-      ttl: number;
-    };
-    UpdateDnsRecordDto: {
-      target: string;
-      ttl?: number;
-      subDomain?: string;
     };
     BackupDto: {
       /** Format: uuid */
@@ -1721,6 +1741,239 @@ export interface operations {
       };
     };
   };
+  DnsController_zones: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ZonesDto"];
+        };
+      };
+    };
+  };
+  DnsController_registerZone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RegisterZoneDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ZonesDto"];
+        };
+      };
+    };
+  };
+  DnsController_unregisterZone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        zone: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ZonesDto"];
+        };
+      };
+    };
+  };
+  DnsController_records: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        zone: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DnsRecordDto"][];
+        };
+      };
+    };
+  };
+  DnsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        zone: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateDnsRecordDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DnsRecordDto"];
+        };
+      };
+    };
+  };
+  DnsController_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        zone: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateDnsRecordDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DnsController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        zone: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  SystemController_info: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemInfoDto"];
+        };
+      };
+    };
+  };
+  SystemController_resources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HostResourcesDto"];
+        };
+      };
+    };
+  };
+  SystemController_images: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DockerImagesDto"];
+        };
+      };
+    };
+  };
+  SystemController_publicIp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PublicIpDto"];
+        };
+      };
+    };
+  };
   EnvVarsController_list: {
     parameters: {
       query?: {
@@ -2084,195 +2337,6 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["StreamTicketDto"];
-        };
-      };
-    };
-  };
-  SystemController_info: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["SystemInfoDto"];
-        };
-      };
-    };
-  };
-  SystemController_resources: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HostResourcesDto"];
-        };
-      };
-    };
-  };
-  SystemController_images: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["DockerImagesDto"];
-        };
-      };
-    };
-  };
-  SystemController_publicIp: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["PublicIpDto"];
-        };
-      };
-    };
-  };
-  DnsController_zones: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ZonesDto"];
-        };
-      };
-    };
-  };
-  DnsController_records: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        zone: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["DnsRecordDto"][];
-        };
-      };
-    };
-  };
-  DnsController_create: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        zone: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CreateDnsRecordDto"];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["DnsRecordDto"];
-        };
-      };
-    };
-  };
-  DnsController_update: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: number;
-        zone: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UpdateDnsRecordDto"];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["OkResponseDto"];
-        };
-      };
-    };
-  };
-  DnsController_remove: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: number;
-        zone: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["OkResponseDto"];
         };
       };
     };

@@ -25,6 +25,7 @@ import {
   useHostPublicIp,
 } from "../api/hooks";
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
+import { ManageZonesDialog } from "../components/ManageZonesDialog";
 import { describeError } from "../errors";
 
 const RECORD_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX"] as const;
@@ -46,6 +47,7 @@ export function DnsPage() {
   const [selection, setSelection] = useState<GridRowSelectionModel>(emptySelection);
   const [confirmBulk, setConfirmBulk] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [manageZones, setManageZones] = useState(false);
 
   const { data: zones, error: zonesError } = useDnsZones();
   const zoneList = zones?.zones ?? [];
@@ -164,6 +166,9 @@ export function DnsPage() {
             </MenuItem>
           ))}
         </TextField>
+        <Button variant="outlined" onClick={() => setManageZones(true)}>
+          Manage zones
+        </Button>
         {zone && (
           <>
             <Box sx={{ flexGrow: 1 }} />
@@ -273,6 +278,12 @@ export function DnsPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ManageZonesDialog
+        open={manageZones}
+        onClose={() => setManageZones(false)}
+        zones={zoneList}
+      />
 
       <Dialog open={confirmBulk} onClose={() => setConfirmBulk(false)} maxWidth="xs">
         <DialogTitle>Delete {selectedIds.length} record(s)?</DialogTitle>

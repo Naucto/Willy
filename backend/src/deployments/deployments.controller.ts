@@ -20,6 +20,7 @@ import {
 } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { OkResponseDto } from "../common/dto/ok.dto";
+import { DomainProvisioningService } from "../domains/domain-provisioning.service";
 import { type Domain, type DeploymentView, DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
@@ -41,7 +42,10 @@ function domainToDto(row: Domain): DomainDto {
 @ApiBearerAuth()
 @Controller("deployments")
 export class DeploymentsController {
-  constructor(private readonly deployments: DeploymentsService) {}
+  constructor(
+    private readonly deployments: DeploymentsService,
+    private readonly domainProvisioning: DomainProvisioningService,
+  ) {}
 
   @Roles("ADMIN", "OPERATOR")
   @ApiBody({ type: CreateDeploymentDto })
@@ -49,6 +53,10 @@ export class DeploymentsController {
   @Post()
   async create(@Body() dto: CreateDeploymentDto): Promise<DeploymentView> {
     const created = await this.deployments.create(dto);
+
+    if (dto.domain) {
+      await this.domainProvisioning.provision(created.id, dto.domain.trim());
+    }
 
     return this.requireForApi(created.id);
   }
@@ -91,13 +99,20 @@ export class DeploymentsController {
   @ApiCreatedResponse({ type: DomainDto })
   @Post(":id/domains")
   async addDomain(@Param("id") id: string, @Body() dto: AddDomainDto): Promise<DomainDto> {
-    return domainToDto(
-      await this.deployments.addDomain(id, {
-        fqdn: dto.fqdn.trim(),
-        targetService: dto.targetService?.trim() || null,
-        targetPort: dto.targetPort ?? null,
-      }),
-    );
+    const fqdn = dto.fqdn.trim();
+    // Reject domains outside the OVH perimeter before persisting (OVH provider only).
+    await this.domainProvisioning.assertInPerimeter(fqdn);
+
+    const domain = await this.deployments.addDomain(id, {
+      fqdn,
+      targetService: dto.targetService?.trim() || null,
+      targetPort: dto.targetPort ?? null,
+    });
+
+    // Auto-create the A record + flag the cert pending (Traefik issues it on the next deploy).
+    await this.domainProvisioning.provision(id, fqdn);
+
+    return domainToDto(domain);
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -143,7 +158,13 @@ export class DeploymentsController {
     @Param("id") id: string,
     @Param("domainId", ParseUUIDPipe) domainId: string,
   ): Promise<{ ok: true }> {
+    // Capture the fqdn before deletion so the managed A record can be torn down too.
+    const domain = (await this.deployments.listDomains(id)).find((row) => row.id === domainId);
     await this.deployments.removeDomain(id, domainId);
+
+    if (domain) {
+      await this.domainProvisioning.deprovision(domain.fqdn);
+    }
 
     return { ok: true };
   }

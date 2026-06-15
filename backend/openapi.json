@@ -784,6 +784,370 @@
         ]
       }
     },
+    "/dns/zones": {
+      "get": {
+        "operationId": "DnsController_zones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      },
+      "post": {
+        "operationId": "DnsController_registerZone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterZoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/dns/zones/{zone}": {
+      "delete": {
+        "operationId": "DnsController_unregisterZone",
+        "parameters": [
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZonesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/dns/zones/{zone}/records": {
+      "get": {
+        "operationId": "DnsController_records",
+        "parameters": [
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DnsRecordDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      },
+      "post": {
+        "operationId": "DnsController_create",
+        "parameters": [
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDnsRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsRecordDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/dns/zones/{zone}/records/{id}": {
+      "put": {
+        "operationId": "DnsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDnsRecordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      },
+      "delete": {
+        "operationId": "DnsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "zone",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "dns"
+        ]
+      }
+    },
+    "/system/info": {
+      "get": {
+        "operationId": "SystemController_info",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfoDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/resources": {
+      "get": {
+        "operationId": "SystemController_resources",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostResourcesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/images": {
+      "get": {
+        "operationId": "SystemController_images",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DockerImagesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/public-ip": {
+      "get": {
+        "operationId": "SystemController_publicIp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicIpDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/deployments/{id}/env": {
       "get": {
         "operationId": "EnvVarsController_list",
@@ -1425,301 +1789,6 @@
         ],
         "tags": [
           "console"
-        ]
-      }
-    },
-    "/system/info": {
-      "get": {
-        "operationId": "SystemController_info",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SystemInfoDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/system/resources": {
-      "get": {
-        "operationId": "SystemController_resources",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HostResourcesDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/system/images": {
-      "get": {
-        "operationId": "SystemController_images",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DockerImagesDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/system/public-ip": {
-      "get": {
-        "operationId": "SystemController_publicIp",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicIpDto"
-                }
-              }
-            }
-          }
-        },
-        "tags": [
-          "system"
-        ]
-      }
-    },
-    "/dns/zones": {
-      "get": {
-        "operationId": "DnsController_zones",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ZonesDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "dns"
-        ]
-      }
-    },
-    "/dns/zones/{zone}/records": {
-      "get": {
-        "operationId": "DnsController_records",
-        "parameters": [
-          {
-            "name": "zone",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/DnsRecordDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "dns"
-        ]
-      },
-      "post": {
-        "operationId": "DnsController_create",
-        "parameters": [
-          {
-            "name": "zone",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDnsRecordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DnsRecordDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "dns"
-        ]
-      }
-    },
-    "/dns/zones/{zone}/records/{id}": {
-      "put": {
-        "operationId": "DnsController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "zone",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDnsRecordDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OkResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "dns"
-        ]
-      },
-      "delete": {
-        "operationId": "DnsController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "number"
-            }
-          },
-          {
-            "name": "zone",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OkResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "dns"
         ]
       }
     },
@@ -3006,6 +3075,188 @@
           }
         }
       },
+      "ZonesDto": {
+        "type": "object",
+        "properties": {
+          "zones": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "zones"
+        ]
+      },
+      "RegisterZoneDto": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "example": "example.com"
+          }
+        },
+        "required": [
+          "zone"
+        ]
+      },
+      "DnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "zone": {
+            "type": "string"
+          },
+          "fieldType": {
+            "type": "string"
+          },
+          "subDomain": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "zone",
+          "fieldType",
+          "subDomain",
+          "target",
+          "ttl"
+        ]
+      },
+      "CreateDnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "fieldType": {
+            "type": "string",
+            "enum": [
+              "A",
+              "AAAA",
+              "CNAME",
+              "TXT",
+              "MX",
+              "NS",
+              "SRV"
+            ]
+          },
+          "subDomain": {
+            "type": "string",
+            "example": "app"
+          },
+          "target": {
+            "type": "string",
+            "example": "203.0.113.10"
+          },
+          "ttl": {
+            "type": "number",
+            "default": 3600
+          }
+        },
+        "required": [
+          "fieldType",
+          "subDomain",
+          "target"
+        ]
+      },
+      "UpdateDnsRecordDto": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "ttl": {
+            "type": "number"
+          },
+          "subDomain": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ]
+      },
+      "SystemInfoDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "kernel": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "commit",
+          "kernel",
+          "platform",
+          "arch",
+          "node"
+        ]
+      },
+      "HostResourcesDto": {
+        "type": "object",
+        "properties": {
+          "cpus": {
+            "type": "number",
+            "description": "Logical CPU count reported by the Docker daemon."
+          },
+          "memoryMb": {
+            "type": "number",
+            "description": "Total host memory in MB."
+          }
+        },
+        "required": [
+          "cpus",
+          "memoryMb"
+        ]
+      },
+      "DockerImagesDto": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "images"
+        ]
+      },
+      "PublicIpDto": {
+        "type": "object",
+        "properties": {
+          "ip": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ip"
+        ]
+      },
       "MaskedEnvVarDto": {
         "type": "object",
         "properties": {
@@ -3258,176 +3509,6 @@
         },
         "required": [
           "ticket"
-        ]
-      },
-      "SystemInfoDto": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "string"
-          },
-          "commit": {
-            "type": "string"
-          },
-          "kernel": {
-            "type": "string"
-          },
-          "platform": {
-            "type": "string"
-          },
-          "arch": {
-            "type": "string"
-          },
-          "node": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "version",
-          "commit",
-          "kernel",
-          "platform",
-          "arch",
-          "node"
-        ]
-      },
-      "HostResourcesDto": {
-        "type": "object",
-        "properties": {
-          "cpus": {
-            "type": "number",
-            "description": "Logical CPU count reported by the Docker daemon."
-          },
-          "memoryMb": {
-            "type": "number",
-            "description": "Total host memory in MB."
-          }
-        },
-        "required": [
-          "cpus",
-          "memoryMb"
-        ]
-      },
-      "DockerImagesDto": {
-        "type": "object",
-        "properties": {
-          "images": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "images"
-        ]
-      },
-      "PublicIpDto": {
-        "type": "object",
-        "properties": {
-          "ip": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "ip"
-        ]
-      },
-      "ZonesDto": {
-        "type": "object",
-        "properties": {
-          "zones": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "zones"
-        ]
-      },
-      "DnsRecordDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "zone": {
-            "type": "string"
-          },
-          "fieldType": {
-            "type": "string"
-          },
-          "subDomain": {
-            "type": "string"
-          },
-          "target": {
-            "type": "string"
-          },
-          "ttl": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "id",
-          "zone",
-          "fieldType",
-          "subDomain",
-          "target",
-          "ttl"
-        ]
-      },
-      "CreateDnsRecordDto": {
-        "type": "object",
-        "properties": {
-          "fieldType": {
-            "type": "string",
-            "enum": [
-              "A",
-              "AAAA",
-              "CNAME",
-              "TXT",
-              "MX",
-              "NS",
-              "SRV"
-            ]
-          },
-          "subDomain": {
-            "type": "string",
-            "example": "app"
-          },
-          "target": {
-            "type": "string",
-            "example": "203.0.113.10"
-          },
-          "ttl": {
-            "type": "number",
-            "default": 3600
-          }
-        },
-        "required": [
-          "fieldType",
-          "subDomain",
-          "target"
-        ]
-      },
-      "UpdateDnsRecordDto": {
-        "type": "object",
-        "properties": {
-          "target": {
-            "type": "string"
-          },
-          "ttl": {
-            "type": "number"
-          },
-          "subDomain": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "target"
         ]
       },
       "BackupDto": {

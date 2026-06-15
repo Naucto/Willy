@@ -5,6 +5,7 @@ import { DnsController } from "./dns.controller";
 import { DnsProvider } from "./dns-provider";
 import { LocalDnsProvider } from "./providers/local-dns.provider";
 import { OvhDnsProvider } from "./providers/ovh-dns.provider";
+import { ManagedZonesService, ZonesService } from "./zones.service";
 
 // Provider selection: explicit DNS_PROVIDER (ovh|local) wins; otherwise auto — OVH when credentials
 // are present, local in-memory otherwise (the default for `make dev`).
@@ -29,6 +30,9 @@ function createDnsProvider(config: ConfigService, ovh: OvhClient): DnsProvider {
   controllers: [DnsController],
   providers: [
     { provide: DnsProvider, useFactory: createDnsProvider, inject: [ConfigService, OvhClient] },
+    ManagedZonesService,
+    ZonesService,
   ],
+  exports: [DnsProvider, ZonesService],
 })
 export class DnsModule {}

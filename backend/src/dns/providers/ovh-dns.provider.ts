@@ -16,6 +16,10 @@ export class OvhDnsProvider extends DnsProvider {
     return this.ovh.configured;
   }
 
+  get enforcesPerimeter(): boolean {
+    return true;
+  }
+
   zones(): Promise<string[]> {
     return this.ovh.request<string[]>("GET", "/domain/zone");
   }

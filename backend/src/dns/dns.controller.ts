@@ -14,20 +14,51 @@ import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestj
 import { Roles } from "../auth/decorators/roles.decorator";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { DnsProvider } from "./dns-provider";
-import { CreateDnsRecordDto, DnsRecordDto, UpdateDnsRecordDto, ZonesDto } from "./dto/dns.dto";
+import {
+  CreateDnsRecordDto,
+  DnsRecordDto,
+  RegisterZoneDto,
+  UpdateDnsRecordDto,
+  ZonesDto,
+} from "./dto/dns.dto";
+import { ManagedZonesService, ZonesService } from "./zones.service";
 
 @ApiTags("dns")
 @ApiBearerAuth()
 @Controller("dns")
 export class DnsController {
-  constructor(private readonly dns: DnsProvider) {}
+  constructor(
+    private readonly dns: DnsProvider,
+    private readonly zonesService: ZonesService,
+    private readonly managedZones: ManagedZonesService,
+  ) {}
 
+  // Discovered ∪ operator-registered zones. Available even when the provider can't list zones.
   @ApiOkResponse({ type: ZonesDto })
   @Get("zones")
   async zones(): Promise<ZonesDto> {
-    this.ensureConfigured();
+    return { zones: await this.zonesService.all() };
+  }
 
-    return { zones: await this.dns.zones() };
+  // Register a zone for Willy to manage (config surface, separate from the records view).
+  @Roles("ADMIN", "OPERATOR")
+  @ApiBody({ type: RegisterZoneDto })
+  @ApiOkResponse({ type: ZonesDto })
+  @Post("zones")
+  async registerZone(@Body() dto: RegisterZoneDto): Promise<ZonesDto> {
+    await this.managedZones.add(dto.zone.trim().toLowerCase());
+
+    return { zones: await this.zonesService.all() };
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "zone", type: String })
+  @ApiOkResponse({ type: ZonesDto })
+  @Delete("zones/:zone")
+  async unregisterZone(@Param("zone") zone: string): Promise<ZonesDto> {
+    await this.managedZones.remove(zone.trim().toLowerCase());
+
+    return { zones: await this.zonesService.all() };
   }
 
   @ApiParam({ name: "zone", type: String })

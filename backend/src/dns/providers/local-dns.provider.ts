@@ -28,6 +28,10 @@ export class LocalDnsProvider extends DnsProvider {
     return true;
   }
 
+  get enforcesPerimeter(): boolean {
+    return false;
+  }
+
   zones(): Promise<string[]> {
     return Promise.resolve([...this.store.keys()].sort());
   }
