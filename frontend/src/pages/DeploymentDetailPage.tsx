@@ -129,7 +129,6 @@ export function DeploymentDetailPage() {
         <Typography variant="body2" color="text.secondary">
           {deployment.type}
         </Typography>
-        <Box sx={{ flexGrow: 1 }} />
         {showSelector && containers && (
           <ContainerSelector
             containers={containers}
@@ -137,6 +136,8 @@ export function DeploymentDetailPage() {
             onChange={selectContainer}
           />
         )}
+        {/* DeployActions flex-grows to fill the rest of the row and right-aligns; it folds its
+            buttons to icons when that remaining space gets tight. */}
         <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 

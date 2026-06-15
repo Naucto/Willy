@@ -14,8 +14,6 @@ import {
   MenuItem,
   Stack,
   Tooltip,
-  useMediaQuery,
-  useTheme,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
@@ -43,10 +41,10 @@ interface Action {
 
 export function DeployActions({ deployment, variant = "full", onDeleted }: DeployActionsProps) {
   const { enqueueSnackbar } = useSnackbar();
-  const theme = useTheme();
-  // Fold the action buttons to icon-only when the header bar gets cramped (e.g. the container
-  // selector is sharing the row on a narrower screen).
-  const compact = useMediaQuery(theme.breakpoints.down("lg"));
+  // Fold to icon-only based on the real space the row gives us (not a viewport breakpoint): the
+  // root flex-grows to fill the remaining width, so a narrow measured width means it's cramped.
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [available, setAvailable] = useState(Number.POSITIVE_INFINITY);
   const deploy = useDeploy(deployment.id);
   const restart = useRestart(deployment.id);
   const stop = useStop(deployment.id);
@@ -76,6 +74,26 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       setPendingKey(null);
     }
   }, [deployment.updatedAt, deployment.state, pendingKey]);
+
+  useEffect(() => {
+    const el = rowRef.current;
+
+    if (!el) {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+
+      if (width !== undefined) {
+        setAvailable(width);
+      }
+    });
+
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, []);
 
   const liveRunning = ["RUNNING", "DEPLOYING", "DEGRADED"].includes(deployment.state);
   const liveHasRelease = deployment.activeReleaseId !== null;
@@ -213,9 +231,23 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     );
   }
 
+  // Roughly the width a full (labelled) button needs; below that per action, fold to icons.
+  const compact = available < actions.length * 124;
+
   return (
     <>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+      <Stack
+        ref={rowRef}
+        direction="row"
+        spacing={1}
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          flexWrap: "nowrap",
+          justifyContent: "flex-end",
+          alignItems: "center",
+        }}
+      >
         {actions.map((action) =>
           compact ? (
             <Tooltip key={action.key} title={action.label}>
