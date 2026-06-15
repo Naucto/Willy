@@ -1,3 +1,4 @@
+import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
 import MenuIcon from "@mui/icons-material/Menu";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
@@ -25,6 +26,7 @@ const COLLAPSED_WIDTH = 64;
 const NAV = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
+  { label: "Backups", to: "/backups", icon: <BackupIcon /> },
 ];
 
 export function AppShell() {

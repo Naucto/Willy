@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./components/AppShell";
+import { BackupsPage } from "./pages/BackupsPage";
 import { CreateDeploymentPage } from "./pages/CreateDeploymentPage";
 import { DeploymentDetailPage } from "./pages/DeploymentDetailPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
           { path: "/deployments/new", element: <CreateDeploymentPage /> },
           { path: "/deployments/:id", element: <DeploymentDetailPage /> },
           { path: "/dns", element: <DnsPage /> },
+          { path: "/backups", element: <BackupsPage /> },
         ],
       },
     ],

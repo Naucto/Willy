@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
+import { tokens } from "./tokens";
 import type {
+  CreateBackupInput,
   CreateDeploymentInput,
   CreateDnsRecordInput,
   SetEnvVarInput,
@@ -80,6 +82,59 @@ export function useSystemInfo() {
     retry: true,
     refetchInterval: (query) => (query.state.data ? false : 5000),
   });
+}
+
+export function useBackups() {
+  return useQuery({
+    queryKey: ["backups"],
+    queryFn: async () => unwrap(await api.GET("/backups")),
+    // Reflect PENDING → RUNNING → SUCCESS without manual refresh.
+    refetchInterval: 4000,
+  });
+}
+
+export function useBackupVolumes() {
+  return useQuery({
+    queryKey: ["backups", "volumes"],
+    queryFn: async () => unwrap(await api.GET("/backups/volumes")),
+  });
+}
+
+export function useCreateBackup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: CreateBackupInput) => unwrap(await api.POST("/backups", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
+export function useDeleteBackup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/backups/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
+// Fetches the artifact with the bearer token (a plain link can't set headers) and saves it.
+export async function downloadBackup(id: string): Promise<void> {
+  const response = await fetch(`/api/backups/${id}/download`, {
+    headers: { Authorization: `Bearer ${tokens.getAccess() ?? ""}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${id}.tar.gz`;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 export function useHostPublicIp() {
