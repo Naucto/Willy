@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import type { Deployment } from "../deployments.service";
 
 const STRATEGIES: Deployment["buildStrategy"][] = ["NIXPACKS", "DOCKERFILE", "COMPOSE"];
@@ -74,6 +74,24 @@ export class UpdateDeploymentDto {
   @IsInt()
   @Min(16)
   memoryLimitMb?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "CPU limit in nano-CPUs (1 CPU = 1e9)" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  nanoCpus?: number;
+
+  @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  capAdd?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ["ALL"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  capDrop?: string[];
 
   @ApiPropertyOptional({ type: String, example: "app.example.com" })
   @IsOptional()

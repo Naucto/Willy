@@ -1,4 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import * as argon2 from "argon2";
 import { eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { type Database, DB } from "../db/db.module";
@@ -50,6 +51,39 @@ export class UsersService {
 
   async list(): Promise<User[]> {
     return this.db.select().from(users);
+  }
+
+  // Admin user management: hash the password here so callers never touch argon2.
+  async createWithPassword(email: string, password: string, role: Role): Promise<User> {
+    if (await this.findByEmail(email)) {
+      throw new ConflictException("a user with that email already exists");
+    }
+
+    return this.create({
+      email,
+      role,
+      passwordHash: await argon2.hash(password, { type: argon2.argon2id }),
+    });
+  }
+
+  async setRole(id: string, role: Role): Promise<void> {
+    await this.db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, id));
+  }
+
+  async setPassword(id: string, password: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({
+        passwordHash: await argon2.hash(password, { type: argon2.argon2id }),
+        // Force re-login everywhere after a password change.
+        refreshTokenHash: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.db.delete(users).where(eq(users.id, id));
   }
 
   async setRefreshTokenHash(id: string, hash: string | null): Promise<void> {

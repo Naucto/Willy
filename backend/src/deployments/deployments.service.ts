@@ -24,6 +24,9 @@ export interface CreateDeploymentInput {
   runCommand?: string;
   cronExpr?: string;
   memoryLimitMb?: number;
+  nanoCpus?: number;
+  capAdd?: string[];
+  capDrop?: string[];
   domain?: string;
   gitToken?: string;
 }
@@ -43,6 +46,9 @@ export interface UpdateDeploymentInput {
   autoDeploy?: boolean;
   restartPolicy?: Deployment["restartPolicy"];
   memoryLimitMb?: number | null;
+  nanoCpus?: number | null;
+  capAdd?: string[] | null;
+  capDrop?: string[] | null;
   // The primary domain lives in a separate table; handled out-of-band in update().
   domain?: string;
 }
@@ -64,6 +70,9 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "autoDeploy",
   "restartPolicy",
   "memoryLimitMb",
+  "nanoCpus",
+  "capAdd",
+  "capDrop",
 ];
 
 @Injectable()
@@ -90,6 +99,9 @@ export class DeploymentsService {
         runCommand: input.runCommand ?? null,
         cronExpr: input.cronExpr ?? null,
         memoryLimitMb: input.memoryLimitMb ?? null,
+        nanoCpus: input.nanoCpus ?? null,
+        capAdd: input.capAdd ?? null,
+        capDrop: input.capDrop ?? null,
       })
       .returning();
 

@@ -14,7 +14,8 @@
     "dev": "tsx watch src/main.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "generate:openapi": "tsx src/openapi.ts"
+    "generate:openapi": "tsx src/openapi.ts",
+    "rotate-key": "tsx src/rotate-key.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",

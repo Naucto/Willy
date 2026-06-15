@@ -29,6 +29,13 @@
       "when": 1781546068208,
       "tag": "0003_uneven_abomination",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781547059539,
+      "tag": "0004_solid_jubilee",
+      "breakpoints": true
     }
   ]
 }

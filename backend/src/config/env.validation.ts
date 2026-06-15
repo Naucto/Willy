@@ -60,6 +60,15 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   BACKUPS_VOLUME?: string;
+
+  // Per-container log rotation (json-file driver). Defaults: 10m / 3 files.
+  @IsOptional()
+  @IsString()
+  LOG_MAX_SIZE?: string;
+
+  @IsOptional()
+  @IsString()
+  LOG_MAX_FILES?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

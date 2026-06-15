@@ -58,6 +58,12 @@ export class DeploymentDto {
   @ApiProperty({ type: Number, nullable: true })
   nanoCpus!: number | null;
 
+  @ApiProperty({ type: [String], nullable: true })
+  capAdd!: string[] | null;
+
+  @ApiProperty({ type: [String], nullable: true })
+  capDrop!: string[] | null;
+
   @ApiProperty({ enum: STATES })
   state!: (typeof STATES)[number];
 

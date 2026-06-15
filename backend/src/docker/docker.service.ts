@@ -23,6 +23,9 @@ export interface RunContainerOptions {
   restartPolicy?: RestartPolicyName | undefined;
   memoryMb?: number | undefined;
   nanoCpus?: number | undefined;
+  // Linux capabilities to add/drop relative to Docker's defaults.
+  capAdd?: string[] | undefined;
+  capDrop?: string[] | undefined;
   command?: string[] | undefined;
 }
 
@@ -92,6 +95,8 @@ function describeError(error: unknown): string {
 export class DockerService {
   private readonly docker: Docker;
   private readonly logger = new Logger(DockerService.name);
+  // Per-container log rotation (operator-tunable retention).
+  private readonly logConfig: { Type: string; Config: Record<string, string> };
 
   constructor(config: ConfigService) {
     this.docker = new Docker({
@@ -99,6 +104,13 @@ export class DockerService {
       port: config.get<number>("DOCKER_PROXY_PORT") ?? 2375,
       protocol: "http",
     });
+    this.logConfig = {
+      Type: "json-file",
+      Config: {
+        "max-size": config.get<string>("LOG_MAX_SIZE") ?? "10m",
+        "max-file": config.get<string>("LOG_MAX_FILES") ?? "3",
+      },
+    };
   }
 
   async ping(): Promise<boolean> {
@@ -165,7 +177,9 @@ export class DockerService {
         RestartPolicy: { Name: options.restartPolicy ?? "unless-stopped" },
         Memory: options.memoryMb ? options.memoryMb * 1024 * 1024 : undefined,
         NanoCpus: options.nanoCpus,
-        LogConfig: { Type: "json-file", Config: { "max-size": "10m", "max-file": "3" } },
+        CapAdd: options.capAdd && options.capAdd.length > 0 ? options.capAdd : undefined,
+        CapDrop: options.capDrop && options.capDrop.length > 0 ? options.capDrop : undefined,
+        LogConfig: this.logConfig,
       },
     });
 

@@ -498,6 +498,9 @@ export class BuildOrchestrator {
       network,
       restartPolicy: RESTART_MAP[deployment.restartPolicy],
       memoryMb: deployment.memoryLimitMb ?? undefined,
+      nanoCpus: deployment.nanoCpus ?? undefined,
+      capAdd: deployment.capAdd ?? undefined,
+      capDrop: deployment.capDrop ?? undefined,
       command: deployment.runCommand ? ["sh", "-c", deployment.runCommand] : undefined,
     });
 

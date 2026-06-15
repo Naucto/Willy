@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from "class-validator";
+import { IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from "class-validator";
 import type { Deployment, DeploymentType } from "../deployments.service";
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
@@ -85,4 +85,22 @@ export class CreateDeploymentDto {
   @IsInt()
   @Min(16)
   memoryLimitMb?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "CPU limit in nano-CPUs (1 CPU = 1e9)" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  nanoCpus?: number;
+
+  @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  capAdd?: string[];
+
+  @ApiPropertyOptional({ type: [String], example: ["ALL"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  capDrop?: string[];
 }
