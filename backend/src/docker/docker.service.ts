@@ -202,6 +202,17 @@ export class DockerService {
     return out;
   }
 
+  // Tags under a repo (e.g. "willy/blog"), newest first — used for keep-N image cleanup.
+  async listImageTags(repo: string): Promise<string[]> {
+    const images = await this.docker.listImages({ filters: { reference: [`${repo}:*`] } });
+
+    return images
+      .filter((image) => image.RepoTags && image.RepoTags.length > 0)
+      .sort((a, b) => b.Created - a.Created)
+      .flatMap((image) => image.RepoTags ?? [])
+      .filter((tag) => tag.startsWith(`${repo}:`) && !tag.endsWith(":<none>"));
+  }
+
   async removeImage(tag: string): Promise<void> {
     try {
       await this.docker.getImage(tag).remove({ force: true });

@@ -26,6 +26,35 @@ export interface CreateDeploymentInput {
   gitToken?: string;
 }
 
+// Fields editable after creation (name/type are immutable; domain/token have their own flows).
+export interface UpdateDeploymentInput {
+  gitUrl?: string;
+  gitRef?: string;
+  buildStrategy?: Deployment["buildStrategy"];
+  dockerfilePath?: string | null;
+  webServicePort?: number | null;
+  healthCheckPath?: string;
+  runCommand?: string | null;
+  cronExpr?: string | null;
+  autoDeploy?: boolean;
+  restartPolicy?: Deployment["restartPolicy"];
+  memoryLimitMb?: number | null;
+}
+
+const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
+  "gitUrl",
+  "gitRef",
+  "buildStrategy",
+  "dockerfilePath",
+  "webServicePort",
+  "healthCheckPath",
+  "runCommand",
+  "cronExpr",
+  "autoDeploy",
+  "restartPolicy",
+  "memoryLimitMb",
+];
+
 @Injectable()
 export class DeploymentsService {
   constructor(
@@ -87,6 +116,36 @@ export class DeploymentsService {
     const rows = await this.db.select().from(deployments).where(eq(deployments.id, id)).limit(1);
 
     return rows[0];
+  }
+
+  async update(id: string, input: UpdateDeploymentInput): Promise<Deployment> {
+    const fields: Partial<typeof deployments.$inferInsert> = { updatedAt: new Date() };
+
+    const assign = <K extends keyof UpdateDeploymentInput>(key: K): void => {
+      const value = input[key];
+
+      if (value !== undefined) {
+        (fields as Record<string, unknown>)[key] = value;
+      }
+    };
+
+    for (const key of EDITABLE_FIELDS) {
+      assign(key);
+    }
+
+    const rows = await this.db
+      .update(deployments)
+      .set(fields)
+      .where(eq(deployments.id, id))
+      .returning();
+
+    const deployment = rows[0];
+
+    if (!deployment) {
+      throw new DatabaseError("deployment update returned no row");
+    }
+
+    return deployment;
   }
 
   async remove(id: string): Promise<void> {

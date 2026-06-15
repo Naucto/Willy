@@ -207,6 +207,49 @@
           "deployments"
         ]
       },
+      "patch": {
+        "operationId": "DeploymentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeploymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
       "delete": {
         "operationId": "DeploymentActionsController_remove",
         "parameters": [
@@ -536,6 +579,74 @@
           "deployments"
         ]
       }
+    },
+    "/deployments/{id}/webhook": {
+      "get": {
+        "operationId": "WebhooksController_status",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "webhooks"
+        ]
+      },
+      "post": {
+        "operationId": "WebhooksController_rotate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSecretDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "webhooks"
+        ]
+      }
     }
   },
   "info": {
@@ -858,6 +969,58 @@
           "updatedAt"
         ]
       },
+      "UpdateDeploymentDto": {
+        "type": "object",
+        "properties": {
+          "gitUrl": {
+            "type": "string"
+          },
+          "gitRef": {
+            "type": "string"
+          },
+          "buildStrategy": {
+            "type": "string",
+            "enum": [
+              "NIXPACKS",
+              "DOCKERFILE",
+              "COMPOSE"
+            ]
+          },
+          "dockerfilePath": {
+            "type": "string"
+          },
+          "webServicePort": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "healthCheckPath": {
+            "type": "string"
+          },
+          "runCommand": {
+            "type": "string"
+          },
+          "cronExpr": {
+            "type": "string"
+          },
+          "autoDeploy": {
+            "type": "boolean"
+          },
+          "restartPolicy": {
+            "type": "string",
+            "enum": [
+              "NO",
+              "ON_FAILURE",
+              "ALWAYS",
+              "UNLESS_STOPPED"
+            ]
+          },
+          "memoryLimitMb": {
+            "type": "number",
+            "minimum": 16
+          }
+        }
+      },
       "MaskedEnvVarDto": {
         "type": "object",
         "properties": {
@@ -992,6 +1155,36 @@
           "startedAt",
           "finishedAt",
           "createdAt"
+        ]
+      },
+      "WebhookStatusDto": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "configured",
+          "path"
+        ]
+      },
+      "WebhookSecretDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret",
+          "path"
         ]
       }
     }

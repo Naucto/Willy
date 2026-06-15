@@ -9,11 +9,19 @@ import { BuildQueue } from "./build-queue";
 import { DeploymentActionsController } from "./deployment-actions.controller";
 import { ReleasesService } from "./releases.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
+import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
 @Module({
   imports: [DeploymentsModule, EnvVarsModule, GitModule, TraefikModule],
   controllers: [DeploymentActionsController],
-  providers: [BuildOrchestrator, BuildQueue, ReleasesService, BuildLogStore, DockerfileStrategy],
+  providers: [
+    BuildOrchestrator,
+    BuildQueue,
+    ReleasesService,
+    BuildLogStore,
+    DockerfileStrategy,
+    NixpacksStrategy,
+  ],
   exports: [BuildOrchestrator, ReleasesService, BuildLogStore],
 })
 export class BuildModule {}

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { WillyError } from "../common/errors";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import type { RestartPolicyName } from "../docker/docker.service";
 import { DockerService } from "../docker/docker.service";
@@ -10,8 +11,20 @@ import { BuildQueue } from "./build-queue";
 import type { Release } from "./releases.service";
 import { ReleasesService } from "./releases.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
+import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
 const EDGE_NETWORK = "willy_edge";
+
+// Newer releases get a *lower* router priority so the previous version (higher priority)
+// keeps serving the shared Host rule until it is removed at cutover. Base is chosen so the
+// value stays a positive, shrinking int for the foreseeable future.
+const PRIORITY_BASE = 3_000_000_000;
+
+const WEB_HEALTH_TIMEOUT_MS = 90_000;
+const WORKER_HEALTH_GRACE_MS = 6_000;
+const HEALTH_INTERVAL_MS = 2_000;
+const HTTP_PROBE_TIMEOUT_MS = 3_000;
+const KEEP_IMAGES = 3;
 
 const RESTART_MAP: Record<Deployment["restartPolicy"], RestartPolicyName> = {
   NO: "no",
@@ -20,13 +33,20 @@ const RESTART_MAP: Record<Deployment["restartPolicy"], RestartPolicyName> = {
   UNLESS_STOPPED: "unless-stopped",
 };
 
+class HealthCheckError extends WillyError {}
+
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// Drives a deployment from git clone -> image build -> running container, updating the
-// Release status as it goes. Health-checked zero-downtime swap arrives in Phase 5; here a
-// new container is started and the previous one(s) for the deployment are then removed.
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Drives a deployment from git clone -> image build -> running container. Uses a
+// health-checked swap: the new container is started and probed while the old one keeps
+// serving; only once it is healthy is the old one removed (cutover). A failed build or an
+// unhealthy new container leaves the previous version running untouched.
 @Injectable()
 export class BuildOrchestrator {
   private readonly logger = new Logger(BuildOrchestrator.name);
@@ -39,6 +59,7 @@ export class BuildOrchestrator {
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
     private readonly dockerfile: DockerfileStrategy,
+    private readonly nixpacks: NixpacksStrategy,
     private readonly buildLog: BuildLogStore,
     private readonly queue: BuildQueue,
   ) {}
@@ -71,9 +92,7 @@ export class BuildOrchestrator {
       throw new BadRequestException("active release has no built image");
     }
 
-    const tag = release.gitSha ? release.gitSha.slice(0, 12) : release.id.slice(0, 12);
-    const containerId = await this.launchContainer(deployment, release.imageTag, tag);
-
+    const containerId = await this.launchAndHealthCheck(deployment, release.imageTag, release);
     await this.removeStaleContainers(deploymentId, containerId);
     await this.deployments.setState(deploymentId, "RUNNING");
   }
@@ -83,7 +102,15 @@ export class BuildOrchestrator {
   }
 
   private async runRelease(deployment: Deployment, releaseId: string): Promise<void> {
+    const priorActiveReleaseId = deployment.activeReleaseId;
+
     try {
+      const release = await this.releases.findById(releaseId);
+
+      if (!release) {
+        throw new NotFoundException("release not found");
+      }
+
       this.buildLog.append(releaseId, `deploying ${deployment.name} (${deployment.type})`);
       await this.releases.setStatus(releaseId, "CLONING");
 
@@ -97,12 +124,12 @@ export class BuildOrchestrator {
       const imageTag = `willy/${deployment.name}:${shortSha}`;
 
       await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha, imageTag });
-      this.buildLog.append(releaseId, `building ${imageTag}`);
+      this.buildLog.append(releaseId, `building ${imageTag} (${deployment.buildStrategy})`);
 
       const buildArgs = await this.envVars.resolveForInjection(deployment.id, "BUILD");
 
       try {
-        await this.dockerfile.build({
+        await this.buildImage(deployment, {
           contextDir: dir,
           imageTag,
           dockerfilePath: deployment.dockerfilePath ?? undefined,
@@ -113,33 +140,65 @@ export class BuildOrchestrator {
         await this.git.cleanup(dir);
       }
 
-      await this.releases.setStatus(releaseId, "HEALTHCHECKING");
-      const containerId = await this.launchContainer(deployment, imageTag, shortSha);
+      await this.releases.setStatus(releaseId, "HEALTHCHECKING", { imageTag });
+      this.buildLog.append(releaseId, "starting new container and health-checking");
+      const containerId = await this.launchAndHealthCheck(deployment, imageTag, release);
 
       await this.releases.setStatus(releaseId, "LIVE", { containerId });
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
       await this.removeStaleContainers(deployment.id, containerId);
 
+      if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
+        await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
+      }
+
+      await this.cleanupImages(deployment.name, imageTag);
       this.buildLog.append(releaseId, "deployment live");
     } catch (error) {
       const message = describeError(error);
       this.logger.warn(`release ${releaseId} failed: ${message}`);
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
-      await this.deployments.setState(deployment.id, "ERROR");
+      // The previous version is left untouched, so reflect that it is still serving.
+      await this.deployments.setState(deployment.id, priorActiveReleaseId ? "DEGRADED" : "ERROR");
     } finally {
       this.buildLog.finish(releaseId);
     }
   }
 
-  private async launchContainer(
+  private buildImage(
+    deployment: Deployment,
+    context: {
+      contextDir: string;
+      imageTag: string;
+      dockerfilePath: string | undefined;
+      buildArgs: Record<string, string>;
+      onLog: (line: string) => void;
+    },
+  ): Promise<void> {
+    switch (deployment.buildStrategy) {
+      case "DOCKERFILE":
+        return this.dockerfile.build(context);
+      case "NIXPACKS":
+        return this.nixpacks.build(context);
+      default:
+        throw new BadRequestException(
+          `build strategy ${deployment.buildStrategy} is not supported yet`,
+        );
+    }
+  }
+
+  // Starts the new container and blocks until it is healthy. Throws (leaving the old
+  // container running) if it never becomes healthy.
+  private async launchAndHealthCheck(
     deployment: Deployment,
     imageTag: string,
-    shortSha: string,
+    release: Release,
   ): Promise<string> {
     const env = await this.envVars.resolveForInjection(deployment.id, "RUNTIME");
-    const containerName = `willy_${deployment.name}_${shortSha}`;
+    const releaseShort = release.id.slice(0, 8);
+    const containerName = `willy_${deployment.name}_${releaseShort}`;
 
     await this.docker.removeByName(containerName);
 
@@ -155,10 +214,11 @@ export class BuildOrchestrator {
 
       labels = this.labels.forWeb({
         deploymentId: deployment.id,
-        routerName: deployment.name,
+        routerName: `${deployment.name}-${releaseShort}`,
         host: domain.fqdn,
         port: deployment.webServicePort ?? 80,
         network: EDGE_NETWORK,
+        priority: PRIORITY_BASE - Math.floor(release.createdAt.getTime() / 1000),
       });
       network = EDGE_NETWORK;
     } else {
@@ -166,7 +226,7 @@ export class BuildOrchestrator {
       network = undefined;
     }
 
-    return this.docker.runContainer({
+    const containerId = await this.docker.runContainer({
       name: containerName,
       image: imageTag,
       env,
@@ -176,6 +236,89 @@ export class BuildOrchestrator {
       memoryMb: deployment.memoryLimitMb ?? undefined,
       command: deployment.runCommand ? ["sh", "-c", deployment.runCommand] : undefined,
     });
+
+    const healthy =
+      deployment.type === "WEB"
+        ? await this.probeWeb(containerId, deployment)
+        : await this.probeWorker(containerId);
+
+    if (!healthy) {
+      await this.docker.stopAndRemove(containerId);
+
+      throw new HealthCheckError("new container did not become healthy");
+    }
+
+    return containerId;
+  }
+
+  // WEB: container running + an HTTP response (<500) at healthCheckPath on the edge IP. If the
+  // image declares its own Docker HEALTHCHECK, also wait until it reports "healthy" — Traefik
+  // refuses to route a "starting"/"unhealthy" container, so cutting over before then would
+  // briefly drop traffic.
+  private async probeWeb(containerId: string, deployment: Deployment): Promise<boolean> {
+    const port = deployment.webServicePort ?? 80;
+    const path = deployment.healthCheckPath || "/";
+    const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      const status = await this.docker.inspectContainer(containerId, EDGE_NETWORK);
+      // undefined = no HEALTHCHECK in the image (Traefik routes it immediately).
+      const dockerReady = status?.health === undefined || status.health === "healthy";
+
+      if (status?.running && status.ip && dockerReady) {
+        if (await this.httpProbe(status.ip, port, path)) {
+          return true;
+        }
+      }
+
+      await delay(HEALTH_INTERVAL_MS);
+    }
+
+    return false;
+  }
+
+  // WORKER/CRON: healthy if it survives a short grace window without exiting.
+  private async probeWorker(containerId: string): Promise<boolean> {
+    const deadline = Date.now() + WORKER_HEALTH_GRACE_MS;
+
+    while (Date.now() < deadline) {
+      const status = await this.docker.inspectContainer(containerId);
+
+      if (!status || !status.running || status.health === "unhealthy") {
+        return false;
+      }
+
+      await delay(HEALTH_INTERVAL_MS);
+    }
+
+    return true;
+  }
+
+  private async httpProbe(ip: string, port: number, path: string): Promise<boolean> {
+    const url = `http://${ip}:${port}${path.startsWith("/") ? path : `/${path}`}`;
+
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(HTTP_PROBE_TIMEOUT_MS) });
+
+      return response.status < 500;
+    } catch {
+      return false;
+    }
+  }
+
+  // Keep the most recent images for the deployment; drop the rest.
+  private async cleanupImages(name: string, keepTag: string): Promise<void> {
+    try {
+      const tags = await this.docker.listImageTags(`willy/${name}`);
+
+      for (const tag of tags.slice(KEEP_IMAGES)) {
+        if (tag !== keepTag) {
+          await this.docker.removeImage(tag);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`image cleanup for ${name} failed: ${describeError(error)}`);
+    }
   }
 
   private async removeStaleContainers(deploymentId: string, keepId: string): Promise<void> {

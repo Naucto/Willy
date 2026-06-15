@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
 import { releases } from "../db/schema";
@@ -53,6 +53,15 @@ export class ReleasesService {
     const rows = await this.db.select().from(releases).where(eq(releases.id, id)).limit(1);
 
     return rows[0];
+  }
+
+  // Builds that were mid-flight when the process died can never resume — flag them so they
+  // don't sit "in progress" forever. Called once on boot by the reconciler.
+  async markInterrupted(): Promise<void> {
+    await this.db
+      .update(releases)
+      .set({ status: "INTERRUPTED", finishedAt: new Date() })
+      .where(inArray(releases.status, ["QUEUED", "CLONING", "BUILDING", "HEALTHCHECKING"]));
   }
 
   listForDeployment(deploymentId: string): Promise<Release[]> {

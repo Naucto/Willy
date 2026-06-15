@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
@@ -11,6 +11,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { type Deployment, DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
+import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
 
 @ApiTags("deployments")
 @ApiBearerAuth()
@@ -43,5 +44,20 @@ export class DeploymentsController {
     }
 
     return deployment;
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiBody({ type: UpdateDeploymentDto })
+  @ApiOkResponse({ type: DeploymentDto })
+  @Patch(":id")
+  async update(@Param("id") id: string, @Body() dto: UpdateDeploymentDto): Promise<Deployment> {
+    const existing = await this.deployments.findById(id);
+
+    if (!existing) {
+      throw new NotFoundException("deployment not found");
+    }
+
+    return this.deployments.update(id, dto);
   }
 }

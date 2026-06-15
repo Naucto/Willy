@@ -11,8 +11,10 @@ import { EnvVarsModule } from "./env-vars/env-vars.module";
 import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
 import { LogsModule } from "./logs/logs.module";
+import { ReconcileModule } from "./reconcile/reconcile.module";
 import { TraefikModule } from "./traefik/traefik.module";
 import { UsersModule } from "./users/users.module";
+import { WebhooksModule } from "./webhooks/webhooks.module";
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { UsersModule } from "./users/users.module";
     TraefikModule,
     BuildModule,
     LogsModule,
+    ReconcileModule,
+    WebhooksModule,
   ],
 })
 export class AppModule {}

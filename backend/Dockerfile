@@ -12,9 +12,13 @@ RUN npm run build --workspace @willy/backend
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# git is needed at runtime to clone deployment source repos.
+# git clones deployment source repos; nixpacks generates Dockerfiles for the Nixpacks
+# build strategy (the image build itself still goes through the socket-proxy via dockerode).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git ca-certificates \
+  && apt-get install -y --no-install-recommends git ca-certificates curl \
+  && curl -sSL https://nixpacks.com/install.sh | bash \
+  && apt-get purge -y curl \
+  && apt-get autoremove -y \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
