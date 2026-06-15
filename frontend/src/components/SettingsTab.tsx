@@ -9,21 +9,15 @@ import {
   Typography,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
-import { Controller, useForm } from "react-hook-form";
+import { useState } from "react";
 import { useUpdateDeployment } from "../api/hooks";
-import type { BuildStrategy, Deployment, UpdateDeploymentInput } from "../api/types";
+import type { Deployment, UpdateDeploymentInput } from "../api/types";
 import { describeError } from "../errors";
-
-const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
+import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "./source/SourceFields";
+import type { SourceValue } from "./source/sourceTypes";
 
 interface FormValues {
-  gitUrl: string;
-  gitRef: string;
-  imageRef: string;
-  buildStrategy: BuildStrategy;
-  dockerfilePath: string;
-  composeFilePath: string;
-  composeWebService: string;
+  source: SourceValue;
   webServicePort: string;
   healthCheckPath: string;
   runCommand: string;
@@ -38,13 +32,16 @@ function trimmed(value: string): string | undefined {
 
 function initialValues(deployment: Deployment): FormValues {
   return {
-    gitUrl: deployment.gitUrl,
-    gitRef: deployment.gitRef,
-    imageRef: deployment.strategyConfig.imageRef ?? "",
-    buildStrategy: deployment.buildStrategy,
-    dockerfilePath: deployment.strategyConfig.dockerfilePath ?? "",
-    composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
-    composeWebService: deployment.strategyConfig.composeWebService ?? "",
+    source: {
+      buildStrategy: deployment.buildStrategy,
+      gitUrl: deployment.gitUrl,
+      gitRef: deployment.gitRef,
+      gitToken: "",
+      imageRef: deployment.strategyConfig.imageRef ?? "",
+      dockerfilePath: deployment.strategyConfig.dockerfilePath ?? "",
+      composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
+      composeWebService: deployment.strategyConfig.composeWebService ?? "",
+    },
     webServicePort: deployment.webServicePort?.toString() ?? "",
     healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
@@ -55,18 +52,15 @@ function initialValues(deployment: Deployment): FormValues {
 export function SettingsTab({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
   const update = useUpdateDeployment(deployment.id);
-  const {
-    control,
-    register,
-    handleSubmit,
-    watch,
-    formState: { isDirty },
-  } = useForm<FormValues>({ defaultValues: initialValues(deployment) });
-  const strategy = watch("buildStrategy");
+  const [values, setValues] = useState<FormValues>(() => initialValues(deployment));
 
-  const onSubmit = handleSubmit(async (values) => {
+  const { source } = values;
+  const patchSource = (patch: Partial<SourceValue>): void =>
+    setValues((current) => ({ ...current, source: { ...current.source, ...patch } }));
+
+  const onSubmit = async () => {
     const payload: UpdateDeploymentInput = {
-      buildStrategy: values.buildStrategy,
+      buildStrategy: source.buildStrategy,
       healthCheckPath: values.healthCheckPath.trim() || "/",
     };
 
@@ -79,16 +73,16 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
       }
     };
 
-    if (values.buildStrategy === "IMAGE") {
-      set("imageRef", trimmed(values.imageRef));
+    if (source.buildStrategy === "IMAGE") {
+      set("imageRef", trimmed(source.imageRef));
     } else {
-      set("gitUrl", trimmed(values.gitUrl));
-      set("gitRef", trimmed(values.gitRef));
+      set("gitUrl", trimmed(source.gitUrl));
+      set("gitRef", trimmed(source.gitRef));
     }
 
-    set("dockerfilePath", trimmed(values.dockerfilePath));
-    set("composeFilePath", trimmed(values.composeFilePath));
-    set("composeWebService", trimmed(values.composeWebService));
+    set("dockerfilePath", trimmed(source.dockerfilePath));
+    set("composeFilePath", trimmed(source.composeFilePath));
+    set("composeWebService", trimmed(source.composeWebService));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
@@ -99,86 +93,81 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     } catch (error) {
       enqueueSnackbar(describeError(error), { variant: "error" });
     }
-  });
+  };
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 640 }}>
-      <form onSubmit={onSubmit}>
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="overline" color="text.secondary">
-                Source &amp; build
-              </Typography>
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="overline" color="text.secondary">
+              Source &amp; build
+            </Typography>
 
-              {strategy === "IMAGE" ? (
+            <TextField
+              select
+              label="Source type"
+              value={source.buildStrategy}
+              helperText={sourceDescription(source.buildStrategy)}
+              onChange={(event) =>
+                patchSource({ buildStrategy: event.target.value as SourceValue["buildStrategy"] })
+              }
+            >
+              {SOURCE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <SourceFields value={source} onChange={patchSource} />
+
+            {deployment.type === "WEB" && (
+              <>
                 <TextField
-                  label="Image reference"
-                  placeholder="nginx:1.27"
-                  {...register("imageRef")}
+                  label="Service port"
+                  type="number"
+                  value={values.webServicePort}
+                  onChange={(event) =>
+                    setValues((c) => ({ ...c, webServicePort: event.target.value }))
+                  }
                 />
-              ) : (
-                <>
-                  <TextField label="Git URL" {...register("gitUrl")} />
-                  <TextField label="Git ref" {...register("gitRef")} />
-                </>
-              )}
-
-              <Controller
-                name="buildStrategy"
-                control={control}
-                render={({ field }) => (
-                  <TextField select label="Build strategy" {...field}>
-                    {STRATEGIES.map((value) => (
-                      <MenuItem key={value} value={value}>
-                        {value}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-
-              {strategy === "DOCKERFILE" && (
-                <TextField label="Dockerfile path" {...register("dockerfilePath")} />
-              )}
-
-              {strategy === "COMPOSE" && (
-                <>
-                  <TextField label="Compose file path" {...register("composeFilePath")} />
+                {source.buildStrategy !== "COMPOSE" && (
                   <TextField
-                    label="Compose web service"
-                    helperText="The service Willy routes and health-checks."
-                    {...register("composeWebService")}
+                    label="Health check path"
+                    value={values.healthCheckPath}
+                    onChange={(event) =>
+                      setValues((c) => ({ ...c, healthCheckPath: event.target.value }))
+                    }
                   />
-                </>
-              )}
+                )}
+              </>
+            )}
 
-              {deployment.type === "WEB" && (
-                <>
-                  <TextField label="Service port" type="number" {...register("webServicePort")} />
-                  {strategy !== "COMPOSE" && (
-                    <TextField label="Health check path" {...register("healthCheckPath")} />
-                  )}
-                </>
-              )}
+            {(deployment.type === "WORKER" || deployment.type === "CRON") && (
+              <TextField
+                label="Run command"
+                value={values.runCommand}
+                onChange={(event) => setValues((c) => ({ ...c, runCommand: event.target.value }))}
+              />
+            )}
 
-              {(deployment.type === "WORKER" || deployment.type === "CRON") && (
-                <TextField label="Run command" {...register("runCommand")} />
-              )}
+            {deployment.type === "CRON" && (
+              <TextField
+                label="Cron expression"
+                value={values.cronExpr}
+                onChange={(event) => setValues((c) => ({ ...c, cronExpr: event.target.value }))}
+              />
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
 
-              {deployment.type === "CRON" && (
-                <TextField label="Cron expression" {...register("cronExpr")} />
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
-
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
-          <Button type="submit" variant="contained" disabled={update.isPending || !isDirty}>
-            Save changes
-          </Button>
-        </Box>
-      </form>
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+        <Button variant="contained" disabled={update.isPending} onClick={() => void onSubmit()}>
+          Save changes
+        </Button>
+      </Box>
     </Stack>
   );
 }

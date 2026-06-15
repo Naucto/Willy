@@ -51,6 +51,15 @@ export class SystemService {
     return this.cachedResources ?? { cpus: 0, memoryMb: 0 };
   }
 
+  // Tagged images present on the host, for the IMAGE-source picker.
+  async getDockerImages(): Promise<string[]> {
+    try {
+      return await this.docker.listLocalImageTags();
+    } catch {
+      return [];
+    }
+  }
+
   // The host's public IP, for pre-filling A/AAAA records. Prefers an explicit PUBLIC_IP, otherwise
   // asks an external echo service; cached so we don't hit it on every record edit.
   async getPublicIp(): Promise<PublicIpDto> {

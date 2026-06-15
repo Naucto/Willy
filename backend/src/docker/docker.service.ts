@@ -389,6 +389,17 @@ export class DockerService {
     return out;
   }
 
+  // Every tagged image present on the host, newest first — for the "browse images" picker when
+  // choosing an IMAGE-strategy source. Excludes Willy's own per-release build images and untagged.
+  async listLocalImageTags(): Promise<string[]> {
+    const images = await this.docker.listImages();
+
+    return images
+      .sort((a, b) => b.Created - a.Created)
+      .flatMap((image) => image.RepoTags ?? [])
+      .filter((tag) => tag.length > 0 && !tag.endsWith(":<none>") && !tag.startsWith("willy/"));
+  }
+
   // Tags under a repo (e.g. "willy/blog"), newest first — used for keep-N image cleanup.
   async listImageTags(repo: string): Promise<string[]> {
     const images = await this.docker.listImages({ filters: { reference: [`${repo}:*`] } });

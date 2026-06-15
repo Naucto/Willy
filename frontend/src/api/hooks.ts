@@ -100,6 +100,26 @@ export function useHostResources() {
   });
 }
 
+// Tagged images present on the host, for the IMAGE-source "browse images" picker.
+export function useDockerImages() {
+  return useQuery({
+    queryKey: ["system", "images"],
+    queryFn: async () => unwrap(await api.GET("/system/images")),
+    staleTime: 60 * 1000,
+  });
+}
+
+// Discovers a git remote's branches without cloning (for the source step's branch picker).
+export function useDiscoverBranches() {
+  return useMutation({
+    mutationFn: async (input: { url: string; token?: string }) => {
+      const body = input.token ? { url: input.url, token: input.token } : { url: input.url };
+
+      return unwrap(await api.POST("/git/branches", { body }));
+    },
+  });
+}
+
 export function useBackups() {
   return useQuery({
     queryKey: ["backups"],

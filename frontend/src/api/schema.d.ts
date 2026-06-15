@@ -260,6 +260,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/git/branches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GitController_branches"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/run": {
     parameters: {
       query?: never;
@@ -476,6 +492,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["SystemController_resources"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/system/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_images"];
     put?: never;
     post?: never;
     delete?: never;
@@ -1001,6 +1033,15 @@ export interface components {
       scope?: "BUILD" | "RUNTIME" | "BOTH";
       isSecret?: boolean;
     };
+    DiscoverBranchesDto: {
+      /** @example https://github.com/owner/repo.git */
+      url: string;
+      /** @description Token for a private repo (not stored). */
+      token?: string;
+    };
+    GitBranchesDto: {
+      branches: string[];
+    };
     CronRunDto: {
       /** Format: uuid */
       id: string;
@@ -1072,6 +1113,9 @@ export interface components {
       cpus: number;
       /** @description Total host memory in MB. */
       memoryMb: number;
+    };
+    DockerImagesDto: {
+      images: string[];
     };
     PublicIpDto: {
       ip: string | null;
@@ -1748,6 +1792,29 @@ export interface operations {
       };
     };
   };
+  GitController_branches: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DiscoverBranchesDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GitBranchesDto"];
+        };
+      };
+    };
+  };
   DeploymentActionsController_run: {
     parameters: {
       query?: never;
@@ -2055,6 +2122,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HostResourcesDto"];
+        };
+      };
+    };
+  };
+  SystemController_images: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DockerImagesDto"];
         };
       };
     };

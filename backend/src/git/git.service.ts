@@ -9,6 +9,7 @@ import { WillyError } from "../common/errors";
 
 const exec = promisify(execFile);
 const CLONE_TIMEOUT_MS = 120_000;
+const LS_REMOTE_TIMEOUT_MS = 15_000;
 
 export class GitError extends WillyError {}
 
@@ -67,6 +68,28 @@ export class GitService {
 
   async cleanup(dir: string): Promise<void> {
     await rm(dir, { recursive: true, force: true });
+  }
+
+  // Lists a remote's branches without cloning (`git ls-remote --heads`), so the create/settings UI
+  // can offer branch choices for any git remote (not GitHub-specific) before the first deploy.
+  async listBranches(url: string, token?: string): Promise<string[]> {
+    this.assertSafeUrl(url);
+    const remote = this.applyToken(url, token);
+
+    try {
+      const { stdout } = await exec("git", ["ls-remote", "--heads", remote], {
+        timeout: LS_REMOTE_TIMEOUT_MS,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      });
+
+      return stdout
+        .split("\n")
+        .map((line) => line.split("\trefs/heads/")[1])
+        .filter((branch): branch is string => Boolean(branch))
+        .sort();
+    } catch (error) {
+      throw new GitError(`could not list branches: ${describeError(error)}`);
+    }
   }
 
   private assertSafeUrl(url: string): void {

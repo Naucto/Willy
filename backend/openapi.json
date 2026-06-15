@@ -926,6 +926,42 @@
         ]
       }
     },
+    "/git/branches": {
+      "post": {
+        "operationId": "GitController_branches",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoverBranchesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitBranchesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "git"
+        ]
+      }
+    },
     "/deployments/{id}/run": {
       "post": {
         "operationId": "DeploymentActionsController_run",
@@ -1424,6 +1460,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HostResourcesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/images": {
+      "get": {
+        "operationId": "SystemController_images",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DockerImagesDto"
                 }
               }
             }
@@ -2990,6 +3052,36 @@
           "value"
         ]
       },
+      "DiscoverBranchesDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://github.com/owner/repo.git"
+          },
+          "token": {
+            "type": "string",
+            "description": "Token for a private repo (not stored)."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "GitBranchesDto": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "branches"
+        ]
+      },
       "CronRunDto": {
         "type": "object",
         "properties": {
@@ -3214,6 +3306,20 @@
         "required": [
           "cpus",
           "memoryMb"
+        ]
+      },
+      "DockerImagesDto": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "images"
         ]
       },
       "PublicIpDto": {
