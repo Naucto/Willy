@@ -1,14 +1,16 @@
 import BackupIcon from "@mui/icons-material/Backup";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import {
-  Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Stack,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -110,36 +112,40 @@ export function VolumesTab({
     },
   ];
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (volumes.length === 0) {
-    return (
-      <Alert severity="info">
-        This deployment has no named volumes. (Plain image deployments don't persist data; compose
-        stacks expose the volumes declared in their compose file.)
-      </Alert>
-    );
-  }
-
   return (
-    <>
-      <Box sx={{ height: 480 }}>
-        <DataGrid
-          rows={volumes}
-          columns={columns}
-          getRowId={(row) => row.name}
-          density="compact"
-          disableRowSelectionOnClick
-          hideFooter
-          sx={{ border: 0 }}
-        />
-      </Box>
+    <Card variant="outlined">
+      <CardContent>
+        <Stack spacing={2}>
+          <Typography variant="overline" color="text.secondary">
+            Volumes
+          </Typography>
+
+          {isLoading ? (
+            <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Box sx={{ width: "100%" }}>
+              <DataGrid
+                rows={volumes}
+                columns={columns}
+                getRowId={(row) => row.name}
+                density="compact"
+                autoHeight
+                disableRowSelectionOnClick
+                hideFooter
+                localeText={{ noRowsLabel: "No named volumes for this deployment." }}
+                sx={{ border: 0 }}
+              />
+            </Box>
+          )}
+
+          <Typography variant="caption" color="text.secondary">
+            Volumes come from the deployment's containers. Back up before a reset — reset erases a
+            volume's contents.
+          </Typography>
+        </Stack>
+      </CardContent>
 
       <Dialog open={confirmReset !== null} onClose={() => setConfirmReset(null)} maxWidth="xs">
         <DialogTitle>Reset {confirmReset}?</DialogTitle>
@@ -161,6 +167,6 @@ export function VolumesTab({
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </Card>
   );
 }
