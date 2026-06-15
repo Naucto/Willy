@@ -485,11 +485,15 @@ export function useRunCron(id: string) {
   });
 }
 
-export function useEnvVars(id: string) {
+export function useEnvVars(id: string, service = "") {
   return useQuery({
-    queryKey: queryKeys.env(id),
+    queryKey: [...queryKeys.env(id), service],
     queryFn: async () =>
-      unwrap(await api.GET("/deployments/{id}/env", { params: { path: { id } } })),
+      unwrap(
+        await api.GET("/deployments/{id}/env", {
+          params: { path: { id }, query: { service } },
+        }),
+      ),
   });
 }
 
@@ -612,28 +616,32 @@ export function useRemoveDeployment() {
   });
 }
 
-export function useSetEnvVar(id: string) {
+export function useSetEnvVar(id: string, service = "") {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: { key: string; body: SetEnvVarInput }) =>
       unwrap(
         await api.PUT("/deployments/{id}/env/{key}", {
-          params: { path: { id, key: input.key } },
+          params: { path: { id, key: input.key }, query: { service } },
           body: input.body,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.env(id) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
   });
 }
 
-export function useDeleteEnvVar(id: string) {
+export function useDeleteEnvVar(id: string, service = "") {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (key: string) =>
-      unwrap(await api.DELETE("/deployments/{id}/env/{key}", { params: { path: { id, key } } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.env(id) }),
+      unwrap(
+        await api.DELETE("/deployments/{id}/env/{key}", {
+          params: { path: { id, key }, query: { service } },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
   });
 }
 

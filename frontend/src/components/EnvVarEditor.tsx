@@ -15,17 +15,33 @@ import {
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import { useDeleteEnvVar, useEnvVars, useSetEnvVar } from "../api/hooks";
-import type { EnvScope, MaskedEnvVar } from "../api/types";
+import { useDeleteEnvVar, useDeploymentContainers, useEnvVars, useSetEnvVar } from "../api/hooks";
+import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
 
 const SCOPES: EnvScope[] = ["RUNTIME", "BUILD", "BOTH"];
 
-export function EnvVarEditor({ deploymentId }: { deploymentId: string }) {
+export function EnvVarEditor({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
-  const { data, isLoading, error } = useEnvVars(deploymentId);
-  const setEnvVar = useSetEnvVar(deploymentId);
-  const deleteEnvVar = useDeleteEnvVar(deploymentId);
+  const deploymentId = deployment.id;
+  const isCompose = deployment.buildStrategy === "COMPOSE";
+  const { data: containers } = useDeploymentContainers(deploymentId);
+
+  // Compose env is scoped per service ("" = shared across all services). Single-container apps just
+  // use the shared scope.
+  const [service, setService] = useState("");
+  const serviceNames = Array.from(
+    new Set(
+      [
+        deployment.strategyConfig.composeWebService ?? "",
+        ...(containers ?? []).map((c) => c.service ?? ""),
+      ].filter(Boolean),
+    ),
+  );
+
+  const { data, isLoading, error } = useEnvVars(deploymentId, service);
+  const setEnvVar = useSetEnvVar(deploymentId, service);
+  const deleteEnvVar = useDeleteEnvVar(deploymentId, service);
 
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
@@ -85,6 +101,24 @@ export function EnvVarEditor({ deploymentId }: { deploymentId: string }) {
   return (
     <Stack spacing={3}>
       {error && <Alert severity="error">{describeError(error)}</Alert>}
+
+      {isCompose && (
+        <TextField
+          select
+          label="Applies to"
+          value={service}
+          onChange={(event) => setService(event.target.value)}
+          helperText="Shared vars apply to every service; a service's own vars override them."
+          sx={{ maxWidth: 320 }}
+        >
+          <MenuItem value="">All services (shared)</MenuItem>
+          {serviceNames.map((name) => (
+            <MenuItem key={name} value={name}>
+              {name}
+            </MenuItem>
+          ))}
+        </TextField>
+      )}
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack

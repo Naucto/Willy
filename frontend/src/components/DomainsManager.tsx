@@ -1,7 +1,17 @@
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
-import { Box, Button, Card, CardContent, Link, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Link,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import {
   DataGrid,
   GridActionsCellItem,
@@ -12,6 +22,7 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   useAddDomain,
+  useDeploymentContainers,
   useDeploymentDomains,
   useMakeDomainPrimary,
   useRemoveDomain,
@@ -27,6 +38,7 @@ import { DomainPicker } from "./DomainPicker";
 export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
   const { data: domains } = useDeploymentDomains(deployment.id);
+  const { data: containers } = useDeploymentContainers(deployment.id);
   const addDomain = useAddDomain(deployment.id);
   const makePrimary = useMakeDomainPrimary(deployment.id);
   const removeDomain = useRemoveDomain(deployment.id);
@@ -35,6 +47,22 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const isCompose = deployment.buildStrategy === "COMPOSE";
   const defaultService = deployment.strategyConfig.composeWebService ?? "";
   const defaultPort = deployment.webServicePort ?? 80;
+
+  // Service options come from the running containers (plus whatever domains already reference and
+  // the configured default), so the service is always picked from a list rather than typed.
+  const serviceNames = Array.from(
+    new Set(
+      [
+        defaultService,
+        ...(containers ?? []).map((c) => c.service ?? ""),
+        ...(domains ?? []).map((d) => d.targetService ?? ""),
+      ].filter(Boolean),
+    ),
+  );
+  const serviceOptions = [
+    { value: "", label: defaultService ? `default (${defaultService})` : "default" },
+    ...serviceNames.map((name) => ({ value: name, label: name })),
+  ];
 
   const [fqdn, setFqdn] = useState("");
   const [service, setService] = useState("");
@@ -57,7 +85,7 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     await run(
       addDomain.mutateAsync({
         fqdn: fqdn.trim(),
-        targetService: isCompose && service.trim() ? service.trim() : null,
+        targetService: isCompose && service ? service : null,
         targetPort: port.trim() ? Number(port) : null,
       }),
       "Domain added",
@@ -99,16 +127,11 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
           {
             field: "targetService",
             headerName: "Service",
-            width: 150,
+            width: 170,
             editable: true,
-            renderCell: ({ value }) =>
-              value ? (
-                String(value)
-              ) : (
-                <Typography variant="body2" color="text.disabled">
-                  {defaultService || "—"}
-                </Typography>
-              ),
+            type: "singleSelect",
+            valueOptions: serviceOptions,
+            valueGetter: (value) => value ?? "",
           },
         ] satisfies GridColDef<DeploymentDomain>[])
       : []),
@@ -176,41 +199,49 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
             />
           </Box>
 
-          <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", flexWrap: "wrap" }}>
-            <Box sx={{ flexGrow: 1, minWidth: 240 }}>
-              <DomainPicker value={fqdn} onChange={setFqdn} />
-            </Box>
-            {isCompose && (
+          <Stack spacing={1.5}>
+            <DomainPicker value={fqdn} onChange={setFqdn} />
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+              {isCompose && (
+                <TextField
+                  select
+                  size="small"
+                  label="Service"
+                  value={service}
+                  onChange={(event) => setService(event.target.value)}
+                  sx={{ width: 180 }}
+                >
+                  {serviceOptions.map((option) => (
+                    <MenuItem key={option.value || "default"} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
               <TextField
-                label="Service"
-                placeholder={defaultService || "web service"}
-                value={service}
-                onChange={(event) => setService(event.target.value)}
-                sx={{ mt: 1, width: 150 }}
+                size="small"
+                label="Port"
+                type="number"
+                placeholder={String(defaultPort)}
+                value={port}
+                onChange={(event) => setPort(event.target.value)}
+                sx={{ width: 110 }}
               />
-            )}
-            <TextField
-              label="Port"
-              type="number"
-              placeholder={String(defaultPort)}
-              value={port}
-              onChange={(event) => setPort(event.target.value)}
-              sx={{ mt: 1, width: 110 }}
-            />
-            <Button
-              variant="contained"
-              sx={{ mt: 1 }}
-              disabled={addDomain.isPending || !fqdn.trim()}
-              onClick={() => void onAdd()}
-            >
-              Add
-            </Button>
-          </Box>
+              <Box sx={{ flexGrow: 1 }} />
+              <Button
+                variant="contained"
+                disabled={addDomain.isPending || !fqdn.trim()}
+                onClick={() => void onAdd()}
+              >
+                Add domain
+              </Button>
+            </Box>
+          </Stack>
 
           {isCompose && (
             <Typography variant="caption" color="text.secondary">
               Service/port pin a domain to one compose service and port (e.g.{" "}
-              <code>api.example.com → backend:4000</code>). Blank routes to the deployment default.
+              <code>api.example.com → backend:4000</code>). Default routes to the web service.
             </Typography>
           )}
         </Stack>

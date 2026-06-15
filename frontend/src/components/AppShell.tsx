@@ -31,7 +31,7 @@ import {
 } from "@mui/material";
 import { type ReactNode, useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
-import { useDeployment } from "../api/hooks";
+import { useDeployment, useDeploymentContainers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { deploymentSections } from "../deploymentSections";
 
@@ -87,6 +87,9 @@ export function AppShell() {
   const detail = matchDeployment(location.pathname);
   // Only fetched on a deployment route (so we know whether to show Runs vs Runtime/Console).
   const { data: deployment } = useDeployment(detail?.id ?? "");
+  // Container-scoped sections only make sense when there's a container to focus on.
+  const { data: containers } = useDeploymentContainers(detail?.id ?? "");
+  const hasContainers = (containers?.length ?? 0) > 0;
 
   const width = open ? DRAWER_WIDTH : COLLAPSED_WIDTH;
 
@@ -177,21 +180,23 @@ export function AppShell() {
             <>
               {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
               <Divider sx={{ my: 1 }} />
-              {deploymentSections(deployment?.type === "CRON").map((section) => {
-                const container = new URLSearchParams(location.search).get("container");
-                const query =
-                  container && CONTAINER_SCOPED.has(section.key)
-                    ? `?container=${encodeURIComponent(container)}`
-                    : "";
+              {deploymentSections(deployment?.type === "CRON")
+                .filter((section) => hasContainers || !CONTAINER_SCOPED.has(section.key))
+                .map((section) => {
+                  const container = new URLSearchParams(location.search).get("container");
+                  const query =
+                    container && CONTAINER_SCOPED.has(section.key)
+                      ? `?container=${encodeURIComponent(container)}`
+                      : "";
 
-                return item(
-                  section.key,
-                  `/deployments/${detail.id}/${section.key}${query}`,
-                  section.label,
-                  SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
-                  detail.section === section.key,
-                );
-              })}
+                  return item(
+                    section.key,
+                    `/deployments/${detail.id}/${section.key}${query}`,
+                    section.label,
+                    SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
+                    detail.section === section.key,
+                  );
+                })}
             </>
           ) : (
             GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>

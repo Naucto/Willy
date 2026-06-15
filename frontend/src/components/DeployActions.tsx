@@ -14,6 +14,8 @@ import {
   MenuItem,
   Stack,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
@@ -41,6 +43,10 @@ interface Action {
 
 export function DeployActions({ deployment, variant = "full", onDeleted }: DeployActionsProps) {
   const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
+  // Fold the action buttons to icon-only when the header bar gets cramped (e.g. the container
+  // selector is sharing the row on a narrower screen).
+  const compact = useMediaQuery(theme.breakpoints.down("lg"));
   const deploy = useDeploy(deployment.id);
   const restart = useRestart(deployment.id);
   const stop = useStop(deployment.id);
@@ -210,23 +216,37 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   return (
     <>
       <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
-        {actions.map((action) => (
-          <Tooltip key={action.key} title={action.tip}>
-            <span>
-              <Button
-                variant={action.key === "deploy" ? "contained" : "outlined"}
-                color={action.destructive ? "error" : "primary"}
-                disabled={isDisabled(action)}
-                startIcon={
-                  action.spinning ? <CircularProgress size={18} color="inherit" /> : action.icon
-                }
-                onClick={action.run}
-              >
-                {action.label}
-              </Button>
-            </span>
-          </Tooltip>
-        ))}
+        {actions.map((action) =>
+          compact ? (
+            <Tooltip key={action.key} title={action.label}>
+              <span>
+                <IconButton
+                  color={action.destructive ? "error" : "primary"}
+                  disabled={isDisabled(action)}
+                  onClick={action.run}
+                >
+                  {action.spinning ? <CircularProgress size={18} color="inherit" /> : action.icon}
+                </IconButton>
+              </span>
+            </Tooltip>
+          ) : (
+            <Tooltip key={action.key} title={action.tip}>
+              <span>
+                <Button
+                  variant={action.key === "deploy" ? "contained" : "outlined"}
+                  color={action.destructive ? "error" : "primary"}
+                  disabled={isDisabled(action)}
+                  startIcon={
+                    action.spinning ? <CircularProgress size={18} color="inherit" /> : action.icon
+                  }
+                  onClick={action.run}
+                >
+                  {action.label}
+                </Button>
+              </span>
+            </Tooltip>
+          ),
+        )}
       </Stack>
       {confirmDialog}
     </>

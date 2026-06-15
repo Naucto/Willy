@@ -42,10 +42,6 @@ import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { describeError } from "../errors";
 
-// Tabs that act on a single container follow the ?container= selection; the rest are
-// deployment-scoped and ignore it.
-const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
-
 function isRunning(deployment: Deployment): boolean {
   return (
     deployment.activeReleaseId !== null &&
@@ -94,7 +90,6 @@ export function DeploymentDetailPage() {
 
   // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
   const active = section ?? "overview";
-  const containerScoped = CONTAINER_SCOPED.has(active);
 
   // Resolve the focused container from the URL, falling back to the first one. Persisted in the URL
   // so switching tabs keeps focus on the same container.
@@ -120,7 +115,9 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
-  const showSelector = containerScoped && (containers?.length ?? 0) > 1 && selectedId;
+  // The container dropdown is a persistent part of the deployment bar whenever there's more than
+  // one container to focus (single-container deployments have nothing to choose).
+  const showSelector = (containers?.length ?? 0) > 1 && selectedId;
 
   return (
     <Stack spacing={3}>
@@ -155,7 +152,7 @@ export function DeploymentDetailPage() {
         ) : (
           <Alert severity="info">Console is available while the deployment is running.</Alert>
         ))}
-      {active === "env" && <EnvVarEditor deploymentId={id} />}
+      {active === "env" && <EnvVarEditor deployment={deployment} />}
       {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
       {active === "networking" && <NetworkingTab container={selected} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
