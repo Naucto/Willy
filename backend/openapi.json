@@ -2377,6 +2377,32 @@
           "deployments"
         ]
       }
+    },
+    "/maintenance/cleanup": {
+      "post": {
+        "operationId": "CleanupController_run",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "maintenance"
+        ]
+      }
     }
   },
   "info": {
@@ -3862,6 +3888,26 @@
           "volumes",
           "service",
           "networks"
+        ]
+      },
+      "CleanupResultDto": {
+        "type": "object",
+        "properties": {
+          "spaceReclaimedBytes": {
+            "type": "number",
+            "description": "Bytes reclaimed by pruning dangling images."
+          },
+          "removedImageTags": {
+            "description": "Stale per-deployment image tags that were removed.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "spaceReclaimedBytes",
+          "removedImageTags"
         ]
       }
     }

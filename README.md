@@ -2,8 +2,8 @@
 
 A self-hosted mini-PaaS. Point it at a fresh Debian VPS and deploy arbitrary git apps — web apps,
 headless workers, and cron jobs — each on its own domain, with automatic Let's Encrypt certificates via
-OVH, per-deployment environment variables, live logs and console, managed databases, and backups, all
-from a web control panel.
+OVH, per-deployment environment variables, durable build/runtime logs, an interactive console, and
+volume backups, all from a web control panel.
 
 > Rework of the former `Docker-Synchronizer`. The pre-rewrite history is preserved on the `pre-willy` tag.
 

@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // In the watch profile the SPA runs on Vite's dev server; /api is proxied to the
 // running control plane. Default target is the compose stack behind Traefik
@@ -15,5 +15,9 @@ export default defineConfig({
     proxy: {
       "/api": { target: apiProxyTarget, changeOrigin: true, secure: false },
     },
+  },
+  // Playwright owns e2e/**; keep Vitest (unit/integration) out of it.
+  test: {
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 });

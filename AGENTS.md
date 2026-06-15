@@ -2,8 +2,8 @@
 
 Willy is a self-hosted mini-PaaS: it deploys arbitrary git apps (web apps, headless workers, cron jobs)
 to a single Docker host, each routed to its own domain via Traefik with automatic Let's Encrypt
-certificates through OVH, with per-deployment env vars, logs, console, managed databases, and backups —
-all driven from a web control panel.
+certificates through OVH, with per-deployment env vars, durable build/runtime logs, an interactive
+console, and volume backups — all driven from a web control panel.
 
 This file is the source of truth for humans and coding agents. `CLAUDE.md` is a symlink to it.
 

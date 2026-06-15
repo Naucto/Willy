@@ -443,4 +443,19 @@ export class DockerService {
       this.logger.warn(`failed to remove image ${tag}: ${describeError(error)}`);
     }
   }
+
+  // Prunes only dangling images (untagged layers left behind by rebuilds). Scoped on purpose —
+  // never a blanket `image prune -a`, which would delete images still referenced by deployments.
+  // Returns the bytes reclaimed.
+  async pruneDanglingImages(): Promise<number> {
+    try {
+      const result = await this.docker.pruneImages({ filters: { dangling: { true: true } } });
+
+      return result.SpaceReclaimed ?? 0;
+    } catch (error) {
+      this.logger.warn(`dangling image prune failed: ${describeError(error)}`);
+
+      return 0;
+    }
+  }
 }

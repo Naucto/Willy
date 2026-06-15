@@ -36,5 +36,5 @@ lint-fix: ## Apply lint/format fixes (Biome)
 typecheck: ## Type-check all workspaces
 	npm run typecheck
 
-e2e: ## Run Playwright e2e against the local stack (Phase 4+)
-	@echo "e2e suite lands with the dashboard in Phase 4"
+e2e: ## Run Playwright e2e against the local stack (needs `make dev` running + `npx playwright install`)
+	npm run e2e -w @willy/frontend

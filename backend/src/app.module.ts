@@ -16,6 +16,7 @@ import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
 import { LogStorageModule } from "./logs/log-storage.module";
 import { LogsModule } from "./logs/logs.module";
+import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { OvhModule } from "./ovh/ovh.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
 import { SystemModule } from "./system/system.module";
@@ -47,6 +48,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     OvhModule,
     DnsModule,
     BackupsModule,
+    MaintenanceModule,
   ],
 })
 export class AppModule {}
