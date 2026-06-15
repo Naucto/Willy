@@ -1,21 +1,26 @@
 import DnsIcon from "@mui/icons-material/Dns";
+import MenuIcon from "@mui/icons-material/Menu";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import {
   AppBar,
   Box,
   Button,
   Drawer,
+  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
   ListItemText,
   Toolbar,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import { useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const DRAWER_WIDTH = 220;
+const COLLAPSED_WIDTH = 72;
 
 const NAV = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
@@ -25,6 +30,9 @@ const NAV = [
 export function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [open, setOpen] = useState(true);
+
+  const width = open ? DRAWER_WIDTH : COLLAPSED_WIDTH;
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
@@ -40,6 +48,16 @@ export function AppShell() {
         }}
       >
         <Toolbar>
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="Toggle navigation"
+            onClick={() => setOpen((value) => !value)}
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+          </IconButton>
+
           <Typography
             variant="h6"
             component={RouterLink}
@@ -66,23 +84,37 @@ export function AppShell() {
       <Drawer
         variant="permanent"
         sx={{
-          width: DRAWER_WIDTH,
+          width,
           flexShrink: 0,
-          "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+          whiteSpace: "nowrap",
+          "& .MuiDrawer-paper": {
+            width,
+            boxSizing: "border-box",
+            overflowX: "hidden",
+            transition: (theme) =>
+              theme.transitions.create("width", {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.standard,
+              }),
+          },
         }}
       >
         <Toolbar />
         <List>
           {NAV.map((item) => (
-            <ListItemButton
-              key={item.to}
-              component={RouterLink}
-              to={item.to}
-              selected={location.pathname.startsWith(item.to)}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
-            </ListItemButton>
+            <Tooltip key={item.to} title={item.label} placement="right" disableHoverListener={open}>
+              <ListItemButton
+                component={RouterLink}
+                to={item.to}
+                selected={location.pathname.startsWith(item.to)}
+                sx={{ justifyContent: open ? "initial" : "center", px: 2.5 }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : "auto", justifyContent: "center" }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.label} sx={{ opacity: open ? 1 : 0 }} />
+              </ListItemButton>
+            </Tooltip>
           ))}
         </List>
       </Drawer>
