@@ -29,7 +29,7 @@ import {
 } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
-import { ContainerSelector } from "../components/ContainerSelector";
+import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelector";
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
@@ -94,8 +94,16 @@ export function DeploymentDetailPage() {
   // Resolve the focused container from the URL, falling back to the first one. Persisted in the URL
   // so switching tabs keeps focus on the same container.
   const requested = searchParams.get("container");
-  const selected = containers?.find((container) => container.id === requested) ?? containers?.[0];
+  const matched = containers?.find((container) => container.id === requested);
+  const selected = matched ?? containers?.[0];
   const selectedId = selected?.id;
+
+  // The Environment tab reuses the same selector but adds an "Everyone" entry (shared vars); its
+  // value can be the ALL sentinel rather than a container id, and it defaults to Everyone.
+  const isEnv = active === "env";
+  const isCompose = deployment?.buildStrategy === "COMPOSE";
+  const envValue = requested === ALL_CONTAINERS ? ALL_CONTAINERS : (matched?.id ?? ALL_CONTAINERS);
+  const envService = envValue === ALL_CONTAINERS ? "" : (matched?.service ?? "");
 
   const selectContainer = (value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -115,9 +123,13 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
-  // The container dropdown is a persistent part of the deployment bar whenever there's more than
-  // one container to focus (single-container deployments have nothing to choose).
-  const showSelector = (containers?.length ?? 0) > 1 && selectedId;
+  // The container dropdown is a persistent part of the deployment bar. On Environment it shows for
+  // any compose stack (Everyone + each service); elsewhere only when there's more than one container
+  // to focus (single-container deployments have nothing to choose).
+  const containerCount = containers?.length ?? 0;
+  const showSelector = isEnv
+    ? isCompose && containerCount >= 1
+    : containerCount > 1 && Boolean(selectedId);
 
   return (
     <Stack spacing={3}>
@@ -132,8 +144,9 @@ export function DeploymentDetailPage() {
         {showSelector && containers && (
           <ContainerSelector
             containers={containers}
-            value={selectedId}
+            value={isEnv ? envValue : (selectedId ?? "")}
             onChange={selectContainer}
+            allowAll={isEnv}
           />
         )}
         {/* DeployActions flex-grows to fill the rest of the row and right-aligns; it folds its
@@ -153,7 +166,7 @@ export function DeploymentDetailPage() {
         ) : (
           <Alert severity="info">Console is available while the deployment is running.</Alert>
         ))}
-      {active === "env" && <EnvVarEditor deployment={deployment} />}
+      {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
       {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
       {active === "networking" && <NetworkingTab container={selected} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
