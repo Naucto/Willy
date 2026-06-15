@@ -180,6 +180,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/domains/{domainId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["DeploymentsController_removeDomain"];
+    options?: never;
+    head?: never;
+    patch: operations["DeploymentsController_updateDomainTarget"];
+    trace?: never;
+  };
   "/deployments/{id}/domains/{domainId}/primary": {
     parameters: {
       query?: never;
@@ -194,22 +210,6 @@ export interface paths {
     options?: never;
     head?: never;
     patch: operations["DeploymentsController_makeDomainPrimary"];
-    trace?: never;
-  };
-  "/deployments/{id}/domains/{domainId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: operations["DeploymentsController_removeDomain"];
-    options?: never;
-    head?: never;
-    patch?: never;
     trace?: never;
   };
   "/deployments/{id}/env": {
@@ -908,10 +908,24 @@ export interface components {
       id: string;
       fqdn: string;
       isPrimary: boolean;
+      /** @description Compose service this domain routes to; null = the deployment's default container. */
+      targetService: string | null;
+      /** @description Internal port this domain routes to; null = the deployment's web service port. */
+      targetPort: number | null;
     };
     AddDomainDto: {
       /** @example app.example.com */
       fqdn: string;
+      /** @example frontend */
+      targetService?: string | null;
+      /** @example 8080 */
+      targetPort?: number | null;
+    };
+    UpdateDomainTargetDto: {
+      /** @example frontend */
+      targetService?: string | null;
+      /** @example 8080 */
+      targetPort?: number | null;
     };
     MaskedEnvVarDto: {
       key: string;
@@ -1472,7 +1486,7 @@ export interface operations {
       };
     };
   };
-  DeploymentsController_makeDomainPrimary: {
+  DeploymentsController_removeDomain: {
     parameters: {
       query?: never;
       header?: never;
@@ -1494,7 +1508,33 @@ export interface operations {
       };
     };
   };
-  DeploymentsController_removeDomain: {
+  DeploymentsController_updateDomainTarget: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateDomainTargetDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DomainDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_makeDomainPrimary: {
     parameters: {
       query?: never;
       header?: never;

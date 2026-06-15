@@ -339,7 +339,7 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
         </Stack>
       </form>
 
-      {deployment.type === "WEB" && <DomainsManager deploymentId={deployment.id} />}
+      {deployment.type === "WEB" && <DomainsManager deployment={deployment} />}
 
       <WebhookCard deploymentId={deployment.id} autoDeploy={deployment.autoDeploy} />
     </Stack>

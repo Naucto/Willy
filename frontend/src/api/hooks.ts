@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { tokens } from "./tokens";
 import type {
+  AddDomainInput,
   CreateBackupDestinationInput,
   CreateBackupInput,
   CreateBackupScheduleInput,
@@ -12,6 +13,7 @@ import type {
   SetEnvVarInput,
   UpdateDeploymentInput,
   UpdateDnsRecordInput,
+  UpdateDomainTargetInput,
 } from "./types";
 
 export const queryKeys = {
@@ -360,9 +362,22 @@ export function useAddDomain(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (fqdn: string) =>
+    mutationFn: async (body: AddDomainInput) =>
+      unwrap(await api.POST("/deployments/{id}/domains", { params: { path: { id } }, body })),
+    onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function useUpdateDomainTarget(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { domainId: string; body: UpdateDomainTargetInput }) =>
       unwrap(
-        await api.POST("/deployments/{id}/domains", { params: { path: { id } }, body: { fqdn } }),
+        await api.PATCH("/deployments/{id}/domains/{domainId}", {
+          params: { path: { id, domainId: input.domainId } },
+          body: input.body,
+        }),
       ),
     onSuccess: () => invalidateDomains(queryClient, id),
   });
