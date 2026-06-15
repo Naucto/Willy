@@ -10,17 +10,13 @@ import {
   Paper,
   Stack,
   Switch,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
 } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useDeleteEnvVar, useEnvVars, useSetEnvVar } from "../api/hooks";
-import type { EnvScope } from "../api/types";
+import type { EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
 
 const SCOPES: EnvScope[] = ["RUNTIME", "BUILD", "BOTH"];
@@ -61,6 +57,30 @@ export function EnvVarEditor({ deploymentId }: { deploymentId: string }) {
       enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
+
+  const columns: GridColDef<MaskedEnvVar>[] = [
+    { field: "key", headerName: "Key", flex: 1, minWidth: 200, cellClassName: "willy-mono" },
+    { field: "scope", headerName: "Scope", width: 120 },
+    {
+      field: "isSecret",
+      headerName: "Secret",
+      width: 110,
+      renderCell: (params) => (params.row.isSecret ? <Chip label="secret" size="small" /> : "—"),
+    },
+    {
+      field: "actions",
+      headerName: "",
+      width: 70,
+      sortable: false,
+      filterable: false,
+      align: "right",
+      renderCell: (params) => (
+        <IconButton size="small" onClick={() => void remove(params.row.key)}>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
 
   return (
     <Stack spacing={3}>
@@ -115,34 +135,19 @@ export function EnvVarEditor({ deploymentId }: { deploymentId: string }) {
       )}
 
       {data && data.length > 0 && (
-        <Paper variant="outlined">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Key</TableCell>
-                <TableCell>Scope</TableCell>
-                <TableCell>Secret</TableCell>
-                <TableCell align="right" />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {data.map((envVar) => (
-                <TableRow key={envVar.key} hover>
-                  <TableCell sx={{ fontFamily: "monospace" }}>{envVar.key}</TableCell>
-                  <TableCell>{envVar.scope}</TableCell>
-                  <TableCell>
-                    {envVar.isSecret ? <Chip label="secret" size="small" /> : "—"}
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => void remove(envVar.key)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Paper>
+        <Box sx={{ height: 420 }}>
+          <DataGrid
+            rows={data}
+            columns={columns}
+            loading={isLoading}
+            getRowId={(row) => row.key}
+            density="compact"
+            disableRowSelectionOnClick
+            pageSizeOptions={[25, 50, 100]}
+            initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
+            sx={{ border: 0, "& .willy-mono": { fontFamily: "monospace" } }}
+          />
+        </Box>
       )}
 
       <Box sx={{ fontSize: 12, color: "text.secondary" }}>

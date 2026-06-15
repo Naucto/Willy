@@ -21,6 +21,7 @@ export const router = createBrowserRouter([
           { path: "/deployments", element: <DeploymentsPage /> },
           { path: "/deployments/new", element: <CreateDeploymentPage /> },
           { path: "/deployments/:id", element: <DeploymentDetailPage /> },
+          { path: "/deployments/:id/:section", element: <DeploymentDetailPage /> },
           { path: "/dns", element: <DnsPage /> },
           { path: "/backups", element: <BackupsPage /> },
           { path: "/users", element: <UsersPage /> },

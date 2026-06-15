@@ -325,6 +325,7 @@ export function useDeployment(id: string) {
   return useQuery({
     queryKey: queryKeys.deployment(id),
     queryFn: async () => unwrap(await api.GET("/deployments/{id}", { params: { path: { id } } })),
+    enabled: id.length > 0,
     refetchInterval: 5000,
   });
 }

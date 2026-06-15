@@ -1,4 +1,3 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
@@ -11,13 +10,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   Link,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Stack,
   Tooltip,
   Typography,
@@ -38,16 +32,6 @@ import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { describeError } from "../errors";
-
-type TabKey =
-  | "overview"
-  | "build"
-  | "runs"
-  | "runtime"
-  | "console"
-  | "env"
-  | "volumes"
-  | "settings";
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -89,10 +73,9 @@ function DetailRow({
 }
 
 export function DeploymentDetailPage() {
-  const { id = "" } = useParams();
+  const { id = "", section } = useParams();
   const navigate = useNavigate();
   const { data: deployment, isLoading, error } = useDeployment(id);
-  const [tab, setTab] = useState<TabKey>("overview");
 
   if (isLoading) {
     return (
@@ -106,20 +89,8 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
-  const isCron = deployment.type === "CRON";
-  const tabItems: { key: TabKey; label: string }[] = [
-    { key: "overview", label: "Overview" },
-    { key: "build", label: "Build logs" },
-    ...(isCron
-      ? [{ key: "runs" as const, label: "Runs" }]
-      : [
-          { key: "runtime" as const, label: "Runtime logs" },
-          { key: "console" as const, label: "Console" },
-        ]),
-    { key: "env", label: "Env" },
-    { key: "volumes", label: "Volumes" },
-    { key: "settings", label: "Settings" },
-  ];
+  // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
+  const active = section ?? "overview";
 
   return (
     <Stack spacing={3}>
@@ -135,42 +106,19 @@ export function DeploymentDetailPage() {
         <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 
-      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
-        <List dense sx={{ width: 180, flexShrink: 0, position: "sticky", top: 88 }}>
-          <ListItemButton onClick={() => navigate("/deployments")}>
-            <ListItemIcon sx={{ minWidth: 32 }}>
-              <ArrowBackIcon fontSize="small" />
-            </ListItemIcon>
-            <ListItemText primary="Deployments" />
-          </ListItemButton>
-          <Divider sx={{ my: 1 }} />
-          {tabItems.map((item) => (
-            <ListItemButton
-              key={item.key}
-              selected={tab === item.key}
-              onClick={() => setTab(item.key)}
-            >
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
-        </List>
-
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
-          {tab === "build" && <BuildLogsTab deploymentId={id} />}
-          {tab === "runs" && <CronRunsTab deploymentId={id} />}
-          {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
-          {tab === "console" &&
-            (isRunning(deployment) ? (
-              <Console deploymentId={id} />
-            ) : (
-              <Alert severity="info">Console is available while the deployment is running.</Alert>
-            ))}
-          {tab === "env" && <EnvVarEditor deploymentId={id} />}
-          {tab === "volumes" && <VolumesTab deploymentId={id} />}
-          {tab === "settings" && <SettingsTab deployment={deployment} />}
-        </Box>
-      </Box>
+      {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
+      {active === "build" && <BuildLogsTab deploymentId={id} />}
+      {active === "runs" && <CronRunsTab deploymentId={id} />}
+      {active === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
+      {active === "console" &&
+        (isRunning(deployment) ? (
+          <Console deploymentId={id} />
+        ) : (
+          <Alert severity="info">Console is available while the deployment is running.</Alert>
+        ))}
+      {active === "env" && <EnvVarEditor deploymentId={id} />}
+      {active === "volumes" && <VolumesTab deploymentId={id} />}
+      {active === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );
 }

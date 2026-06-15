@@ -1,12 +1,22 @@
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
+import HistoryIcon from "@mui/icons-material/History";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import SettingsIcon from "@mui/icons-material/Settings";
+import StorageIcon from "@mui/icons-material/Storage";
+import TerminalIcon from "@mui/icons-material/Terminal";
+import TuneIcon from "@mui/icons-material/Tune";
 import {
   AppBar,
   Box,
   Button,
+  Divider,
   Drawer,
   IconButton,
   List,
@@ -19,7 +29,9 @@ import {
 } from "@mui/material";
 import { type ReactNode, useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
+import { useDeployment } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
+import { deploymentSections } from "../deploymentSections";
 
 const DRAWER_WIDTH = 220;
 const COLLAPSED_WIDTH = 64;
@@ -31,20 +43,61 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const NAV: NavItem[] = [
+const GLOBAL_NAV: NavItem[] = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
   { label: "Backups", to: "/backups", icon: <BackupIcon /> },
   { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
 ];
 
+const SECTION_ICONS: Record<string, ReactNode> = {
+  overview: <InfoOutlinedIcon />,
+  build: <ReceiptLongIcon />,
+  runtime: <ArticleOutlinedIcon />,
+  runs: <HistoryIcon />,
+  console: <TerminalIcon />,
+  env: <TuneIcon />,
+  volumes: <StorageIcon />,
+  settings: <SettingsIcon />,
+};
+
+// Recognise a deployment-detail route (/deployments/:id[/:section]); "new" and the bare list aren't.
+function matchDeployment(pathname: string): { id: string; section: string } | null {
+  const match = pathname.match(/^\/deployments\/([^/]+)(?:\/([^/]+))?/);
+
+  if (!match?.[1] || match[1] === "new") {
+    return null;
+  }
+
+  return { id: match[1], section: match[2] ?? "overview" };
+}
+
 export function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(true);
-  const nav = NAV.filter((item) => !item.adminOnly || user?.role === "ADMIN");
+
+  const detail = matchDeployment(location.pathname);
+  // Only fetched on a deployment route (so we know whether to show Runs vs Runtime/Console).
+  const { data: deployment } = useDeployment(detail?.id ?? "");
 
   const width = open ? DRAWER_WIDTH : COLLAPSED_WIDTH;
+
+  const item = (key: string, to: string, label: string, icon: ReactNode, selected: boolean) => (
+    <Tooltip key={key} title={label} placement="right" disableHoverListener={open}>
+      <ListItemButton
+        component={RouterLink}
+        to={to}
+        selected={selected}
+        sx={{ minHeight: 48, justifyContent: open ? "initial" : "center", px: 2.5 }}
+      >
+        <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 0, justifyContent: "center" }}>
+          {icon}
+        </ListItemIcon>
+        {open && <ListItemText primary={label} />}
+      </ListItemButton>
+    </Tooltip>
+  );
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
@@ -113,21 +166,25 @@ export function AppShell() {
       >
         <Toolbar />
         <List>
-          {nav.map((item) => (
-            <Tooltip key={item.to} title={item.label} placement="right" disableHoverListener={open}>
-              <ListItemButton
-                component={RouterLink}
-                to={item.to}
-                selected={location.pathname.startsWith(item.to)}
-                sx={{ minHeight: 48, justifyContent: open ? "initial" : "center", px: 2.5 }}
-              >
-                <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 0, justifyContent: "center" }}>
-                  {item.icon}
-                </ListItemIcon>
-                {open && <ListItemText primary={item.label} />}
-              </ListItemButton>
-            </Tooltip>
-          ))}
+          {detail ? (
+            <>
+              {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
+              <Divider sx={{ my: 1 }} />
+              {deploymentSections(deployment?.type === "CRON").map((section) =>
+                item(
+                  section.key,
+                  `/deployments/${detail.id}/${section.key}`,
+                  section.label,
+                  SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
+                  detail.section === section.key,
+                ),
+              )}
+            </>
+          ) : (
+            GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>
+              item(nav.to, nav.to, nav.label, nav.icon, location.pathname.startsWith(nav.to)),
+            )
+          )}
         </List>
       </Drawer>
 
