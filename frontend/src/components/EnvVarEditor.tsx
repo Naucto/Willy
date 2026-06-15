@@ -38,6 +38,8 @@ export function EnvVarEditor({ deploymentId }: { deploymentId: string }) {
 
   const add = async () => {
     if (!key.trim()) {
+      enqueueSnackbar("A key is required", { variant: "warning" });
+
       return;
     }
 

@@ -6,6 +6,7 @@ import {
   CardContent,
   Divider,
   MenuItem,
+  Slider,
   Stack,
   TextField,
   Typography,
@@ -227,7 +228,39 @@ export function CreateDeploymentPage() {
                 </>
               )}
 
-              <TextField label="Memory limit (MB)" type="number" {...register("memoryLimitMb")} />
+              <Controller
+                name="memoryLimitMb"
+                control={control}
+                render={({ field }) => {
+                  const current = field.value ? Number(field.value) : 0;
+
+                  return (
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Memory limit: {current === 0 ? "none" : `${current} MB`}
+                      </Typography>
+                      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+                        <Slider
+                          value={current}
+                          min={0}
+                          max={4096}
+                          step={64}
+                          valueLabelDisplay="auto"
+                          onChange={(_, value) => field.onChange(value === 0 ? "" : String(value))}
+                          sx={{ flexGrow: 1 }}
+                        />
+                        <TextField
+                          label="MB"
+                          type="number"
+                          value={field.value}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          sx={{ width: 110 }}
+                        />
+                      </Stack>
+                    </Box>
+                  );
+                }}
+              />
 
               <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
                 <Button onClick={() => navigate("/deployments")}>Cancel</Button>

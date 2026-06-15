@@ -13,13 +13,15 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useDeployments } from "../api/hooks";
+import { DeployActions } from "../components/DeployActions";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
 
 export function DeploymentsPage() {
   const { data, isLoading, error } = useDeployments();
+  const navigate = useNavigate();
 
   return (
     <Stack spacing={3}>
@@ -59,14 +61,18 @@ export function DeploymentsPage() {
                 <TableCell>State</TableCell>
                 <TableCell>Repository</TableCell>
                 <TableCell>Ref</TableCell>
+                <TableCell align="right" />
               </TableRow>
             </TableHead>
             <TableBody>
               {data.map((deployment) => (
-                <TableRow key={deployment.id} hover>
-                  <TableCell>
-                    <RouterLink to={`/deployments/${deployment.id}`}>{deployment.name}</RouterLink>
-                  </TableCell>
+                <TableRow
+                  key={deployment.id}
+                  hover
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => navigate(`/deployments/${deployment.id}`)}
+                >
+                  <TableCell sx={{ fontWeight: 600 }}>{deployment.name}</TableCell>
                   <TableCell>{deployment.type}</TableCell>
                   <TableCell>
                     <StatusBadge status={deployment.state} />
@@ -75,6 +81,13 @@ export function DeploymentsPage() {
                     {deployment.gitUrl}
                   </TableCell>
                   <TableCell>{deployment.gitRef}</TableCell>
+                  <TableCell
+                    align="right"
+                    onClick={(event) => event.stopPropagation()}
+                    sx={{ cursor: "default" }}
+                  >
+                    <DeployActions deployment={deployment} variant="menu" />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

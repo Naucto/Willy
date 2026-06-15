@@ -19,7 +19,7 @@ import {
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDeployment, useReleases } from "../api/hooks";
-import type { Release } from "../api/types";
+import type { Deployment, Release } from "../api/types";
 import { DeployActions } from "../components/DeployActions";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
@@ -77,7 +77,7 @@ export function DeploymentDetailPage() {
 
       {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
       {tab === "build" && <BuildLogsTab deploymentId={id} />}
-      {tab === "runtime" && <LogViewer path={`/deployments/${id}/logs`} />}
+      {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
       {tab === "env" && <EnvVarEditor deploymentId={id} />}
     </Stack>
   );
@@ -152,6 +152,31 @@ function ReleasesTable({ releases }: { releases: Release[] | undefined }) {
       </TableBody>
     </Table>
   );
+}
+
+function RuntimeLogsTab({
+  deploymentId,
+  deployment,
+}: {
+  deploymentId: string;
+  deployment: Deployment;
+}) {
+  if (!deployment.activeReleaseId) {
+    return <Alert severity="info">No deployment yet — trigger a deploy to see runtime logs.</Alert>;
+  }
+
+  const running = ["RUNNING", "DEGRADED", "DEPLOYING"].includes(deployment.state);
+
+  if (!running) {
+    return (
+      <Alert severity="info">
+        Deployment is not running ({deployment.state}). Runtime logs appear while the container
+        runs.
+      </Alert>
+    );
+  }
+
+  return <LogViewer path={`/deployments/${deploymentId}/logs`} />;
 }
 
 function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
