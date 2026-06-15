@@ -780,6 +780,12 @@ export interface components {
        */
       capDrop?: string[];
     };
+    StrategyConfigDto: {
+      dockerfilePath?: string;
+      composeFilePath?: string;
+      composeWebService?: string;
+      imageRef?: string;
+    };
     DeploymentDto: {
       /** Format: uuid */
       id: string;
@@ -790,10 +796,7 @@ export interface components {
       gitRef: string;
       /** @enum {string} */
       buildStrategy: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
-      dockerfilePath: string | null;
-      composeFilePath: string | null;
-      composeWebService: string | null;
-      imageRef: string | null;
+      strategyConfig: components["schemas"]["StrategyConfigDto"];
       runCommand: string | null;
       cronExpr: string | null;
       webServicePort: number | null;
