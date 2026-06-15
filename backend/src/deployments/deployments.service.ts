@@ -17,6 +17,8 @@ export interface CreateDeploymentInput {
   gitRef?: string;
   buildStrategy?: Deployment["buildStrategy"];
   dockerfilePath?: string;
+  composeFilePath?: string;
+  composeWebService?: string;
   webServicePort?: number;
   healthCheckPath?: string;
   runCommand?: string;
@@ -32,6 +34,8 @@ export interface UpdateDeploymentInput {
   gitRef?: string;
   buildStrategy?: Deployment["buildStrategy"];
   dockerfilePath?: string | null;
+  composeFilePath?: string | null;
+  composeWebService?: string | null;
   webServicePort?: number | null;
   healthCheckPath?: string;
   runCommand?: string | null;
@@ -51,6 +55,8 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitRef",
   "buildStrategy",
   "dockerfilePath",
+  "composeFilePath",
+  "composeWebService",
   "webServicePort",
   "healthCheckPath",
   "runCommand",
@@ -77,6 +83,8 @@ export class DeploymentsService {
         gitRef: input.gitRef ?? "main",
         buildStrategy: input.buildStrategy ?? "DOCKERFILE",
         dockerfilePath: input.dockerfilePath ?? null,
+        composeFilePath: input.composeFilePath ?? null,
+        composeWebService: input.composeWebService ?? null,
         webServicePort: input.webServicePort ?? null,
         healthCheckPath: input.healthCheckPath ?? "/",
         runCommand: input.runCommand ?? null,
@@ -184,6 +192,16 @@ export class DeploymentsService {
       .limit(1);
 
     return rows[0];
+  }
+
+  // All FQDNs attached to a deployment (primary first), for multi-domain routing rules.
+  async allDomains(deploymentId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({ fqdn: domains.fqdn, isPrimary: domains.isPrimary })
+      .from(domains)
+      .where(eq(domains.deploymentId, deploymentId));
+
+    return rows.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary)).map((row) => row.fqdn);
   }
 
   // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.

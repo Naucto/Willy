@@ -925,6 +925,14 @@
           "dockerfilePath": {
             "type": "string"
           },
+          "composeFilePath": {
+            "type": "string",
+            "example": "docker-compose.yml"
+          },
+          "composeWebService": {
+            "type": "string",
+            "description": "Compose service to route + monitor."
+          },
           "webServicePort": {
             "type": "number",
             "minimum": 1,
@@ -1117,6 +1125,12 @@
             ]
           },
           "dockerfilePath": {
+            "type": "string"
+          },
+          "composeFilePath": {
+            "type": "string"
+          },
+          "composeWebService": {
             "type": "string"
           },
           "webServicePort": {

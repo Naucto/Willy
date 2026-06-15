@@ -10,6 +10,7 @@ import { BuildLogStore } from "./build-log.store";
 import { BuildQueue } from "./build-queue";
 import type { Release } from "./releases.service";
 import { ReleasesService } from "./releases.service";
+import { ComposeService } from "./strategies/compose.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
 import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
@@ -62,6 +63,7 @@ export class BuildOrchestrator {
     private readonly envVars: EnvVarsService,
     private readonly dockerfile: DockerfileStrategy,
     private readonly nixpacks: NixpacksStrategy,
+    private readonly compose: ComposeService,
     private readonly buildLog: BuildLogStore,
     private readonly queue: BuildQueue,
   ) {}
@@ -88,7 +90,19 @@ export class BuildOrchestrator {
   }
 
   async start(deploymentId: string): Promise<void> {
-    await this.requireActiveImage(deploymentId);
+    const deployment = await this.requireDeployment(deploymentId);
+
+    // Compose has no stored per-release image to relaunch — a fresh `up` is the way back.
+    if (deployment.buildStrategy === "COMPOSE") {
+      await this.deploy(deploymentId);
+
+      return;
+    }
+
+    if (!deployment.activeReleaseId) {
+      throw new BadRequestException("no active release to start; deploy first");
+    }
+
     await this.deployments.setState(deploymentId, "DEPLOYING");
     this.queue.enqueue(deploymentId, () => this.runRelaunch(deploymentId));
   }
@@ -100,7 +114,12 @@ export class BuildOrchestrator {
 
   // Re-launch a previously built release's image (no rebuild) and make it active.
   async rollback(deploymentId: string, releaseId: string): Promise<void> {
-    await this.requireDeployment(deploymentId);
+    const deployment = await this.requireDeployment(deploymentId);
+
+    if (deployment.buildStrategy === "COMPOSE") {
+      throw new BadRequestException("rollback is not supported for compose deployments");
+    }
+
     const target = await this.releases.findById(releaseId);
 
     if (!target || target.deploymentId !== deploymentId) {
@@ -116,12 +135,27 @@ export class BuildOrchestrator {
   }
 
   async teardown(deploymentId: string): Promise<void> {
+    const deployment = await this.requireDeployment(deploymentId);
+
+    if (deployment.buildStrategy === "COMPOSE") {
+      await this.compose.down(deployment);
+
+      return;
+    }
+
     await this.removeAllContainers(deploymentId);
   }
 
   private async runStop(deploymentId: string): Promise<void> {
     try {
-      await this.removeAllContainers(deploymentId);
+      const deployment = await this.requireDeployment(deploymentId);
+
+      if (deployment.buildStrategy === "COMPOSE") {
+        await this.compose.down(deployment);
+      } else {
+        await this.removeAllContainers(deploymentId);
+      }
+
       await this.deployments.setState(deploymentId, "STOPPED");
     } catch (error) {
       this.logger.warn(`stop failed for ${deploymentId}: ${describeError(error)}`);
@@ -175,14 +209,6 @@ export class BuildOrchestrator {
     }
   }
 
-  private async requireActiveImage(deploymentId: string): Promise<void> {
-    const deployment = await this.requireDeployment(deploymentId);
-
-    if (!deployment.activeReleaseId) {
-      throw new BadRequestException("no active release to start; deploy first");
-    }
-  }
-
   // A failed background action leaves the old container running (the swap only removes it on
   // success), so reflect "still up" vs "nothing running".
   private async markActionFailed(deploymentId: string): Promise<void> {
@@ -191,6 +217,12 @@ export class BuildOrchestrator {
   }
 
   private async runRelease(deployment: Deployment, releaseId: string): Promise<void> {
+    if (deployment.buildStrategy === "COMPOSE") {
+      await this.runComposeRelease(deployment, releaseId);
+
+      return;
+    }
+
     const priorActiveReleaseId = deployment.activeReleaseId;
 
     try {
@@ -250,6 +282,77 @@ export class BuildOrchestrator {
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
       // The previous version is left untouched, so reflect that it is still serving.
+      await this.deployments.setState(deployment.id, priorActiveReleaseId ? "DEGRADED" : "ERROR");
+    } finally {
+      this.buildLog.finish(releaseId);
+    }
+  }
+
+  // Compose path: `docker compose up -d --build` recreates the stack in place (brief
+  // interruption), then the web service is health-checked. No health-checked swap.
+  private async runComposeRelease(deployment: Deployment, releaseId: string): Promise<void> {
+    const priorActiveReleaseId = deployment.activeReleaseId;
+
+    try {
+      const release = await this.releases.findById(releaseId);
+
+      if (!release) {
+        throw new NotFoundException("release not found");
+      }
+
+      this.buildLog.append(releaseId, `deploying ${deployment.name} (compose)`);
+      await this.releases.setStatus(releaseId, "CLONING");
+
+      const token = await this.deployments.resolveGitToken(deployment.id);
+      const { dir, sha } = await this.git.clone({
+        url: deployment.gitUrl,
+        ref: deployment.gitRef,
+        token,
+      });
+
+      await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha });
+      this.buildLog.append(releaseId, "docker compose up -d --build");
+
+      const project = this.compose.projectName(deployment);
+      let webContainerId: string;
+
+      try {
+        webContainerId = await this.compose.up(deployment, dir, (line) =>
+          this.buildLog.append(releaseId, line),
+        );
+      } finally {
+        await this.git.cleanup(dir);
+      }
+
+      await this.releases.setStatus(releaseId, "HEALTHCHECKING", {
+        containerId: webContainerId,
+        composeProject: project,
+      });
+      this.buildLog.append(releaseId, "health-checking web service");
+
+      const healthy =
+        deployment.type === "WEB"
+          ? await this.probeWeb(webContainerId, deployment)
+          : await this.probeWorker(webContainerId);
+
+      if (!healthy) {
+        throw new HealthCheckError("web service did not become healthy");
+      }
+
+      await this.releases.setStatus(releaseId, "LIVE", { containerId: webContainerId });
+      await this.deployments.setActiveRelease(deployment.id, releaseId);
+      await this.deployments.setState(deployment.id, "RUNNING");
+
+      if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
+        await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
+      }
+
+      this.buildLog.append(releaseId, "deployment live");
+    } catch (error) {
+      const message = describeError(error);
+      this.logger.warn(`compose release ${releaseId} failed: ${message}`);
+      this.buildLog.append(releaseId, `error: ${message}`);
+      await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
       await this.deployments.setState(deployment.id, priorActiveReleaseId ? "DEGRADED" : "ERROR");
     } finally {
       this.buildLog.finish(releaseId);

@@ -13,12 +13,17 @@ FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 # git clones deployment source repos; nixpacks generates Dockerfiles for the Nixpacks
-# build strategy (the image build itself still goes through the socket-proxy via dockerode).
+# strategy; the docker CLI + compose plugin drive the Compose strategy (builds run on the
+# legacy builder through the socket-proxy — DOCKER_HOST is set per-invocation).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends git ca-certificates curl \
+  && apt-get install -y --no-install-recommends git ca-certificates curl gnupg \
   && curl -sSL https://nixpacks.com/install.sh | bash \
-  && apt-get purge -y curl \
-  && apt-get autoremove -y \
+  && install -m 0755 -d /etc/apt/keyrings \
+  && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
+  && chmod a+r /etc/apt/keyrings/docker.asc \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/

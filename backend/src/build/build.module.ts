@@ -8,6 +8,7 @@ import { BuildOrchestrator } from "./build-orchestrator.service";
 import { BuildQueue } from "./build-queue";
 import { DeploymentActionsController } from "./deployment-actions.controller";
 import { ReleasesService } from "./releases.service";
+import { ComposeService } from "./strategies/compose.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
 import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
@@ -21,6 +22,7 @@ import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
     BuildLogStore,
     DockerfileStrategy,
     NixpacksStrategy,
+    ComposeService,
   ],
   exports: [BuildOrchestrator, ReleasesService, BuildLogStore],
 })

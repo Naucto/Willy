@@ -35,6 +35,16 @@ export class CreateDeploymentDto {
   @IsString()
   dockerfilePath?: string;
 
+  @ApiPropertyOptional({ type: String, example: "docker-compose.yml" })
+  @IsOptional()
+  @IsString()
+  composeFilePath?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Compose service to route + monitor." })
+  @IsOptional()
+  @IsString()
+  composeWebService?: string;
+
   @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 65535 })
   @IsOptional()
   @IsInt()

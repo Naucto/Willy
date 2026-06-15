@@ -11,6 +11,7 @@ export interface ReleaseUpdate {
   gitSha?: string;
   imageTag?: string;
   containerId?: string;
+  composeProject?: string;
   errorMessage?: string;
 }
 

@@ -230,6 +230,14 @@ export class DockerService {
     return { stream, resize: (cols, rows) => exec.resize({ w: cols, h: rows }) };
   }
 
+  async removeNetwork(name: string): Promise<void> {
+    try {
+      await this.docker.getNetwork(name).remove();
+    } catch {
+      // Network may not exist or still be in use — best effort.
+    }
+  }
+
   async removeImage(tag: string): Promise<void> {
     try {
       await this.docker.getImage(tag).remove({ force: true });

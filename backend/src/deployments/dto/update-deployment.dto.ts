@@ -27,6 +27,16 @@ export class UpdateDeploymentDto {
   @IsString()
   dockerfilePath?: string;
 
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  composeFilePath?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  composeWebService?: string;
+
   @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 65535 })
   @IsOptional()
   @IsInt()
