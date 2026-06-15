@@ -18,6 +18,13 @@ export const queryKeys = {
   systemInfo: ["system", "info"] as const,
 };
 
+export function useDnsZones() {
+  return useQuery({
+    queryKey: ["dns", "zones"],
+    queryFn: async () => unwrap(await api.GET("/dns/zones")),
+  });
+}
+
 export function useDnsRecords(zone: string) {
   return useQuery({
     queryKey: ["dns", "records", zone],

@@ -1,6 +1,7 @@
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -16,7 +17,7 @@ import {
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import { useCreateDnsRecord, useDeleteDnsRecord, useDnsRecords } from "../api/hooks";
+import { useCreateDnsRecord, useDeleteDnsRecord, useDnsRecords, useDnsZones } from "../api/hooks";
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
 import { describeError } from "../errors";
 
@@ -36,6 +37,7 @@ export function DnsPage() {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<CreateDnsRecordInput>(EMPTY_RECORD);
 
+  const { data: zones, error: zonesError } = useDnsZones();
   const { data: records, isLoading, error } = useDnsRecords(zone);
   const createRecord = useCreateDnsRecord(zone);
   const deleteRecord = useDeleteDnsRecord(zone);
@@ -103,12 +105,18 @@ export function DnsPage() {
           setZone(zoneInput.trim());
         }}
       >
-        <TextField
-          label="Zone"
-          placeholder="example.com"
+        <Autocomplete
+          freeSolo
+          options={zones?.zones ?? []}
           value={zoneInput}
-          onChange={(event) => setZoneInput(event.target.value)}
-          sx={{ minWidth: 260 }}
+          sx={{ minWidth: 320 }}
+          onInputChange={(_, value) => setZoneInput(value)}
+          onChange={(_, value) => {
+            const next = (value ?? "").trim();
+            setZoneInput(next);
+            setZone(next);
+          }}
+          renderInput={(params) => <TextField {...params} label="Zone" placeholder="example.com" />}
         />
         <Button type="submit" variant="outlined">
           Load records
@@ -123,9 +131,11 @@ export function DnsPage() {
         )}
       </Box>
 
-      {!zone && (
+      {!zone && !zonesError && (
         <Alert severity="info">
-          Enter an OVH-managed zone (e.g. naucto.net) to manage its records.
+          {zones?.zones?.length
+            ? "Pick a zone to manage its records."
+            : "Select or type a DNS zone to manage its records."}
         </Alert>
       )}
 
