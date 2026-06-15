@@ -70,6 +70,8 @@ export class BuildOrchestrator {
     const deployment = await this.requireDeployment(deploymentId);
     const release = await this.releases.create(deploymentId, actorId);
 
+    // Mark transitional immediately so the UI reflects "in progress" before the build runs.
+    await this.deployments.setState(deploymentId, "DEPLOYING");
     this.queue.enqueue(deploymentId, () => this.runRelease(deployment, release.id));
 
     return release;
