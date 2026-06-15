@@ -1,17 +1,38 @@
-import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
-import { Outlet, Link as RouterLink } from "react-router-dom";
+import DnsIcon from "@mui/icons-material/Dns";
+import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import {
+  AppBar,
+  Box,
+  Button,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+} from "@mui/material";
+import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+
+const DRAWER_WIDTH = 220;
+
+const NAV = [
+  { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
+  { label: "DNS", to: "/dns", icon: <DnsIcon /> },
+];
 
 export function AppShell() {
   const { user, logout } = useAuth();
+  const location = useLocation();
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       <AppBar
-        position="static"
+        position="fixed"
         color="transparent"
         elevation={0}
-        sx={{ borderBottom: 1, borderColor: "divider" }}
+        sx={{ borderBottom: 1, borderColor: "divider", zIndex: (theme) => theme.zIndex.drawer + 1 }}
       >
         <Toolbar>
           <Typography
@@ -37,9 +58,36 @@ export function AppShell() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Outlet />
-      </Container>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: DRAWER_WIDTH,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box" },
+        }}
+      >
+        <Toolbar />
+        <List>
+          {NAV.map((item) => (
+            <ListItemButton
+              key={item.to}
+              component={RouterLink}
+              to={item.to}
+              selected={location.pathname.startsWith(item.to)}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Drawer>
+
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Toolbar />
+        <Box sx={{ p: 4 }}>
+          <Outlet />
+        </Box>
+      </Box>
     </Box>
   );
 }

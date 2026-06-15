@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
-import type { CreateDeploymentInput, SetEnvVarInput, UpdateDeploymentInput } from "./types";
+import type {
+  CreateDeploymentInput,
+  CreateDnsRecordInput,
+  SetEnvVarInput,
+  UpdateDeploymentInput,
+  UpdateDnsRecordInput,
+} from "./types";
 
 export const queryKeys = {
   deployments: ["deployments"] as const,
@@ -11,6 +17,52 @@ export const queryKeys = {
   webhook: (id: string) => ["deployments", id, "webhook"] as const,
   systemInfo: ["system", "info"] as const,
 };
+
+export function useDnsRecords(zone: string) {
+  return useQuery({
+    queryKey: ["dns", "records", zone],
+    enabled: zone.length > 0,
+    queryFn: async () =>
+      unwrap(await api.GET("/dns/zones/{zone}/records", { params: { path: { zone } } })),
+  });
+}
+
+export function useCreateDnsRecord(zone: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: CreateDnsRecordInput) =>
+      unwrap(await api.POST("/dns/zones/{zone}/records", { params: { path: { zone } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns", "records", zone] }),
+  });
+}
+
+export function useUpdateDnsRecord(zone: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: number; body: UpdateDnsRecordInput }) =>
+      unwrap(
+        await api.PUT("/dns/zones/{zone}/records/{id}", {
+          params: { path: { zone, id: input.id } },
+          body: input.body,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns", "records", zone] }),
+  });
+}
+
+export function useDeleteDnsRecord(zone: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: number) =>
+      unwrap(
+        await api.DELETE("/dns/zones/{zone}/records/{id}", { params: { path: { zone, id } } }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dns", "records", zone] }),
+  });
+}
 
 export function useSystemInfo() {
   return useQuery({

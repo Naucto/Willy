@@ -13,6 +13,10 @@ export type SetEnvVarInput = components["schemas"]["SetEnvVarDto"];
 export type WebhookStatus = components["schemas"]["WebhookStatusDto"];
 export type WebhookSecret = components["schemas"]["WebhookSecretDto"];
 
+export type DnsRecord = components["schemas"]["DnsRecordDto"];
+export type CreateDnsRecordInput = components["schemas"]["CreateDnsRecordDto"];
+export type UpdateDnsRecordInput = components["schemas"]["UpdateDnsRecordDto"];
+
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type BuildStrategy = Deployment["buildStrategy"];

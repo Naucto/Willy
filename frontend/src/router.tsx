@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import { CreateDeploymentPage } from "./pages/CreateDeploymentPage";
 import { DeploymentDetailPage } from "./pages/DeploymentDetailPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
+import { DnsPage } from "./pages/DnsPage";
 import { LoginPage } from "./pages/LoginPage";
 
 export const router = createBrowserRouter([
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
           { path: "/deployments", element: <DeploymentsPage /> },
           { path: "/deployments/new", element: <CreateDeploymentPage /> },
           { path: "/deployments/:id", element: <DeploymentDetailPage /> },
+          { path: "/dns", element: <DnsPage /> },
         ],
       },
     ],
