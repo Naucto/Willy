@@ -2,17 +2,20 @@ import { readFileSync } from "node:fs";
 import { release as kernelRelease, arch, platform } from "node:os";
 import { join } from "node:path";
 import { Injectable } from "@nestjs/common";
+import { DockerService } from "../docker/docker.service";
+import type { HostResourcesDto } from "./dto/host-resources.dto";
 import type { PublicIpDto } from "./dto/public-ip.dto";
 import type { SystemInfoDto } from "./dto/system-info.dto";
 
 const PUBLIC_IP_TTL_MS = 60 * 60 * 1000;
+// Host capacity barely changes; cache it so the resource sliders don't poll the daemon repeatedly.
+const RESOURCES_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class SystemService {
   private readonly info: SystemInfoDto = {
     version: this.readVersion(),
     commit: process.env.GIT_COMMIT ?? "dev",
-    distro: this.readDistro(),
     // Containers share the host kernel, so this reflects the VPS kernel.
     kernel: kernelRelease(),
     platform: platform(),
@@ -22,9 +25,30 @@ export class SystemService {
 
   private cachedIp: string | null = null;
   private cachedIpAt = 0;
+  private cachedResources: HostResourcesDto | null = null;
+  private cachedResourcesAt = 0;
+
+  constructor(private readonly docker: DockerService) {}
 
   getInfo(): SystemInfoDto {
     return this.info;
+  }
+
+  // Real host CPU/memory for sizing the resource sliders. Falls back to zeros (the client then uses
+  // default ceilings) when the daemon is unreachable, reusing the last good value if there is one.
+  async getResources(): Promise<HostResourcesDto> {
+    if (this.cachedResources && Date.now() - this.cachedResourcesAt < RESOURCES_TTL_MS) {
+      return this.cachedResources;
+    }
+
+    try {
+      this.cachedResources = await this.docker.hostInfo();
+      this.cachedResourcesAt = Date.now();
+    } catch {
+      // Keep the previous value (possibly null) on failure.
+    }
+
+    return this.cachedResources ?? { cpus: 0, memoryMb: 0 };
   }
 
   // The host's public IP, for pre-filling A/AAAA records. Prefers an explicit PUBLIC_IP, otherwise
@@ -64,17 +88,6 @@ export class SystemService {
       return (JSON.parse(pkg) as { version?: string }).version ?? "0.0.0";
     } catch {
       return "0.0.0";
-    }
-  }
-
-  private readDistro(): string {
-    try {
-      const osRelease = readFileSync("/etc/os-release", "utf8");
-      const match = /^PRETTY_NAME="?([^"\n]+)"?/m.exec(osRelease);
-
-      return match?.[1] ?? "unknown";
-    } catch {
-      return "unknown";
     }
   }
 }

@@ -8,9 +8,7 @@ export class SystemInfoDto {
   @ApiProperty({ type: String })
   commit!: string;
 
-  @ApiProperty({ type: String })
-  distro!: string;
-
+  // Host kernel release (containers share the host kernel, so this is the VPS kernel).
   @ApiProperty({ type: String })
   kernel!: string;
 

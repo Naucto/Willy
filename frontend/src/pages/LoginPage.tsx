@@ -108,7 +108,7 @@ export function LoginPage() {
               Willy v{system.version} · {system.commit.slice(0, 12)}
             </div>
             <div>
-              {system.distro} · {system.kernel} · {system.arch}
+              Linux {system.kernel} · {system.arch}
             </div>
           </>
         ) : (

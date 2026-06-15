@@ -155,6 +155,17 @@ export class DockerService {
     }
   }
 
+  // Host capacity (CPU count + total memory in MB) from the Docker daemon — used to size the
+  // resource-limit sliders to the real machine instead of hardcoded ceilings.
+  async hostInfo(): Promise<{ cpus: number; memoryMb: number }> {
+    const info = (await this.docker.info()) as { NCPU?: number; MemTotal?: number };
+
+    return {
+      cpus: info.NCPU ?? 0,
+      memoryMb: info.MemTotal ? Math.floor(info.MemTotal / (1024 * 1024)) : 0,
+    };
+  }
+
   // Builds an image from a context directory, streaming build output to onLog.
   async buildImage(options: BuildImageOptions): Promise<void> {
     const tar = spawn("tar", ["-C", options.contextDir, "--exclude=.git", "-czf", "-", "."]);

@@ -91,6 +91,15 @@ export function useSystemInfo() {
   });
 }
 
+// Host CPU/memory capacity, for sizing the resource-limit sliders to the real machine.
+export function useHostResources() {
+  return useQuery({
+    queryKey: ["system", "resources"],
+    queryFn: async () => unwrap(await api.GET("/system/resources")),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useBackups() {
   return useQuery({
     queryKey: ["backups"],

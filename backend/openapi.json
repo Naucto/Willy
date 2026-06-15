@@ -1413,6 +1413,32 @@
         ]
       }
     },
+    "/system/resources": {
+      "get": {
+        "operationId": "SystemController_resources",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostResourcesDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/system/public-ip": {
       "get": {
         "operationId": "SystemController_publicIp",
@@ -3151,9 +3177,6 @@
           "commit": {
             "type": "string"
           },
-          "distro": {
-            "type": "string"
-          },
           "kernel": {
             "type": "string"
           },
@@ -3170,11 +3193,27 @@
         "required": [
           "version",
           "commit",
-          "distro",
           "kernel",
           "platform",
           "arch",
           "node"
+        ]
+      },
+      "HostResourcesDto": {
+        "type": "object",
+        "properties": {
+          "cpus": {
+            "type": "number",
+            "description": "Logical CPU count reported by the Docker daemon."
+          },
+          "memoryMb": {
+            "type": "number",
+            "description": "Total host memory in MB."
+          }
+        },
+        "required": [
+          "cpus",
+          "memoryMb"
         ]
       },
       "PublicIpDto": {

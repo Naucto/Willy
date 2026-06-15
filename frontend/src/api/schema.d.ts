@@ -468,6 +468,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/system/resources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["SystemController_resources"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/system/public-ip": {
     parameters: {
       query?: never;
@@ -1046,11 +1062,16 @@ export interface components {
     SystemInfoDto: {
       version: string;
       commit: string;
-      distro: string;
       kernel: string;
       platform: string;
       arch: string;
       node: string;
+    };
+    HostResourcesDto: {
+      /** @description Logical CPU count reported by the Docker daemon. */
+      cpus: number;
+      /** @description Total host memory in MB. */
+      memoryMb: number;
     };
     PublicIpDto: {
       ip: string | null;
@@ -2015,6 +2036,25 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SystemInfoDto"];
+        };
+      };
+    };
+  };
+  SystemController_resources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HostResourcesDto"];
         };
       };
     };

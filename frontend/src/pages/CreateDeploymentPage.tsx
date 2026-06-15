@@ -13,8 +13,9 @@ import {
 import { useSnackbar } from "notistack";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { useCreateDeployment } from "../api/hooks";
+import { useCreateDeployment, useHostResources } from "../api/hooks";
 import type { BuildStrategy, CreateDeploymentInput, DeploymentType } from "../api/types";
+import { memoryMarks, memoryMaxMb } from "../components/resourceScale";
 import { describeError } from "../errors";
 
 interface FormValues {
@@ -55,13 +56,6 @@ const DEFAULTS: FormValues = {
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
 const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
-
-const MEMORY_MARKS = [
-  { value: 0, label: "Off" },
-  { value: 1024, label: "1G" },
-  { value: 2048, label: "2G" },
-  { value: 4096, label: "4G" },
-];
 
 function trimmed(value: string): string | undefined {
   const cleaned = value.trim();
@@ -126,6 +120,8 @@ export function CreateDeploymentPage() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const createDeployment = useCreateDeployment();
+  const { data: host } = useHostResources();
+  const memMax = memoryMaxMb(host?.memoryMb);
   const {
     control,
     register,
@@ -330,9 +326,9 @@ export function CreateDeploymentPage() {
                           <Slider
                             value={current}
                             min={0}
-                            max={4096}
+                            max={memMax}
                             step={64}
-                            marks={MEMORY_MARKS}
+                            marks={memoryMarks(memMax)}
                             valueLabelDisplay="auto"
                             valueLabelFormat={(value) => (value === 0 ? "Off" : `${value} MB`)}
                             onChange={(_, value) =>

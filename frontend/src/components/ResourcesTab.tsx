@@ -14,24 +14,31 @@ import {
 } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import { useServiceResources, useUpdateDeployment, useUpdateServiceResources } from "../api/hooks";
+import {
+  useHostResources,
+  useServiceResources,
+  useUpdateDeployment,
+  useUpdateServiceResources,
+} from "../api/hooks";
 import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { describeError } from "../errors";
+import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 
 const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
 
-const MEMORY_MARKS = [
-  { value: 0, label: "Off" },
-  { value: 1024, label: "1G" },
-  { value: 2048, label: "2G" },
-  { value: 4096, label: "4G" },
+// Log rotation sliders: 0 means "use the operator-wide default" (LOG_MAX_SIZE / LOG_MAX_FILES).
+const LOG_SIZE_MARKS = [
+  { value: 0, label: "Default" },
+  { value: 50, label: "50" },
+  { value: 100, label: "100" },
+  { value: 200, label: "200" },
 ];
 
-const CPU_MARKS = [
-  { value: 0, label: "Off" },
-  { value: 2, label: "2" },
-  { value: 4, label: "4" },
-  { value: 8, label: "8" },
+const LOG_FILES_MARKS = [
+  { value: 0, label: "Default" },
+  { value: 3, label: "3" },
+  { value: 5, label: "5" },
+  { value: 10, label: "10" },
 ];
 
 const COMMON_CAPS = [
@@ -177,8 +184,12 @@ function ResourceCard({
   const [cpuCores, setCpuCores] = useState(initial.nanoCpus ? initial.nanoCpus / 1e9 : 0);
   const [capAdd, setCapAdd] = useState((initial.capAdd ?? []).join(", "));
   const [capDrop, setCapDrop] = useState((initial.capDrop ?? []).join(", "));
-  const [logMaxSizeMb, setLogMaxSizeMb] = useState(initial.logMaxSizeMb?.toString() ?? "");
-  const [logMaxFiles, setLogMaxFiles] = useState(initial.logMaxFiles?.toString() ?? "");
+  const [logMaxSizeMb, setLogMaxSizeMb] = useState(initial.logMaxSizeMb ?? 0);
+  const [logMaxFiles, setLogMaxFiles] = useState(initial.logMaxFiles ?? 0);
+
+  const { data: host } = useHostResources();
+  const memMax = memoryMaxMb(host?.memoryMb);
+  const cpuCeiling = cpuMax(host?.cpus);
 
   const submit = () =>
     void onSave({
@@ -187,8 +198,8 @@ function ResourceCard({
       capAdd: parseCaps(capAdd),
       capDrop: parseCaps(capDrop),
       restartPolicy,
-      logMaxSizeMb: logMaxSizeMb ? Number(logMaxSizeMb) : null,
-      logMaxFiles: logMaxFiles ? Number(logMaxFiles) : null,
+      logMaxSizeMb: logMaxSizeMb > 0 ? logMaxSizeMb : null,
+      logMaxFiles: logMaxFiles > 0 ? logMaxFiles : null,
     });
 
   return (
@@ -216,9 +227,9 @@ function ResourceCard({
             <LimitSlider
               label="Memory limit"
               value={memoryMb}
-              max={4096}
+              max={memMax}
               step={64}
-              marks={MEMORY_MARKS}
+              marks={memoryMarks(memMax)}
               format={(v) => (v === 0 ? "No limit" : `${v} MB`)}
               onChange={setMemoryMb}
             />
@@ -226,9 +237,9 @@ function ResourceCard({
             <LimitSlider
               label="CPU limit"
               value={cpuCores}
-              max={8}
+              max={cpuCeiling}
               step={0.5}
-              marks={CPU_MARKS}
+              marks={cpuMarks(cpuCeiling)}
               format={(v) => (v === 0 ? "No limit" : `${v} cores`)}
               onChange={setCpuCores}
             />
@@ -247,24 +258,25 @@ function ResourceCard({
               onChange={setCapDrop}
             />
 
-            <Box sx={{ display: "flex", gap: 2 }}>
-              <TextField
-                label="Log max size (MB)"
-                type="number"
-                placeholder="default"
-                value={logMaxSizeMb}
-                onChange={(event) => setLogMaxSizeMb(event.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Log max files"
-                type="number"
-                placeholder="default"
-                value={logMaxFiles}
-                onChange={(event) => setLogMaxFiles(event.target.value)}
-                fullWidth
-              />
-            </Box>
+            <LimitSlider
+              label="Log max size"
+              value={logMaxSizeMb}
+              max={200}
+              step={5}
+              marks={LOG_SIZE_MARKS}
+              format={(v) => (v === 0 ? "Default" : `${v} MB`)}
+              onChange={setLogMaxSizeMb}
+            />
+
+            <LimitSlider
+              label="Log max files"
+              value={logMaxFiles}
+              max={10}
+              step={1}
+              marks={LOG_FILES_MARKS}
+              format={(v) => (v === 0 ? "Default" : `${v} files`)}
+              onChange={setLogMaxFiles}
+            />
           </Stack>
         </CardContent>
       </Card>

@@ -23,6 +23,7 @@ export type CreateBackupInput = components["schemas"]["CreateBackupDto"];
 export type PanelUser = components["schemas"]["UserDto"];
 export type CreateUserInput = components["schemas"]["CreateUserDto"];
 export type Container = components["schemas"]["ContainerDto"];
+export type HostResources = components["schemas"]["HostResourcesDto"];
 export type VolumeMount = components["schemas"]["VolumeMountDto"];
 export type BackupSchedule = components["schemas"]["BackupScheduleDto"];
 export type CreateBackupScheduleInput = components["schemas"]["CreateBackupScheduleDto"];
