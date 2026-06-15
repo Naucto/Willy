@@ -1,6 +1,6 @@
 # Build context = repo root (see docker-compose.yml).
 # Debian (glibc) base so argon2's prebuilt native binding loads without compiling.
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY backend/package.json ./backend/
@@ -9,7 +9,7 @@ RUN npm ci
 COPY backend ./backend
 RUN npm run build --workspace @willy/backend
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 # git clones deployment source repos; nixpacks generates Dockerfiles for the Nixpacks
