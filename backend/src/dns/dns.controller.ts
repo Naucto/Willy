@@ -13,14 +13,14 @@ import {
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { OkResponseDto } from "../common/dto/ok.dto";
-import { DnsService } from "./dns.service";
+import { DnsProvider } from "./dns-provider";
 import { CreateDnsRecordDto, DnsRecordDto, UpdateDnsRecordDto, ZonesDto } from "./dto/dns.dto";
 
 @ApiTags("dns")
 @ApiBearerAuth()
 @Controller("dns")
 export class DnsController {
-  constructor(private readonly dns: DnsService) {}
+  constructor(private readonly dns: DnsProvider) {}
 
   @ApiOkResponse({ type: ZonesDto })
   @Get("zones")
@@ -53,6 +53,8 @@ export class DnsController {
   @ApiOkResponse({ type: DnsRecordDto })
   @Post("zones/:zone/records")
   create(@Param("zone") zone: string, @Body() dto: CreateDnsRecordDto): Promise<DnsRecordDto> {
+    this.ensureConfigured();
+
     return this.dns.create(zone, dto);
   }
 
@@ -68,6 +70,7 @@ export class DnsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() dto: UpdateDnsRecordDto,
   ): Promise<{ ok: true }> {
+    this.ensureConfigured();
     await this.dns.update(zone, id, dto);
 
     return { ok: true };
@@ -82,6 +85,7 @@ export class DnsController {
     @Param("zone") zone: string,
     @Param("id", ParseIntPipe) id: number,
   ): Promise<{ ok: true }> {
+    this.ensureConfigured();
     await this.dns.remove(zone, id);
 
     return { ok: true };
