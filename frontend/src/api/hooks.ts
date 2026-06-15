@@ -119,6 +119,26 @@ export function useDeleteBackup() {
   });
 }
 
+export function useCreateBackupFor(deploymentId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (target: string) =>
+      unwrap(await api.POST("/backups", { body: { kind: "VOLUME_TAR", target, deploymentId } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
+export function useRestoreBackup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST("/backups/{id}/restore", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
 // Fetches the artifact with the bearer token (a plain link can't set headers) and saves it.
 export async function downloadBackup(id: string): Promise<void> {
   const response = await fetch(`/api/backups/${id}/download`, {
@@ -159,6 +179,30 @@ export function useDeployment(id: string) {
     queryKey: queryKeys.deployment(id),
     queryFn: async () => unwrap(await api.GET("/deployments/{id}", { params: { path: { id } } })),
     refetchInterval: 5000,
+  });
+}
+
+export function useDeploymentContainers(id: string) {
+  return useQuery({
+    queryKey: ["deployments", id, "containers"],
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/containers", { params: { path: { id } } })),
+    enabled: id.length > 0,
+    refetchInterval: 5000,
+  });
+}
+
+export function useResetVolume(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) =>
+      unwrap(
+        await api.POST("/deployments/{id}/volumes/{name}/reset", {
+          params: { path: { id, name } },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["deployments", id, "containers"] }),
   });
 }
 
@@ -237,6 +281,20 @@ export function useRollback(id: string) {
     mutationFn: async (releaseId: string) =>
       unwrap(
         await api.POST("/deployments/{id}/rollback/{releaseId}", {
+          params: { path: { id, releaseId } },
+        }),
+      ),
+    onSuccess: () => invalidateDeployment(queryClient, id),
+  });
+}
+
+export function useDeleteRelease(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (releaseId: string) =>
+      unwrap(
+        await api.DELETE("/deployments/{id}/releases/{releaseId}", {
           params: { path: { id, releaseId } },
         }),
       ),

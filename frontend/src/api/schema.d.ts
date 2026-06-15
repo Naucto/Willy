@@ -228,6 +228,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/releases/{releaseId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["DeploymentActionsController_deleteRelease"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/releases/{id}": {
     parameters: {
       query?: never;
@@ -388,6 +404,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/backups/{id}/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BackupsController_restore"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/backups/{id}/download": {
     parameters: {
       query?: never;
@@ -415,6 +447,38 @@ export interface paths {
     put?: never;
     post?: never;
     delete: operations["BackupsController_remove"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/containers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentVolumesController_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/reset": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DeploymentVolumesController_reset"];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -655,6 +719,18 @@ export interface components {
       target: string;
       /** Format: uuid */
       deploymentId?: string;
+    };
+    VolumeMountDto: {
+      name: string;
+      destination: string;
+      rw: boolean;
+    };
+    ContainerDto: {
+      id: string;
+      name: string;
+      image: string;
+      running: boolean;
+      volumes: components["schemas"]["VolumeMountDto"][];
     };
   };
   responses: never;
@@ -1046,6 +1122,28 @@ export interface operations {
       };
     };
   };
+  DeploymentActionsController_deleteRelease: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        releaseId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
   DeploymentActionsController_getRelease: {
     parameters: {
       query?: never;
@@ -1340,6 +1438,27 @@ export interface operations {
       };
     };
   };
+  BackupsController_restore: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
   BackupsController_download: {
     parameters: {
       query?: never;
@@ -1364,6 +1483,49 @@ export interface operations {
       query?: never;
       header?: never;
       path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentVolumesController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ContainerDto"][];
+        };
+      };
+    };
+  };
+  DeploymentVolumesController_reset: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
         id: string;
       };
       cookie?: never;

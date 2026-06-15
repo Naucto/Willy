@@ -1,3 +1,4 @@
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
   Box,
@@ -6,18 +7,22 @@ import {
   CardContent,
   CircularProgress,
   Dialog,
+  DialogActions,
   DialogContent,
+  DialogTitle,
+  IconButton,
   Link,
   Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useDeployment, useReleases, useRollback } from "../api/hooks";
+import { useDeleteRelease, useDeployment, useReleases, useRollback } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { Console } from "../components/Console";
 import { CopyButton } from "../components/CopyButton";
@@ -26,9 +31,10 @@ import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
+import { VolumesTab } from "../components/VolumesTab";
 import { describeError } from "../errors";
 
-type TabKey = "overview" | "build" | "runtime" | "console" | "env" | "settings";
+type TabKey = "overview" | "build" | "runtime" | "console" | "env" | "volumes" | "settings";
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -107,6 +113,7 @@ export function DeploymentDetailPage() {
         <Tab label="Runtime logs" value="runtime" />
         <Tab label="Console" value="console" />
         <Tab label="Env" value="env" />
+        <Tab label="Volumes" value="volumes" />
         <Tab label="Settings" value="settings" />
       </Tabs>
 
@@ -120,6 +127,7 @@ export function DeploymentDetailPage() {
           <Alert severity="info">Console is available while the deployment is running.</Alert>
         ))}
       {tab === "env" && <EnvVarEditor deploymentId={id} />}
+      {tab === "volumes" && <VolumesTab deploymentId={id} />}
       {tab === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>
   );
@@ -216,6 +224,8 @@ function ReleasesGrid({
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const rollback = useRollback(deploymentId);
+  const deleteRelease = useDeleteRelease(deploymentId);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const selectMode = onSelect !== undefined;
 
   // Keep the clicked Rollback's spinner on (and the others disabled) until the deployment
@@ -297,30 +307,54 @@ function ReleasesGrid({
     },
   ];
 
+  const onDelete = async (releaseId: string) => {
+    try {
+      await deleteRelease.mutateAsync(releaseId);
+      enqueueSnackbar("Release deleted", { variant: "success" });
+      setPendingDeleteId(null);
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
+
   if (!selectMode) {
     columns.push({
       field: "actions",
       headerName: "",
-      width: 120,
+      width: 170,
       sortable: false,
       filterable: false,
       align: "right",
       headerAlign: "right",
-      renderCell: (params) =>
-        params.row.imageTag && params.row.id !== activeReleaseId ? (
-          <Button
-            size="small"
-            disabled={rollbackBusy}
-            startIcon={
-              pendingRollbackId === params.row.id ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : undefined
-            }
-            onClick={() => void onRollback(params.row.id)}
-          >
-            Rollback
-          </Button>
-        ) : null,
+      renderCell: (params) => (
+        <Box>
+          {params.row.imageTag && params.row.id !== activeReleaseId && (
+            <Button
+              size="small"
+              disabled={rollbackBusy}
+              startIcon={
+                pendingRollbackId === params.row.id ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : undefined
+              }
+              onClick={() => void onRollback(params.row.id)}
+            >
+              Rollback
+            </Button>
+          )}
+          {params.row.id !== activeReleaseId && (
+            <Tooltip title="Delete release">
+              <IconButton
+                size="small"
+                disabled={deleteRelease.isPending}
+                onClick={() => setPendingDeleteId(params.row.id)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      ),
     });
   }
 
@@ -349,6 +383,30 @@ function ReleasesGrid({
           ...(selectMode ? { "& .MuiDataGrid-row": { cursor: "pointer" } } : {}),
         }}
       />
+
+      <Dialog
+        open={pendingDeleteId !== null}
+        onClose={() => setPendingDeleteId(null)}
+        maxWidth="xs"
+      >
+        <DialogTitle>Delete this release?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Removes the release's container and image. This can't be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={deleteRelease.isPending}
+            onClick={() => pendingDeleteId && void onDelete(pendingDeleteId)}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

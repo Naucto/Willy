@@ -19,6 +19,8 @@ export type UpdateDnsRecordInput = components["schemas"]["UpdateDnsRecordDto"];
 
 export type Backup = components["schemas"]["BackupDto"];
 export type CreateBackupInput = components["schemas"]["CreateBackupDto"];
+export type Container = components["schemas"]["ContainerDto"];
+export type VolumeMount = components["schemas"]["VolumeMountDto"];
 
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
