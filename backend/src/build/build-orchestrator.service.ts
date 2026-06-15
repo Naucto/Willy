@@ -15,10 +15,12 @@ import { NixpacksStrategy } from "./strategies/nixpacks.strategy";
 
 const EDGE_NETWORK = "willy_edge";
 
-// Newer releases get a *lower* router priority so the previous version (higher priority)
-// keeps serving the shared Host rule until it is removed at cutover. Base is chosen so the
-// value stays a positive, shrinking int for the foreseeable future.
-const PRIORITY_BASE = 3_000_000_000;
+// A freshly launched container gets a *lower* router priority than the one already serving
+// the shared Host rule, so the old version keeps winning until it is removed at cutover.
+// Priority is derived from launch time (not the release date) so a rollback — launching an
+// older release's image — still correctly supersedes the current one. Base keeps the value
+// positive and shrinking; Traefik priorities are int64 so the magnitude is fine.
+const PRIORITY_BASE = 9_000_000_000_000;
 
 const WEB_HEALTH_TIMEOUT_MS = 90_000;
 const WORKER_HEALTH_GRACE_MS = 6_000;
@@ -95,6 +97,32 @@ export class BuildOrchestrator {
     const containerId = await this.launchAndHealthCheck(deployment, release.imageTag, release);
     await this.removeStaleContainers(deploymentId, containerId);
     await this.deployments.setState(deploymentId, "RUNNING");
+  }
+
+  // Re-launch a previously built release's image (no rebuild) and make it active.
+  async rollback(deploymentId: string, releaseId: string): Promise<void> {
+    const deployment = await this.requireDeployment(deploymentId);
+    const target = await this.releases.findById(releaseId);
+
+    if (!target || target.deploymentId !== deploymentId) {
+      throw new NotFoundException("release not found for this deployment");
+    }
+
+    if (!target.imageTag) {
+      throw new BadRequestException("release has no built image to roll back to");
+    }
+
+    const priorActiveReleaseId = deployment.activeReleaseId;
+    const containerId = await this.launchAndHealthCheck(deployment, target.imageTag, target);
+
+    await this.removeStaleContainers(deploymentId, containerId);
+    await this.releases.setStatus(releaseId, "LIVE", { containerId });
+    await this.deployments.setActiveRelease(deploymentId, releaseId);
+    await this.deployments.setState(deploymentId, "RUNNING");
+
+    if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
+      await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
+    }
   }
 
   async teardown(deploymentId: string): Promise<void> {
@@ -218,7 +246,7 @@ export class BuildOrchestrator {
         host: domain.fqdn,
         port: deployment.webServicePort ?? 80,
         network: EDGE_NETWORK,
-        priority: PRIORITY_BASE - Math.floor(release.createdAt.getTime() / 1000),
+        priority: PRIORITY_BASE - Date.now(),
       });
       network = EDGE_NETWORK;
     } else {

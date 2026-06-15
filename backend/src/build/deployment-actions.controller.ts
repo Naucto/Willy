@@ -48,6 +48,20 @@ export class DeploymentActionsController {
     return { ok: true };
   }
 
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(202)
+  @ApiParam({ name: "releaseId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Post("deployments/:id/rollback/:releaseId")
+  async rollback(
+    @Param("id") id: string,
+    @Param("releaseId") releaseId: string,
+  ): Promise<{ ok: true }> {
+    await this.orchestrator.rollback(id, releaseId);
+
+    return { ok: true };
+  }
+
   @Roles("ADMIN")
   @ApiOkResponse({ type: OkResponseDto })
   @Delete("deployments/:id")

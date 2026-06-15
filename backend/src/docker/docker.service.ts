@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { PassThrough, type Readable } from "node:stream";
+import { type Duplex, PassThrough, type Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Docker from "dockerode";
@@ -211,6 +211,23 @@ export class DockerService {
       .sort((a, b) => b.Created - a.Created)
       .flatMap((image) => image.RepoTags ?? [])
       .filter((tag) => tag.startsWith(`${repo}:`) && !tag.endsWith(":<none>"));
+  }
+
+  // Opens an interactive shell (TTY) in a container for the console. The returned duplex
+  // carries raw terminal bytes both ways; resize forwards window changes to the PTY.
+  async execShell(
+    containerId: string,
+  ): Promise<{ stream: Duplex; resize: (cols: number, rows: number) => Promise<void> }> {
+    const exec = await this.docker.getContainer(containerId).exec({
+      Cmd: ["/bin/sh"],
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+    });
+    const stream = (await exec.start({ hijack: true, stdin: true, Tty: true })) as Duplex;
+
+    return { stream, resize: (cols, rows) => exec.resize({ w: cols, h: rows }) };
   }
 
   async removeImage(tag: string): Promise<void> {

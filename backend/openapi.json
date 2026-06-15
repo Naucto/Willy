@@ -507,6 +507,49 @@
         ]
       }
     },
+    "/deployments/{id}/rollback/{releaseId}": {
+      "post": {
+        "operationId": "DeploymentActionsController_rollback",
+        "parameters": [
+          {
+            "name": "releaseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/deployments/{id}/releases": {
       "get": {
         "operationId": "DeploymentActionsController_listReleases",
@@ -645,6 +688,32 @@
         ],
         "tags": [
           "webhooks"
+        ]
+      }
+    },
+    "/streams/ticket": {
+      "post": {
+        "operationId": "ConsoleController_ticket",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamTicketDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "console"
         ]
       }
     }
@@ -1185,6 +1254,17 @@
         "required": [
           "secret",
           "path"
+        ]
+      },
+      "StreamTicketDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket"
         ]
       }
     }
