@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { tokens } from "./tokens";
 import type {
+  CreateBackupDestinationInput,
   CreateBackupInput,
   CreateBackupScheduleInput,
   CreateDeploymentInput,
@@ -136,6 +137,47 @@ export function useRestoreBackup() {
   return useMutation({
     mutationFn: async (id: string) =>
       unwrap(await api.POST("/backups/{id}/restore", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+}
+
+export function useBackupDestinations() {
+  return useQuery({
+    queryKey: ["backups", "destinations"],
+    queryFn: async () => unwrap(await api.GET("/backups/destinations")),
+  });
+}
+
+export function useCreateDestination() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: CreateBackupDestinationInput) =>
+      unwrap(await api.POST("/backups/destinations", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups", "destinations"] }),
+  });
+}
+
+export function useDeleteDestination() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/backups/destinations/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups", "destinations"] }),
+  });
+}
+
+export function usePushBackup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; destinationId: string }) =>
+      unwrap(
+        await api.POST("/backups/{id}/push/{destinationId}", {
+          params: { path: { id: input.id, destinationId: input.destinationId } },
+        }),
+      ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
   });
 }

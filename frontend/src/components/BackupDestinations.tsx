@@ -1,0 +1,191 @@
+import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import {
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { useSnackbar } from "notistack";
+import { useState } from "react";
+import { useBackupDestinations, useCreateDestination, useDeleteDestination } from "../api/hooks";
+import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
+import { describeError } from "../errors";
+
+const TYPES = ["S3", "FTP", "SFTP"] as const;
+type DestType = (typeof TYPES)[number];
+
+export function BackupDestinations() {
+  const { enqueueSnackbar } = useSnackbar();
+  const { data: destinations, isLoading } = useBackupDestinations();
+  const deleteDestination = useDeleteDestination();
+  const [adding, setAdding] = useState(false);
+
+  const onDelete = async (id: string) => {
+    try {
+      await deleteDestination.mutateAsync(id);
+      enqueueSnackbar("Destination deleted", { variant: "success" });
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
+
+  const columns: GridColDef<BackupDestination>[] = [
+    { field: "name", headerName: "Name", flex: 1, minWidth: 160 },
+    { field: "type", headerName: "Type", width: 100 },
+    {
+      field: "createdAt",
+      headerName: "Added",
+      width: 180,
+      valueFormatter: (value) => new Date(value as string).toLocaleString(),
+    },
+    {
+      field: "actions",
+      headerName: "",
+      width: 60,
+      sortable: false,
+      filterable: false,
+      align: "right",
+      renderCell: (params) => (
+        <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
+
+  return (
+    <Box>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          Offsite destinations
+        </Typography>
+        <Button size="small" variant="outlined" onClick={() => setAdding(true)}>
+          New destination
+        </Button>
+      </Box>
+
+      <Box sx={{ height: 280 }}>
+        <DataGrid
+          rows={destinations ?? []}
+          columns={columns}
+          loading={isLoading}
+          getRowId={(row) => row.id}
+          density="compact"
+          disableRowSelectionOnClick
+          hideFooter
+          sx={{ border: 0 }}
+        />
+      </Box>
+
+      <NewDestinationDialog open={adding} onClose={() => setAdding(false)} />
+    </Box>
+  );
+}
+
+function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { enqueueSnackbar } = useSnackbar();
+  const create = useCreateDestination();
+  const [type, setType] = useState<DestType>("S3");
+  const [fields, setFields] = useState<Record<string, string>>({});
+
+  const set = (key: string, value: string) => setFields((prev) => ({ ...prev, [key]: value }));
+
+  const reset = () => {
+    setType("S3");
+    setFields({});
+  };
+
+  const onCreate = async () => {
+    const { port, ...rest } = fields;
+    const body = {
+      ...rest,
+      name: fields.name ?? "",
+      type,
+      ...(port ? { port: Number(port) } : {}),
+    } as CreateBackupDestinationInput;
+
+    try {
+      await create.mutateAsync(body);
+      enqueueSnackbar("Destination created", { variant: "success" });
+      reset();
+      onClose();
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
+
+  const field = (key: string, label: string, password = false) => (
+    <TextField
+      label={label}
+      type={password ? "password" : "text"}
+      value={fields[key] ?? ""}
+      onChange={(event) => set(key, event.target.value)}
+    />
+  );
+
+  const ready =
+    Boolean(fields.name) &&
+    (type === "S3"
+      ? Boolean(fields.bucket && fields.accessKeyId && fields.secretAccessKey)
+      : Boolean(fields.host && fields.username && fields.password));
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>New offsite destination</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {field("name", "Name")}
+          <TextField
+            select
+            label="Type"
+            value={type}
+            onChange={(event) => setType(event.target.value as DestType)}
+          >
+            {TYPES.map((value) => (
+              <MenuItem key={value} value={value}>
+                {value}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {type === "S3" ? (
+            <>
+              {field("bucket", "Bucket")}
+              {field("prefix", "Prefix (optional)")}
+              {field("region", "Region (optional)")}
+              {field("endpoint", "Endpoint (optional, for non-AWS)")}
+              {field("accessKeyId", "Access key ID")}
+              {field("secretAccessKey", "Secret access key", true)}
+            </>
+          ) : (
+            <>
+              {field("host", "Host")}
+              {field("port", "Port (optional)")}
+              {field("username", "Username")}
+              {field("password", "Password", true)}
+              {field("path", "Remote path (optional)")}
+            </>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={create.isPending || !ready}
+          onClick={() => void onCreate()}
+        >
+          Create
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

@@ -1,3 +1,4 @@
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import DownloadIcon from "@mui/icons-material/Download";
 import RestoreIcon from "@mui/icons-material/Restore";
@@ -22,14 +23,17 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   downloadBackup,
+  useBackupDestinations,
   useBackups,
   useCreateBackupFor,
   useDeleteBackup,
   useDeploymentContainers,
   useDeployments,
+  usePushBackup,
   useRestoreBackup,
 } from "../api/hooks";
 import type { Backup } from "../api/types";
+import { BackupDestinations } from "../components/BackupDestinations";
 import { BackupSchedules } from "../components/BackupSchedules";
 import { describeError } from "../errors";
 
@@ -60,11 +64,15 @@ function formatBytes(bytes: number | null): string {
 export function BackupsPage() {
   const { enqueueSnackbar } = useSnackbar();
   const { data: backups, isLoading } = useBackups();
+  const { data: destinations } = useBackupDestinations();
   const deleteBackup = useDeleteBackup();
   const restoreBackup = useRestoreBackup();
+  const pushBackup = usePushBackup();
 
   const [adding, setAdding] = useState(false);
   const [restoreId, setRestoreId] = useState<string | null>(null);
+  const [pushId, setPushId] = useState<string | null>(null);
+  const [destinationId, setDestinationId] = useState("");
 
   const onDownload = async (id: string) => {
     try {
@@ -88,6 +96,21 @@ export function BackupsPage() {
       await restoreBackup.mutateAsync(id);
       enqueueSnackbar("Restore started", { variant: "success" });
       setRestoreId(null);
+    } catch (caught) {
+      enqueueSnackbar(describeError(caught), { variant: "error" });
+    }
+  };
+
+  const onPush = async () => {
+    if (!pushId || !destinationId) {
+      return;
+    }
+
+    try {
+      await pushBackup.mutateAsync({ id: pushId, destinationId });
+      enqueueSnackbar("Offsite push started", { variant: "success" });
+      setPushId(null);
+      setDestinationId("");
     } catch (caught) {
       enqueueSnackbar(describeError(caught), { variant: "error" });
     }
@@ -118,7 +141,7 @@ export function BackupsPage() {
     {
       field: "actions",
       headerName: "",
-      width: 130,
+      width: 170,
       sortable: false,
       filterable: false,
       align: "right",
@@ -132,6 +155,20 @@ export function BackupsPage() {
                 onClick={() => void onDownload(params.row.id)}
               >
                 <DownloadIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip
+            title={params.row.offsiteUrl ? `Pushed: ${params.row.offsiteUrl}` : "Push offsite"}
+          >
+            <span>
+              <IconButton
+                size="small"
+                color={params.row.offsiteUrl ? "success" : "default"}
+                disabled={params.row.status !== "SUCCESS"}
+                onClick={() => setPushId(params.row.id)}
+              >
+                <CloudUploadIcon fontSize="small" />
               </IconButton>
             </span>
           </Tooltip>
@@ -168,8 +205,8 @@ export function BackupsPage() {
       </Box>
 
       <Alert severity="info">
-        Snapshots a deployment's volume into a compressed archive you can download or restore back
-        to that deployment. Database dumps and schedules are coming next.
+        Snapshots a deployment's volume into a compressed archive you can download, restore back to
+        that deployment, or push to an offsite destination (S3 / FTP / SFTP).
       </Alert>
 
       <Box sx={{ height: 540 }}>
@@ -192,7 +229,43 @@ export function BackupsPage() {
 
       <BackupSchedules />
 
+      <BackupDestinations />
+
       <NewBackupDialog open={adding} onClose={() => setAdding(false)} />
+
+      <Dialog open={pushId !== null} onClose={() => setPushId(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Push offsite</DialogTitle>
+        <DialogContent>
+          {destinations && destinations.length > 0 ? (
+            <TextField
+              select
+              fullWidth
+              label="Destination"
+              value={destinationId}
+              sx={{ mt: 1 }}
+              onChange={(event) => setDestinationId(event.target.value)}
+            >
+              {destinations.map((dest) => (
+                <MenuItem key={dest.id} value={dest.id}>
+                  {dest.name} ({dest.type})
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <Alert severity="info">Add an offsite destination below first.</Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPushId(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={pushBackup.isPending || !destinationId}
+            onClick={() => void onPush()}
+          >
+            Push
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={restoreId !== null} onClose={() => setRestoreId(null)} maxWidth="xs">
         <DialogTitle>Restore this backup?</DialogTitle>

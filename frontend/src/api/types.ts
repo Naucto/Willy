@@ -23,6 +23,8 @@ export type Container = components["schemas"]["ContainerDto"];
 export type VolumeMount = components["schemas"]["VolumeMountDto"];
 export type BackupSchedule = components["schemas"]["BackupScheduleDto"];
 export type CreateBackupScheduleInput = components["schemas"]["CreateBackupScheduleDto"];
+export type BackupDestination = components["schemas"]["BackupDestinationDto"];
+export type CreateBackupDestinationInput = components["schemas"]["CreateBackupDestinationDto"];
 
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];

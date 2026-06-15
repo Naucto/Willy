@@ -420,6 +420,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/backups/{id}/push/{destinationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BackupsController_push"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/backups/{id}/download": {
     parameters: {
       query?: never;
@@ -482,6 +498,38 @@ export interface paths {
     options?: never;
     head?: never;
     patch: operations["BackupSchedulesController_setEnabled"];
+    trace?: never;
+  };
+  "/backups/destinations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["BackupDestinationsController_list"];
+    put?: never;
+    post: operations["BackupDestinationsController_create"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/backups/destinations/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["BackupDestinationsController_remove"];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/deployments/{id}/containers": {
@@ -736,6 +784,7 @@ export interface components {
       target: string | null;
       sizeBytes: number | null;
       errorMessage: string | null;
+      offsiteUrl: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -777,6 +826,33 @@ export interface components {
     };
     UpdateBackupScheduleDto: {
       enabled: boolean;
+    };
+    BackupDestinationDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** @enum {string} */
+      type: "S3" | "FTP" | "SFTP";
+      /** Format: date-time */
+      createdAt: string;
+    };
+    CreateBackupDestinationDto: {
+      /** @example offsite-s3 */
+      name: string;
+      /** @enum {string} */
+      type: "S3" | "FTP" | "SFTP";
+      bucket?: string;
+      prefix?: string;
+      region?: string;
+      /** @example https://s3.example.com */
+      endpoint?: string;
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      host?: string;
+      port?: number;
+      username?: string;
+      password?: string;
+      path?: string;
     };
     VolumeMountDto: {
       name: string;
@@ -1517,6 +1593,28 @@ export interface operations {
       };
     };
   };
+  BackupsController_push: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        destinationId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
   BackupsController_download: {
     parameters: {
       query?: never;
@@ -1641,6 +1739,69 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["BackupScheduleDto"];
+        };
+      };
+    };
+  };
+  BackupDestinationsController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupDestinationDto"][];
+        };
+      };
+    };
+  };
+  BackupDestinationsController_create: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBackupDestinationDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BackupDestinationDto"];
+        };
+      };
+    };
+  };
+  BackupDestinationsController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
         };
       };
     };
