@@ -500,16 +500,16 @@ export class BuildOrchestrator {
     let network: string | undefined;
 
     if (deployment.type === "WEB") {
-      const domain = await this.deployments.primaryDomain(deployment.id);
+      const hosts = await this.deployments.allDomains(deployment.id);
 
-      if (!domain) {
-        throw new BadRequestException("WEB deployment requires a primary domain");
+      if (hosts.length === 0) {
+        throw new BadRequestException("WEB deployment requires a domain");
       }
 
       labels = this.labels.forWeb({
         deploymentId: deployment.id,
         routerName: `${deployment.name}-${releaseShort}`,
-        host: domain.fqdn,
+        hosts,
         port: deployment.webServicePort ?? 80,
         network: EDGE_NETWORK,
         priority: PRIORITY_BASE - Date.now(),

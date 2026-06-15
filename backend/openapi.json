@@ -472,6 +472,173 @@
         ]
       }
     },
+    "/deployments/{id}/domains": {
+      "get": {
+        "operationId": "DeploymentsController_domains",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DomainDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "post": {
+        "operationId": "DeploymentsController_addDomain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDomainDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/domains/{domainId}/primary": {
+      "patch": {
+        "operationId": "DeploymentsController_makeDomainPrimary",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/domains/{domainId}": {
+      "delete": {
+        "operationId": "DeploymentsController_removeDomain",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
     "/deployments/{id}/env": {
       "get": {
         "operationId": "EnvVarsController_list",
@@ -2441,6 +2608,38 @@
             "example": "app.example.com"
           }
         }
+      },
+      "DomainDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fqdn": {
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "fqdn",
+          "isPrimary"
+        ]
+      },
+      "AddDomainDto": {
+        "type": "object",
+        "properties": {
+          "fqdn": {
+            "type": "string",
+            "example": "app.example.com"
+          }
+        },
+        "required": [
+          "fqdn"
+        ]
       },
       "MaskedEnvVarDto": {
         "type": "object",

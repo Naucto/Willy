@@ -1,4 +1,15 @@
-import { Body, Controller, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
@@ -8,10 +19,16 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { type DeploymentView, DeploymentsService } from "./deployments.service";
+import { OkResponseDto } from "../common/dto/ok.dto";
+import { type Domain, type DeploymentView, DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
+import { AddDomainDto, DomainDto } from "./dto/domain.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
+
+function domainToDto(row: Domain): DomainDto {
+  return { id: row.id, fqdn: row.fqdn, isPrimary: row.isPrimary };
+}
 
 @ApiTags("deployments")
 @ApiBearerAuth()
@@ -52,6 +69,51 @@ export class DeploymentsController {
     await this.deployments.update(id, dto);
 
     return this.requireForApi(id);
+  }
+
+  @ApiParam({ name: "id", type: String })
+  @ApiOkResponse({ type: [DomainDto] })
+  @Get(":id/domains")
+  async domains(@Param("id") id: string): Promise<DomainDto[]> {
+    return (await this.deployments.listDomains(id)).map(domainToDto);
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiBody({ type: AddDomainDto })
+  @ApiCreatedResponse({ type: DomainDto })
+  @Post(":id/domains")
+  async addDomain(@Param("id") id: string, @Body() dto: AddDomainDto): Promise<DomainDto> {
+    return domainToDto(await this.deployments.addDomain(id, dto.fqdn.trim()));
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(200)
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Patch(":id/domains/:domainId/primary")
+  async makeDomainPrimary(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+  ): Promise<{ ok: true }> {
+    await this.deployments.makePrimary(id, domainId);
+
+    return { ok: true };
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Delete(":id/domains/:domainId")
+  async removeDomain(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+  ): Promise<{ ok: true }> {
+    await this.deployments.removeDomain(id, domainId);
+
+    return { ok: true };
   }
 
   private async requireForApi(id: string): Promise<DeploymentView> {

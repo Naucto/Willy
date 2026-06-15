@@ -5,7 +5,8 @@ export const OWNER_LABEL = "willy.deploymentId";
 export interface WebLabelInput {
   deploymentId: string;
   routerName: string;
-  host: string;
+  // One or more FQDNs; routed by a Host(`a`) || Host(`b`) rule (per-domain certs via the resolver).
+  hosts: string[];
   port: number;
   network: string;
   // Lower priority loses to a higher one when two routers share a Host rule. During a
@@ -21,11 +22,12 @@ export interface WebLabelInput {
 export class LabelGeneratorService {
   forWeb(input: WebLabelInput): Record<string, string> {
     const router = input.routerName;
+    const rule = input.hosts.map((host) => `Host(\`${host}\`)`).join(" || ");
 
     return {
       "traefik.enable": "true",
       "traefik.docker.network": input.network,
-      [`traefik.http.routers.${router}.rule`]: `Host(\`${input.host}\`)`,
+      [`traefik.http.routers.${router}.rule`]: rule,
       [`traefik.http.routers.${router}.entrypoints`]: "websecure",
       [`traefik.http.routers.${router}.tls`]: "true",
       [`traefik.http.routers.${router}.tls.certresolver`]: "ovh",

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
@@ -305,6 +305,60 @@ export class DeploymentsService {
     }
 
     await this.db.insert(domains).values({ deploymentId, fqdn, isPrimary: true });
+  }
+
+  listDomains(deploymentId: string): Promise<Domain[]> {
+    return this.db
+      .select()
+      .from(domains)
+      .where(eq(domains.deploymentId, deploymentId))
+      .orderBy(desc(domains.isPrimary), domains.fqdn);
+  }
+
+  // Adds an extra FQDN; becomes primary only if the deployment has none yet.
+  async addDomain(deploymentId: string, fqdn: string): Promise<Domain> {
+    const existing = await this.primaryDomain(deploymentId);
+    const [row] = await this.db
+      .insert(domains)
+      .values({ deploymentId, fqdn, isPrimary: !existing })
+      .returning();
+
+    if (!row) {
+      throw new DatabaseError("domain insert returned no row");
+    }
+
+    return row;
+  }
+
+  // Removes a domain; if it was primary, promotes another (so a WEB deployment keeps a primary).
+  async removeDomain(deploymentId: string, domainId: string): Promise<void> {
+    const [removed] = await this.db
+      .delete(domains)
+      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
+      .returning();
+
+    if (removed?.isPrimary) {
+      const [next] = await this.db
+        .select()
+        .from(domains)
+        .where(eq(domains.deploymentId, deploymentId))
+        .limit(1);
+
+      if (next) {
+        await this.db.update(domains).set({ isPrimary: true }).where(eq(domains.id, next.id));
+      }
+    }
+  }
+
+  async makePrimary(deploymentId: string, domainId: string): Promise<void> {
+    await this.db
+      .update(domains)
+      .set({ isPrimary: false })
+      .where(eq(domains.deploymentId, deploymentId));
+    await this.db
+      .update(domains)
+      .set({ isPrimary: true })
+      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)));
   }
 
   // List/get enriched with the primary domain fqdn for API responses.

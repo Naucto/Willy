@@ -8,14 +8,16 @@ describe("LabelGeneratorService", () => {
     const labels = service.forWeb({
       deploymentId: "dep-1",
       routerName: "app-blog",
-      host: "blog.willy.naucto.net",
+      hosts: ["blog.willy.naucto.net", "www.blog.naucto.net"],
       port: 8080,
       network: "willy_edge",
       priority: 1000,
     });
 
     expect(labels["traefik.enable"]).toBe("true");
-    expect(labels["traefik.http.routers.app-blog.rule"]).toBe("Host(`blog.willy.naucto.net`)");
+    expect(labels["traefik.http.routers.app-blog.rule"]).toBe(
+      "Host(`blog.willy.naucto.net`) || Host(`www.blog.naucto.net`)",
+    );
     expect(labels["traefik.http.routers.app-blog.tls.certresolver"]).toBe("ovh");
     expect(labels["traefik.http.routers.app-blog.priority"]).toBe("1000");
     expect(labels["traefik.http.services.app-blog.loadbalancer.server.port"]).toBe("8080");
