@@ -1,3 +1,4 @@
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import {
   Alert,
@@ -10,11 +11,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   Link,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   Stack,
-  Tab,
-  Tabs,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -103,6 +107,19 @@ export function DeploymentDetailPage() {
   }
 
   const isCron = deployment.type === "CRON";
+  const tabItems: { key: TabKey; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "build", label: "Build logs" },
+    ...(isCron
+      ? [{ key: "runs" as const, label: "Runs" }]
+      : [
+          { key: "runtime" as const, label: "Runtime logs" },
+          { key: "console" as const, label: "Console" },
+        ]),
+    { key: "env", label: "Env" },
+    { key: "volumes", label: "Volumes" },
+    { key: "settings", label: "Settings" },
+  ];
 
   return (
     <Stack spacing={3}>
@@ -118,35 +135,42 @@ export function DeploymentDetailPage() {
         <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 
-      <Tabs value={tab} onChange={(_, value: TabKey) => setTab(value)}>
-        <Tab label="Overview" value="overview" />
-        <Tab label="Build logs" value="build" />
-        {isCron ? (
-          <Tab label="Runs" value="runs" />
-        ) : (
-          [
-            <Tab key="runtime" label="Runtime logs" value="runtime" />,
-            <Tab key="console" label="Console" value="console" />,
-          ]
-        )}
-        <Tab label="Env" value="env" />
-        <Tab label="Volumes" value="volumes" />
-        <Tab label="Settings" value="settings" />
-      </Tabs>
+      <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+        <List dense sx={{ width: 180, flexShrink: 0, position: "sticky", top: 88 }}>
+          <ListItemButton onClick={() => navigate("/deployments")}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <ArrowBackIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Deployments" />
+          </ListItemButton>
+          <Divider sx={{ my: 1 }} />
+          {tabItems.map((item) => (
+            <ListItemButton
+              key={item.key}
+              selected={tab === item.key}
+              onClick={() => setTab(item.key)}
+            >
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
 
-      {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
-      {tab === "build" && <BuildLogsTab deploymentId={id} />}
-      {tab === "runs" && <CronRunsTab deploymentId={id} />}
-      {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
-      {tab === "console" &&
-        (isRunning(deployment) ? (
-          <Console deploymentId={id} />
-        ) : (
-          <Alert severity="info">Console is available while the deployment is running.</Alert>
-        ))}
-      {tab === "env" && <EnvVarEditor deploymentId={id} />}
-      {tab === "volumes" && <VolumesTab deploymentId={id} />}
-      {tab === "settings" && <SettingsTab deployment={deployment} />}
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          {tab === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
+          {tab === "build" && <BuildLogsTab deploymentId={id} />}
+          {tab === "runs" && <CronRunsTab deploymentId={id} />}
+          {tab === "runtime" && <RuntimeLogsTab deploymentId={id} deployment={deployment} />}
+          {tab === "console" &&
+            (isRunning(deployment) ? (
+              <Console deploymentId={id} />
+            ) : (
+              <Alert severity="info">Console is available while the deployment is running.</Alert>
+            ))}
+          {tab === "env" && <EnvVarEditor deploymentId={id} />}
+          {tab === "volumes" && <VolumesTab deploymentId={id} />}
+          {tab === "settings" && <SettingsTab deployment={deployment} />}
+        </Box>
+      </Box>
     </Stack>
   );
 }

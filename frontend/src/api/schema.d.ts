@@ -739,11 +739,16 @@ export interface components {
       /** @enum {string} */
       type: "WEB" | "WORKER" | "CRON";
       /** @example https://github.com/owner/repo.git */
-      gitUrl: string;
+      gitUrl?: string;
       /** @example main */
       gitRef?: string;
+      /**
+       * @description For the IMAGE strategy.
+       * @example nginx:1.27
+       */
+      imageRef?: string;
       /** @enum {string} */
-      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
+      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath?: string;
       /** @example docker-compose.yml */
       composeFilePath?: string;
@@ -784,10 +789,11 @@ export interface components {
       gitUrl: string;
       gitRef: string;
       /** @enum {string} */
-      buildStrategy: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
+      buildStrategy: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath: string | null;
       composeFilePath: string | null;
       composeWebService: string | null;
+      imageRef: string | null;
       runCommand: string | null;
       cronExpr: string | null;
       webServicePort: number | null;
@@ -813,9 +819,11 @@ export interface components {
     };
     UpdateDeploymentDto: {
       gitUrl?: string;
+      /** @example nginx:1.27 */
+      imageRef?: string;
       gitRef?: string;
       /** @enum {string} */
-      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE";
+      buildStrategy?: "NIXPACKS" | "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath?: string;
       composeFilePath?: string;
       composeWebService?: string;

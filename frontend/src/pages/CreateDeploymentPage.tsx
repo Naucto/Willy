@@ -23,6 +23,7 @@ interface FormValues {
   type: DeploymentType;
   gitUrl: string;
   gitRef: string;
+  imageRef: string;
   buildStrategy: BuildStrategy;
   dockerfilePath: string;
   webServicePort: string;
@@ -41,6 +42,7 @@ const DEFAULTS: FormValues = {
   type: "WEB",
   gitUrl: "",
   gitRef: "main",
+  imageRef: "",
   buildStrategy: "DOCKERFILE",
   dockerfilePath: "",
   composeFilePath: "",
@@ -55,7 +57,7 @@ const DEFAULTS: FormValues = {
 };
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
-const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE"];
+const STRATEGIES: BuildStrategy[] = ["DOCKERFILE", "NIXPACKS", "COMPOSE", "IMAGE"];
 
 const MEMORY_MARKS = [
   { value: 0, label: "Off" },
@@ -74,7 +76,6 @@ function toPayload(values: FormValues): CreateDeploymentInput {
   const payload: CreateDeploymentInput = {
     name: values.name.trim(),
     type: values.type,
-    gitUrl: values.gitUrl.trim(),
     buildStrategy: values.buildStrategy,
   };
 
@@ -88,9 +89,15 @@ function toPayload(values: FormValues): CreateDeploymentInput {
     }
   };
 
-  set("gitRef", trimmed(values.gitRef));
-  set("gitToken", trimmed(values.gitToken));
   set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
+
+  if (values.buildStrategy === "IMAGE") {
+    set("imageRef", trimmed(values.imageRef));
+  } else {
+    set("gitUrl", trimmed(values.gitUrl));
+    set("gitRef", trimmed(values.gitRef));
+    set("gitToken", trimmed(values.gitToken));
+  }
 
   if (values.buildStrategy === "DOCKERFILE") {
     set("dockerfilePath", trimmed(values.dockerfilePath));
@@ -187,21 +194,37 @@ export function CreateDeploymentPage() {
                   )}
                 />
 
-                <TextField
-                  label="Git URL"
-                  placeholder="https://github.com/owner/repo.git"
-                  error={Boolean(errors.gitUrl)}
-                  helperText={errors.gitUrl?.message}
-                  {...register("gitUrl", { required: "Git URL is required" })}
-                />
+                {strategy === "IMAGE" ? (
+                  <TextField
+                    label="Image reference"
+                    placeholder="nginx:1.27 or ghcr.io/owner/app:tag"
+                    error={Boolean(errors.imageRef)}
+                    helperText={errors.imageRef?.message ?? "An existing image to run as-is."}
+                    {...register("imageRef", {
+                      validate: (value) => value.trim().length > 0 || "Image reference is required",
+                    })}
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      label="Git URL"
+                      placeholder="https://github.com/owner/repo.git"
+                      error={Boolean(errors.gitUrl)}
+                      helperText={errors.gitUrl?.message}
+                      {...register("gitUrl", {
+                        validate: (value) => value.trim().length > 0 || "Git URL is required",
+                      })}
+                    />
 
-                <TextField label="Git ref" {...register("gitRef")} />
+                    <TextField label="Git ref" {...register("gitRef")} />
 
-                <TextField
-                  label="Git token (private repos)"
-                  type="password"
-                  {...register("gitToken")}
-                />
+                    <TextField
+                      label="Git token (private repos)"
+                      type="password"
+                      {...register("gitToken")}
+                    />
+                  </>
+                )}
               </Stack>
             </CardContent>
           </Card>
