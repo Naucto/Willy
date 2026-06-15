@@ -53,6 +53,9 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   // mutation itself resolves immediately (202), the real work runs in the background.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const pendingBase = useRef<string | null>(null);
+  // Snapshot of the contextual flags at click time, so the action set (and the spinning button)
+  // stays stable through the transition even though e.g. Start flips the state to DEPLOYING.
+  const frozenContext = useRef<{ running: boolean; hasRelease: boolean } | null>(null);
 
   useEffect(() => {
     if (pendingKey === null) {
@@ -63,16 +66,21 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     // click time and the deployment is no longer transitioning, the action has landed.
     if (deployment.updatedAt !== pendingBase.current && deployment.state !== "DEPLOYING") {
       pendingBase.current = null;
+      frozenContext.current = null;
       setPendingKey(null);
     }
   }, [deployment.updatedAt, deployment.state, pendingKey]);
 
-  const running = ["RUNNING", "DEPLOYING", "DEGRADED"].includes(deployment.state);
-  const hasRelease = deployment.activeReleaseId !== null;
+  const liveRunning = ["RUNNING", "DEPLOYING", "DEGRADED"].includes(deployment.state);
+  const liveHasRelease = deployment.activeReleaseId !== null;
+  const frozen = pendingKey !== null ? frozenContext.current : null;
+  const running = frozen?.running ?? liveRunning;
+  const hasRelease = frozen?.hasRelease ?? liveHasRelease;
   const lifecycleBusy = pendingKey !== null || deployment.state === "DEPLOYING";
 
   const trigger = (key: string, action: () => Promise<unknown>, message: string) => async () => {
     pendingBase.current = deployment.updatedAt;
+    frozenContext.current = { running: liveRunning, hasRelease: liveHasRelease };
     setPendingKey(key);
 
     try {
@@ -80,6 +88,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       enqueueSnackbar(message, { variant: "success" });
     } catch (error) {
       pendingBase.current = null;
+      frozenContext.current = null;
       setPendingKey(null);
       enqueueSnackbar(describeError(error), { variant: "error" });
     }

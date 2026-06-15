@@ -15,7 +15,7 @@ import {
 } from "@mui/material";
 import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDeployment, useReleases, useRollback } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
@@ -168,6 +168,8 @@ function OverviewTab({
             releases={releases}
             deploymentId={deploymentId}
             activeReleaseId={deployment.activeReleaseId}
+            deploymentState={deployment.state}
+            deploymentUpdatedAt={deployment.updatedAt}
             height={380}
           />
         ) : (
@@ -200,6 +202,8 @@ function ReleasesGrid({
   height,
   onSelect,
   toolbarTitle,
+  deploymentState,
+  deploymentUpdatedAt,
 }: {
   releases: Release[];
   activeReleaseId: string | null;
@@ -207,16 +211,41 @@ function ReleasesGrid({
   height: number;
   onSelect?: (releaseId: string) => void;
   toolbarTitle?: string;
+  deploymentState?: string;
+  deploymentUpdatedAt?: string;
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const rollback = useRollback(deploymentId);
   const selectMode = onSelect !== undefined;
 
+  // Keep the clicked Rollback's spinner on (and the others disabled) until the deployment
+  // settles — same model as the lifecycle action buttons.
+  const [pendingRollbackId, setPendingRollbackId] = useState<string | null>(null);
+  const rollbackBase = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pendingRollbackId === null) {
+      return;
+    }
+
+    if (deploymentUpdatedAt !== rollbackBase.current && deploymentState !== "DEPLOYING") {
+      rollbackBase.current = null;
+      setPendingRollbackId(null);
+    }
+  }, [deploymentUpdatedAt, deploymentState, pendingRollbackId]);
+
+  const rollbackBusy = pendingRollbackId !== null || deploymentState === "DEPLOYING";
+
   const onRollback = async (releaseId: string) => {
+    rollbackBase.current = deploymentUpdatedAt ?? null;
+    setPendingRollbackId(releaseId);
+
     try {
       await rollback.mutateAsync(releaseId);
       enqueueSnackbar("Rollback queued", { variant: "success" });
     } catch (error) {
+      rollbackBase.current = null;
+      setPendingRollbackId(null);
       enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
@@ -281,7 +310,12 @@ function ReleasesGrid({
         params.row.imageTag && params.row.id !== activeReleaseId ? (
           <Button
             size="small"
-            disabled={rollback.isPending}
+            disabled={rollbackBusy}
+            startIcon={
+              pendingRollbackId === params.row.id ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : undefined
+            }
             onClick={() => void onRollback(params.row.id)}
           >
             Rollback
