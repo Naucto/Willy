@@ -272,11 +272,13 @@ export function CreateDeploymentPage() {
                             Memory limit
                           </Typography>
                           <Box sx={{ flexGrow: 1 }} />
-                          <Typography variant="body2">
-                            {current === 0 ? "No limit" : `${current} MB`}
-                          </Typography>
+                          {current === 0 && (
+                            <Typography variant="body2" color="text.secondary">
+                              No limit
+                            </Typography>
+                          )}
                         </Box>
-                        <Stack direction="row" spacing={3} sx={{ alignItems: "center", px: 1 }}>
+                        <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
                           <Slider
                             value={current}
                             min={0}
@@ -288,7 +290,11 @@ export function CreateDeploymentPage() {
                             onChange={(_, value) =>
                               field.onChange(value === 0 ? "" : String(value))
                             }
-                            sx={{ flexGrow: 1 }}
+                            sx={{
+                              flexGrow: 1,
+                              mx: 1.5,
+                              "& .MuiSlider-markLabel": { fontSize: 11 },
+                            }}
                           />
                           <TextField
                             label="MB"
