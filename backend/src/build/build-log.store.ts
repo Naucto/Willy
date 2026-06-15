@@ -1,73 +1,38 @@
-import { EventEmitter } from "node:events";
 import { Injectable } from "@nestjs/common";
+import { LogStorageService } from "../logs/log-storage.service";
 
-interface LogBuffer {
-  lines: string[];
-  emitter: EventEmitter;
-  done: boolean;
-}
-
-const MAX_LINES = 2000;
-
-// In-memory build-log buffers keyed by release id, with live fan-out for SSE.
-// Logs are ephemeral (lost on restart) in this phase; durable storage comes later.
+// Build logs, addressed by release id, on top of the durable LogStorageService. Keeping this thin
+// wrapper lets the orchestrator stay oblivious to the `builds/` key namespace and gives build logs
+// the same durability (survive restarts) as runtime logs.
 @Injectable()
 export class BuildLogStore {
-  private readonly buffers = new Map<string, LogBuffer>();
+  constructor(private readonly logs: LogStorageService) {}
 
   append(releaseId: string, line: string): void {
-    const buffer = this.buffer(releaseId);
-    buffer.lines.push(line);
-
-    if (buffer.lines.length > MAX_LINES) {
-      buffer.lines.shift();
-    }
-
-    buffer.emitter.emit("line", line);
+    this.logs.append(this.key(releaseId), line);
   }
 
   finish(releaseId: string): void {
-    const buffer = this.buffer(releaseId);
-    buffer.done = true;
-    buffer.emitter.emit("done");
+    this.logs.finish(this.key(releaseId));
   }
 
-  snapshot(releaseId: string): string[] {
-    return [...this.buffer(releaseId).lines];
+  history(releaseId: string): Promise<string[]> {
+    return this.logs.history(this.key(releaseId));
   }
 
-  // Replays buffered lines, then streams new ones until done. Returns an unsubscribe fn.
-  subscribe(releaseId: string, onLine: (line: string) => void, onDone: () => void): () => void {
-    const buffer = this.buffer(releaseId);
-
-    for (const line of buffer.lines) {
-      onLine(line);
-    }
-
-    if (buffer.done) {
-      onDone();
-
-      return () => {};
-    }
-
-    buffer.emitter.on("line", onLine);
-    buffer.emitter.once("done", onDone);
-
-    return () => {
-      buffer.emitter.off("line", onLine);
-      buffer.emitter.off("done", onDone);
-    };
+  isLive(releaseId: string): boolean {
+    return this.logs.isLive(this.key(releaseId));
   }
 
-  private buffer(releaseId: string): LogBuffer {
-    let buffer = this.buffers.get(releaseId);
+  onLine(releaseId: string, listener: (line: string) => void): () => void {
+    return this.logs.onLine(this.key(releaseId), listener);
+  }
 
-    if (!buffer) {
-      buffer = { lines: [], emitter: new EventEmitter(), done: false };
-      buffer.emitter.setMaxListeners(50);
-      this.buffers.set(releaseId, buffer);
-    }
+  onDone(releaseId: string, listener: () => void): () => void {
+    return this.logs.onDone(this.key(releaseId), listener);
+  }
 
-    return buffer;
+  private key(releaseId: string): string {
+    return `builds/${releaseId}`;
   }
 }

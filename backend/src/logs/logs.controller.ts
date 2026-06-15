@@ -1,19 +1,21 @@
-import type { Readable } from "node:stream";
 import { Controller, NotFoundException, Param, Query, Sse } from "@nestjs/common";
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
 import { ReleasesService } from "../build/releases.service";
+import { runtimeLogKey } from "../build/runtime-log.collector";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
+import { LogStorageService } from "./log-storage.service";
 
 interface LogEvent {
   data: string;
 }
 
-// SSE streams are consumed by a fetch-based reader on the client (so the bearer
-// token can be sent), not the generated OpenAPI client — hence excluded from the spec.
+// SSE streams are consumed by a fetch-based reader on the client (so the bearer token can be sent),
+// not the generated OpenAPI client — hence excluded from the spec. Both endpoints replay the
+// durable history first (survives restarts / stopped containers) then stream live lines.
 @Controller()
 export class LogsController {
   constructor(
@@ -22,25 +24,49 @@ export class LogsController {
     private readonly releases: ReleasesService,
     private readonly docker: DockerService,
     private readonly containers: ContainersService,
+    private readonly logs: LogStorageService,
   ) {}
 
-  // Live build log for a release: replays buffered lines then streams new ones.
+  // Build log for a release: replays persisted lines, then streams live ones while the build runs.
+  // After a restart the build is over, so a cold (replay-only) stream completes once replayed.
   @ApiExcludeEndpoint()
   @Sse("releases/:id/logs")
   buildLogs(@Param("id") id: string): Observable<LogEvent> {
     return new Observable<LogEvent>((subscriber) => {
-      const unsubscribe = this.buildLog.subscribe(
-        id,
-        (line) => subscriber.next({ data: line }),
-        () => subscriber.complete(),
-      );
+      let cancelled = false;
+      let detachLine = (): void => {};
+      let detachDone = (): void => {};
 
-      return () => unsubscribe();
+      void (async () => {
+        for (const line of await this.buildLog.history(id)) {
+          subscriber.next({ data: line });
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        if (this.buildLog.isLive(id)) {
+          detachLine = this.buildLog.onLine(id, (line) => subscriber.next({ data: line }));
+          detachDone = this.buildLog.onDone(id, () => subscriber.complete());
+        } else {
+          subscriber.complete();
+        }
+      })().catch((error: unknown) => {
+        subscriber.error(error instanceof Error ? error : new Error(String(error)));
+      });
+
+      return () => {
+        cancelled = true;
+        detachLine();
+        detachDone();
+      };
     });
   }
 
-  // Live runtime logs of a deployment's container. With ?container=<id|name> streams that specific
-  // container's logs (validated to belong to the deployment); otherwise the active release's.
+  // Runtime logs of a deployment's container. With ?container=<id|name> targets that container
+  // (validated to belong to the deployment); otherwise the active release's. Replays the durable
+  // history (kept across restarts and after the container stops) then streams live lines.
   @ApiExcludeEndpoint()
   @Sse("deployments/:id/logs")
   runtimeLogs(
@@ -48,8 +74,8 @@ export class LogsController {
     @Query("container") container?: string,
   ): Observable<LogEvent> {
     return new Observable<LogEvent>((subscriber) => {
-      let stream: Readable | undefined;
       let cancelled = false;
+      let detachLine = (): void => {};
 
       void (async () => {
         const deployment = await this.deployments.findById(id);
@@ -67,36 +93,37 @@ export class LogsController {
               : undefined
             )?.containerId ?? null);
 
-        if (!containerId) {
-          subscriber.error(new NotFoundException("no running container"));
+        // Resolve the durable key from the live container's service; when nothing is running we
+        // still replay history (single-container → the "default" key).
+        let key = runtimeLogKey(id, null);
+        let live = false;
 
-          return;
+        if (containerId) {
+          const info = await this.docker.inspectContainer(containerId);
+          key = runtimeLogKey(id, info?.service ?? null);
+          live = Boolean(info?.running);
         }
 
-        stream = await this.docker.getLogStream(containerId, 200);
+        for (const line of await this.logs.history(key)) {
+          subscriber.next({ data: line });
+        }
 
         if (cancelled) {
-          stream.destroy();
-
           return;
         }
 
-        stream.on("data", (chunk: Buffer) => {
-          for (const line of chunk.toString("utf8").split("\n")) {
-            if (line.length > 0) {
-              subscriber.next({ data: line });
-            }
-          }
-        });
-        stream.on("end", () => subscriber.complete());
-        stream.on("error", (error) => subscriber.error(error));
+        if (live) {
+          detachLine = this.logs.onLine(key, (line) => subscriber.next({ data: line }));
+        } else {
+          subscriber.complete();
+        }
       })().catch((error: unknown) => {
         subscriber.error(error instanceof Error ? error : new Error(String(error)));
       });
 
       return () => {
         cancelled = true;
-        stream?.destroy();
+        detachLine();
       };
     });
   }

@@ -20,6 +20,7 @@ import { BuildQueue } from "./build-queue";
 import { CronService } from "./cron.service";
 import type { Release } from "./releases.service";
 import { ReleasesService } from "./releases.service";
+import { RuntimeLogCollector } from "./runtime-log.collector";
 import { ComposeService } from "./strategies/compose.service";
 import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
 
@@ -75,7 +76,18 @@ export class BuildOrchestrator {
     private readonly buildLog: BuildLogStore,
     private readonly queue: BuildQueue,
     private readonly cron: CronService,
+    private readonly runtimeLog: RuntimeLogCollector,
   ) {}
+
+  // After a container-bearing deployment goes live, (re)attach runtime-log follows to its current
+  // containers so their output is persisted durably. No-op for CRON (no long-lived container).
+  private async syncRuntimeLogs(deployment: Deployment): Promise<void> {
+    if (deployment.type === "CRON") {
+      return;
+    }
+
+    await this.runtimeLog.syncDeployment(deployment);
+  }
 
   async deploy(deploymentId: string, actorId?: string): Promise<Release> {
     const deployment = await this.requireDeployment(deploymentId);
@@ -182,6 +194,7 @@ export class BuildOrchestrator {
 
   async teardown(deploymentId: string): Promise<void> {
     const deployment = await this.requireDeployment(deploymentId);
+    this.runtimeLog.stopDeployment(deploymentId);
 
     if (deployment.type === "CRON") {
       this.cron.unregister(deploymentId);
@@ -201,6 +214,7 @@ export class BuildOrchestrator {
   private async runStop(deploymentId: string): Promise<void> {
     try {
       const deployment = await this.requireDeployment(deploymentId);
+      this.runtimeLog.stopDeployment(deploymentId);
 
       if (deployment.type === "CRON") {
         this.cron.unregister(deploymentId);
@@ -231,6 +245,7 @@ export class BuildOrchestrator {
       const containerId = await this.launchAndHealthCheck(deployment, release.imageTag, release);
       await this.removeStaleContainers(deploymentId, containerId);
       await this.deployments.setState(deploymentId, "RUNNING");
+      await this.syncRuntimeLogs(deployment);
     } catch (error) {
       this.logger.warn(`relaunch failed for ${deploymentId}: ${describeError(error)}`);
       await this.markActionFailed(deploymentId);
@@ -253,6 +268,7 @@ export class BuildOrchestrator {
       await this.releases.setStatus(releaseId, "LIVE", { containerId });
       await this.deployments.setActiveRelease(deploymentId, releaseId);
       await this.deployments.setState(deploymentId, "RUNNING");
+      await this.syncRuntimeLogs(deployment);
 
       if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
         await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
@@ -373,6 +389,7 @@ export class BuildOrchestrator {
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
       await this.removeStaleContainers(deployment.id, containerId);
+      await this.syncRuntimeLogs(deployment);
 
       if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
         await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
@@ -446,6 +463,7 @@ export class BuildOrchestrator {
       await this.releases.setStatus(releaseId, "LIVE", { containerId: webContainerId });
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
+      await this.syncRuntimeLogs(deployment);
 
       if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
         await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");

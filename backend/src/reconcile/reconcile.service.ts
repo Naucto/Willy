@@ -1,6 +1,7 @@
 import { Injectable, type OnApplicationBootstrap, Logger } from "@nestjs/common";
 import { BuildOrchestrator } from "../build/build-orchestrator.service";
 import { ReleasesService } from "../build/releases.service";
+import { RuntimeLogCollector } from "../build/runtime-log.collector";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
@@ -21,6 +22,7 @@ export class ReconcileService implements OnApplicationBootstrap {
     private readonly releases: ReleasesService,
     private readonly docker: DockerService,
     private readonly orchestrator: BuildOrchestrator,
+    private readonly runtimeLog: RuntimeLogCollector,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -43,6 +45,9 @@ export class ReconcileService implements OnApplicationBootstrap {
       const containers = await this.docker.listByLabel(OWNER_LABEL, deployment.id);
 
       if (containers.length > 0) {
+        // Already running — just re-attach runtime-log follows lost with the previous process.
+        await this.runtimeLog.syncDeployment(deployment);
+
         continue;
       }
 

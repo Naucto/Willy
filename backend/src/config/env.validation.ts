@@ -61,6 +61,12 @@ export class EnvironmentVariables {
   @IsString()
   BACKUPS_VOLUME?: string;
 
+  // Where durable build/runtime logs are persisted inside willy-server (the willy_logs volume),
+  // so log history survives restarts and outlives stopped containers.
+  @IsOptional()
+  @IsString()
+  LOGS_DIR?: string;
+
   // Per-container log rotation (json-file driver). Defaults: 10m / 3 files.
   @IsOptional()
   @IsString()

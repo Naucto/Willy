@@ -17,6 +17,9 @@ volumes:
   # Pinned name (no compose prefix) so backup helper containers can bind it by a stable name.
   willy_backups:
     name: willy_backups
+  # Durable build/runtime logs, so history survives restarts and outlives stopped containers.
+  willy_logs:
+    name: willy_logs
 
 services:
   traefik:
@@ -121,8 +124,10 @@ services:
       OVH_CONSUMER_KEY: ${OVH_CONSUMER_KEY:-}
       BACKUPS_DIR: /var/lib/willy/backups
       BACKUPS_VOLUME: willy_backups
+      LOGS_DIR: /var/lib/willy/logs
     volumes:
       - willy_backups:/var/lib/willy/backups
+      - willy_logs:/var/lib/willy/logs
     healthcheck:
       test:
         - CMD

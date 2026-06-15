@@ -14,6 +14,7 @@ import { DockerModule } from "./docker/docker.module";
 import { EnvVarsModule } from "./env-vars/env-vars.module";
 import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
+import { LogStorageModule } from "./logs/log-storage.module";
 import { LogsModule } from "./logs/logs.module";
 import { OvhModule } from "./ovh/ovh.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
@@ -29,6 +30,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     DbModule,
     CryptoModule,
     DockerModule,
+    LogStorageModule,
     UsersModule,
     AuthModule,
     HealthModule,

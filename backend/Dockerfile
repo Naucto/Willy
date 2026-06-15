@@ -12,12 +12,10 @@ RUN npm run build --workspace @willy/backend
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# git clones deployment source repos; nixpacks generates Dockerfiles for the Nixpacks
-# strategy; the docker CLI + compose plugin drive the Compose strategy (builds run on the
-# legacy builder through the socket-proxy — DOCKER_HOST is set per-invocation).
+# git clones deployment source repos; the docker CLI + compose plugin drive the Compose strategy
+# (builds run on the legacy builder through the socket-proxy — DOCKER_HOST is set per-invocation).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates curl gnupg \
-  && curl -sSL https://nixpacks.com/install.sh | bash \
   && install -m 0755 -d /etc/apt/keyrings \
   && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
   && chmod a+r /etc/apt/keyrings/docker.asc \
