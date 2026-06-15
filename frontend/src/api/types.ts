@@ -20,6 +20,8 @@ export type UpdateDnsRecordInput = components["schemas"]["UpdateDnsRecordDto"];
 
 export type Backup = components["schemas"]["BackupDto"];
 export type CreateBackupInput = components["schemas"]["CreateBackupDto"];
+export type PanelUser = components["schemas"]["UserDto"];
+export type CreateUserInput = components["schemas"]["CreateUserDto"];
 export type Container = components["schemas"]["ContainerDto"];
 export type VolumeMount = components["schemas"]["VolumeMountDto"];
 export type BackupSchedule = components["schemas"]["BackupScheduleDto"];

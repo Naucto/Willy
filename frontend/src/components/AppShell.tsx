@@ -1,6 +1,7 @@
 import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
 import MenuIcon from "@mui/icons-material/Menu";
+import PeopleIcon from "@mui/icons-material/People";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import {
   AppBar,
@@ -16,23 +17,32 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 const DRAWER_WIDTH = 220;
 const COLLAPSED_WIDTH = 64;
 
-const NAV = [
+interface NavItem {
+  label: string;
+  to: string;
+  icon: ReactNode;
+  adminOnly?: boolean;
+}
+
+const NAV: NavItem[] = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
   { label: "Backups", to: "/backups", icon: <BackupIcon /> },
+  { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(true);
+  const nav = NAV.filter((item) => !item.adminOnly || user?.role === "ADMIN");
 
   const width = open ? DRAWER_WIDTH : COLLAPSED_WIDTH;
 
@@ -103,7 +113,7 @@ export function AppShell() {
       >
         <Toolbar />
         <List>
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <Tooltip key={item.to} title={item.label} placement="right" disableHoverListener={open}>
               <ListItemButton
                 component={RouterLink}

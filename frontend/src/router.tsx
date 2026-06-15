@@ -7,6 +7,7 @@ import { DeploymentDetailPage } from "./pages/DeploymentDetailPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { DnsPage } from "./pages/DnsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { UsersPage } from "./pages/UsersPage";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
           { path: "/deployments/:id", element: <DeploymentDetailPage /> },
           { path: "/dns", element: <DnsPage /> },
           { path: "/backups", element: <BackupsPage /> },
+          { path: "/users", element: <UsersPage /> },
         ],
       },
     ],

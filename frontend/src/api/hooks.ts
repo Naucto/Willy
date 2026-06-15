@@ -7,6 +7,8 @@ import type {
   CreateBackupScheduleInput,
   CreateDeploymentInput,
   CreateDnsRecordInput,
+  CreateUserInput,
+  Role,
   SetEnvVarInput,
   UpdateDeploymentInput,
   UpdateDnsRecordInput,
@@ -247,6 +249,59 @@ export async function downloadBackup(id: string): Promise<void> {
   anchor.download = `${id}.tar.gz`;
   anchor.click();
   URL.revokeObjectURL(url);
+}
+
+export function useUsers() {
+  return useQuery({
+    queryKey: ["users"],
+    queryFn: async () => unwrap(await api.GET("/users")),
+  });
+}
+
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: CreateUserInput) => unwrap(await api.POST("/users", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+export function useSetUserRole() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; role: Role }) =>
+      unwrap(
+        await api.PATCH("/users/{id}/role", {
+          params: { path: { id: input.id } },
+          body: { role: input.role },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+export function useSetUserPassword() {
+  return useMutation({
+    mutationFn: async (input: { id: string; password: string }) =>
+      unwrap(
+        await api.PATCH("/users/{id}/password", {
+          params: { path: { id: input.id } },
+          body: { password: input.password },
+        }),
+      ),
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/users/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
 }
 
 export function useHostPublicIp() {

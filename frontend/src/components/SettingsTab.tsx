@@ -36,7 +36,18 @@ interface FormValues {
   cronExpr: string;
   restartPolicy: (typeof RESTART)[number];
   memoryLimitMb: string;
+  cpuCores: string;
+  capAdd: string;
+  capDrop: string;
   autoDeploy: boolean;
+}
+
+// Capabilities are entered as a comma list (e.g. "NET_ADMIN, SYS_TIME").
+function parseCaps(value: string): string[] {
+  return value
+    .split(",")
+    .map((cap) => cap.trim().toUpperCase())
+    .filter(Boolean);
 }
 
 function trimmed(value: string): string | undefined {
@@ -60,6 +71,9 @@ function initialValues(deployment: Deployment): FormValues {
     cronExpr: deployment.cronExpr ?? "",
     restartPolicy: deployment.restartPolicy,
     memoryLimitMb: deployment.memoryLimitMb?.toString() ?? "",
+    cpuCores: deployment.nanoCpus ? (deployment.nanoCpus / 1e9).toString() : "",
+    capAdd: (deployment.capAdd ?? []).join(", "),
+    capDrop: (deployment.capDrop ?? []).join(", "),
     autoDeploy: deployment.autoDeploy,
   };
 }
@@ -103,6 +117,9 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("domain", trimmed(values.domain));
     set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
     set("memoryLimitMb", values.memoryLimitMb ? Number(values.memoryLimitMb) : undefined);
+    set("nanoCpus", values.cpuCores ? Math.round(Number(values.cpuCores) * 1e9) : undefined);
+    set("capAdd", parseCaps(values.capAdd));
+    set("capDrop", parseCaps(values.capDrop));
 
     try {
       await update.mutateAsync(payload);
@@ -207,6 +224,28 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
                 />
 
                 <TextField label="Memory limit (MB)" type="number" {...register("memoryLimitMb")} />
+
+                <TextField
+                  label="CPU limit (cores)"
+                  type="number"
+                  helperText="e.g. 0.5 or 2. Empty = unlimited."
+                  slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
+                  {...register("cpuCores")}
+                />
+
+                <TextField
+                  label="Add capabilities"
+                  placeholder="NET_ADMIN, SYS_TIME"
+                  helperText="Linux capabilities to add on top of Docker's defaults (comma-separated)."
+                  {...register("capAdd")}
+                />
+
+                <TextField
+                  label="Drop capabilities"
+                  placeholder="ALL"
+                  helperText="Capabilities to drop. Use ALL to start from none, then add what's needed."
+                  {...register("capDrop")}
+                />
 
                 <Controller
                   name="autoDeploy"
