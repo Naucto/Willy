@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
   MenuItem,
   Slider,
   Stack,
@@ -141,12 +140,12 @@ export function CreateDeploymentPage() {
       <form onSubmit={onSubmit}>
         <Stack spacing={3}>
           <Card variant="outlined">
-            <CardHeader
-              title="Source"
-              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
-            />
-            <CardContent sx={{ pt: 0 }}>
+            <CardContent>
               <Stack spacing={2}>
+                <Typography variant="overline" color="text.secondary">
+                  Source
+                </Typography>
+
                 <TextField
                   label="Name"
                   placeholder="my-app"
@@ -195,12 +194,12 @@ export function CreateDeploymentPage() {
           </Card>
 
           <Card variant="outlined">
-            <CardHeader
-              title="Build & run"
-              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
-            />
-            <CardContent sx={{ pt: 0 }}>
+            <CardContent>
               <Stack spacing={2}>
+                <Typography variant="overline" color="text.secondary">
+                  Build &amp; run
+                </Typography>
+
                 <Controller
                   name="buildStrategy"
                   control={control}

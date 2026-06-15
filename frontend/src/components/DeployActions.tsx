@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
-import { type MouseEvent, type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { useDeploy, useRemoveDeployment, useRestart, useStart, useStop } from "../api/hooks";
 import type { Deployment } from "../api/types";
 import { describeError } from "../errors";
@@ -34,7 +34,7 @@ interface Action {
   label: string;
   tip: string;
   icon: ReactNode;
-  pending: boolean;
+  spinning: boolean;
   run: () => void;
   destructive?: boolean;
 }
@@ -49,15 +49,38 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
+  // Keep the clicked action's spinner on until the server reports a settled state — the
+  // mutation itself resolves immediately (202), the real work runs in the background.
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const pendingBase = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pendingKey === null) {
+      return;
+    }
+
+    // updatedAt changes on every server-side state write; once it differs from the value at
+    // click time and the deployment is no longer transitioning, the action has landed.
+    if (deployment.updatedAt !== pendingBase.current && deployment.state !== "DEPLOYING") {
+      pendingBase.current = null;
+      setPendingKey(null);
+    }
+  }, [deployment.updatedAt, deployment.state, pendingKey]);
+
   const running = ["RUNNING", "DEPLOYING", "DEGRADED"].includes(deployment.state);
   const hasRelease = deployment.activeReleaseId !== null;
-  const busy = deploy.isPending || restart.isPending || stop.isPending || start.isPending;
+  const lifecycleBusy = pendingKey !== null || deployment.state === "DEPLOYING";
 
-  const run = (action: () => Promise<unknown>, message: string) => async () => {
+  const trigger = (key: string, action: () => Promise<unknown>, message: string) => async () => {
+    pendingBase.current = deployment.updatedAt;
+    setPendingKey(key);
+
     try {
       await action();
       enqueueSnackbar(message, { variant: "success" });
     } catch (error) {
+      pendingBase.current = null;
+      setPendingKey(null);
       enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
@@ -68,8 +91,8 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       label: "Deploy",
       tip: "Clone the latest commit, build it, and roll it out — the new version only takes over once it passes its health check.",
       icon: <RocketLaunchIcon fontSize="small" />,
-      pending: deploy.isPending,
-      run: () => void run(() => deploy.mutateAsync(), "Deploy queued")(),
+      spinning: pendingKey === "deploy",
+      run: () => void trigger("deploy", () => deploy.mutateAsync(), "Deploy queued")(),
     },
   ];
 
@@ -79,16 +102,16 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       label: "Restart",
       tip: "Recreate the container from the current release — applies env/setting changes without rebuilding.",
       icon: <RestartAltIcon fontSize="small" />,
-      pending: restart.isPending,
-      run: () => void run(() => restart.mutateAsync(), "Restarting")(),
+      spinning: pendingKey === "restart",
+      run: () => void trigger("restart", () => restart.mutateAsync(), "Restarting")(),
     });
     actions.push({
       key: "stop",
       label: "Stop",
       tip: "Stop and remove the running container (the build/image is kept; Start brings it back).",
       icon: <StopIcon fontSize="small" />,
-      pending: stop.isPending,
-      run: () => void run(() => stop.mutateAsync(), "Stopping")(),
+      spinning: pendingKey === "stop",
+      run: () => void trigger("stop", () => stop.mutateAsync(), "Stopping")(),
     });
   } else if (hasRelease) {
     actions.push({
@@ -96,8 +119,8 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       label: "Start",
       tip: "Start the active release's container again (no rebuild).",
       icon: <PlayArrowIcon fontSize="small" />,
-      pending: start.isPending,
-      run: () => void run(() => start.mutateAsync(), "Starting")(),
+      spinning: pendingKey === "start",
+      run: () => void trigger("start", () => start.mutateAsync(), "Starting")(),
     });
   }
 
@@ -106,10 +129,13 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     label: "Delete",
     tip: "Tear down the container and permanently remove this deployment.",
     icon: <DeleteIcon fontSize="small" color="error" />,
-    pending: remove.isPending,
+    spinning: remove.isPending,
     run: () => setConfirmDelete(true),
     destructive: true,
   });
+
+  const isDisabled = (action: Action): boolean =>
+    action.destructive ? remove.isPending : lifecycleBusy;
 
   const confirmDialog = (
     <ConfirmDialog
@@ -122,10 +148,14 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       onCancel={() => setConfirmDelete(false)}
       onConfirm={() => {
         setConfirmDelete(false);
-        void run(async () => {
-          await remove.mutateAsync(deployment.id);
-          onDeleted?.();
-        }, "Deleted")();
+        void (async () => {
+          try {
+            await remove.mutateAsync(deployment.id);
+            onDeleted?.();
+          } catch (error) {
+            enqueueSnackbar(describeError(error), { variant: "error" });
+          }
+        })();
       }}
     />
   );
@@ -147,7 +177,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
           {actions.map((action) => (
             <MenuItem
               key={action.key}
-              disabled={busy}
+              disabled={isDisabled(action)}
               onClick={(event) => {
                 event.stopPropagation();
                 setMenuAnchor(null);
@@ -155,7 +185,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
               }}
             >
               <ListItemIcon>
-                {action.pending ? <CircularProgress size={18} /> : action.icon}
+                {action.spinning ? <CircularProgress size={18} /> : action.icon}
               </ListItemIcon>
               <ListItemText sx={action.destructive ? { color: "error.main" } : undefined}>
                 {action.label}
@@ -177,9 +207,9 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
               <Button
                 variant={action.key === "deploy" ? "contained" : "outlined"}
                 color={action.destructive ? "error" : "primary"}
-                disabled={busy}
+                disabled={isDisabled(action)}
                 startIcon={
-                  action.pending ? <CircularProgress size={18} color="inherit" /> : action.icon
+                  action.spinning ? <CircularProgress size={18} color="inherit" /> : action.icon
                 }
                 onClick={action.run}
               >

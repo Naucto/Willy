@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
   FormControlLabel,
   MenuItem,
   Stack,
@@ -111,12 +110,12 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
       <form onSubmit={onSubmit}>
         <Stack spacing={3}>
           <Card variant="outlined">
-            <CardHeader
-              title="Source & build"
-              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
-            />
-            <CardContent sx={{ pt: 0 }}>
+            <CardContent>
               <Stack spacing={2}>
+                <Typography variant="overline" color="text.secondary">
+                  Source &amp; build
+                </Typography>
+
                 <TextField label="Git URL" {...register("gitUrl")} />
                 <TextField label="Git ref" {...register("gitRef")} />
 
@@ -168,12 +167,12 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
           </Card>
 
           <Card variant="outlined">
-            <CardHeader
-              title="Runtime"
-              slotProps={{ title: { variant: "subtitle1", fontWeight: 600 } }}
-            />
-            <CardContent sx={{ pt: 0 }}>
+            <CardContent>
               <Stack spacing={2}>
+                <Typography variant="overline" color="text.secondary">
+                  Runtime
+                </Typography>
+
                 <Controller
                   name="restartPolicy"
                   control={control}

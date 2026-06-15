@@ -6,11 +6,9 @@ import {
   CardContent,
   CircularProgress,
   Dialog,
+  DialogContent,
   DialogTitle,
   Link,
-  List,
-  ListItemButton,
-  ListItemText,
   Stack,
   Tab,
   Table,
@@ -21,6 +19,7 @@ import {
   Tabs,
   Typography,
 } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -292,6 +291,30 @@ function releaseSummary(release: Release): string {
   return `${release.status} · ${ref} · ${new Date(release.queuedAt).toLocaleString()}`;
 }
 
+const RELEASE_COLUMNS: GridColDef<Release>[] = [
+  { field: "status", headerName: "Status", width: 150 },
+  {
+    field: "commit",
+    headerName: "Commit",
+    width: 120,
+    sortable: false,
+    valueGetter: (_value, row) => row.gitSha?.slice(0, 8) ?? row.id.slice(0, 8),
+  },
+  {
+    field: "imageTag",
+    headerName: "Image",
+    flex: 1,
+    minWidth: 220,
+    valueGetter: (_value, row) => row.imageTag ?? "—",
+  },
+  {
+    field: "queuedAt",
+    headerName: "Queued",
+    width: 190,
+    valueFormatter: (value) => new Date(value as string).toLocaleString(),
+  },
+];
+
 function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
   const { data: releases } = useReleases(deploymentId);
   const [releaseId, setReleaseId] = useState<string>("");
@@ -327,29 +350,28 @@ function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
 
       {releaseId && <LogViewer key={releaseId} path={`/releases/${releaseId}/logs`} />}
 
-      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="sm">
+      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Select a release</DialogTitle>
-        <List sx={{ pt: 0 }}>
-          {releases.map((release) => (
-            <ListItemButton
-              key={release.id}
-              selected={release.id === releaseId}
-              onClick={() => {
-                setReleaseId(release.id);
-                setPickerOpen(false);
-              }}
-            >
-              <ListItemText
-                primary={releaseSummary(release)}
-                secondary={release.imageTag ?? undefined}
-                slotProps={{
-                  primary: { sx: { fontFamily: "monospace", fontSize: 13 } },
-                  secondary: { sx: { fontFamily: "monospace", fontSize: 12 } },
-                }}
-              />
-            </ListItemButton>
-          ))}
-        </List>
+        <DialogContent sx={{ height: 460 }}>
+          <DataGrid
+            rows={releases}
+            columns={RELEASE_COLUMNS}
+            getRowId={(row) => row.id}
+            onRowClick={(params) => {
+              setReleaseId(params.row.id);
+              setPickerOpen(false);
+            }}
+            showToolbar
+            density="compact"
+            disableRowSelectionOnClick
+            initialState={{
+              sorting: { sortModel: [{ field: "queuedAt", sort: "desc" }] },
+              pagination: { paginationModel: { pageSize: 25 } },
+            }}
+            pageSizeOptions={[25, 50, 100]}
+            sx={{ border: 0, cursor: "pointer", "& .MuiDataGrid-row:hover": { cursor: "pointer" } }}
+          />
+        </DialogContent>
       </Dialog>
     </Stack>
   );
