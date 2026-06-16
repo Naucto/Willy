@@ -7,8 +7,6 @@ import {
   Autocomplete,
   Box,
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogActions,
   DialogContent,
@@ -152,44 +150,38 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
   ];
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Typography variant="overline" color="text.secondary" sx={{ flexGrow: 1 }}>
-              Domains
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setDialog({ mode: "add" })}
-            >
-              Add domain
-            </Button>
-          </Box>
+    <Stack spacing={2}>
+      <Box sx={{ display: "flex" }}>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setDialog({ mode: "add" })}
+        >
+          Add domain
+        </Button>
+      </Box>
 
-          <Box sx={{ width: "100%" }}>
-            <DataGrid
-              rows={domains ?? []}
-              columns={columns}
-              getRowId={(row) => row.id}
-              density="compact"
-              autoHeight
-              hideFooter
-              disableRowSelectionOnClick
-              localeText={{ noRowsLabel: "No domains yet — add one above." }}
-              sx={{ border: 0 }}
-            />
-          </Box>
+      <Box sx={{ width: "100%" }}>
+        <DataGrid
+          rows={domains ?? []}
+          columns={columns}
+          getRowId={(row) => row.id}
+          density="compact"
+          autoHeight
+          hideFooter
+          disableRowSelectionOnClick
+          localeText={{ noRowsLabel: "No domains yet — add one above." }}
+          sx={{ border: 0 }}
+        />
+      </Box>
 
-          {isCompose && (
-            <Typography variant="caption" color="text.secondary">
-              Service/port pin a domain to one compose service and port (e.g.{" "}
-              <code>api.example.com → backend:4000</code>). Default routes to the web service.
-            </Typography>
-          )}
-        </Stack>
-      </CardContent>
+      {isCompose && (
+        <Box sx={{ fontSize: 12, color: "text.secondary" }}>
+          Service/port pin a domain to one compose service and port (e.g.{" "}
+          <code>api.example.com → backend:4000</code>). Default routes to the web service.
+        </Box>
+      )}
 
       {dialog && (
         <DomainDialog
@@ -203,7 +195,7 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
           onClose={() => setDialog(undefined)}
         />
       )}
-    </Card>
+    </Stack>
   );
 }
 

@@ -3,8 +3,6 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -13,7 +11,6 @@ import {
   IconButton,
   Stack,
   Tooltip,
-  Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
@@ -105,47 +102,39 @@ export function VolumesTab({
   ];
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2}>
-          <Typography variant="overline" color="text.secondary">
-            Volumes
-          </Typography>
+    <Stack spacing={2}>
+      {isLoading ? (
+        <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Box sx={{ width: "100%" }}>
+          <DataGrid
+            rows={volumes}
+            columns={columns}
+            getRowId={(row) => row.name}
+            density="compact"
+            autoHeight
+            disableRowSelectionOnClick
+            hideFooter
+            localeText={{ noRowsLabel: "No named volumes for this deployment." }}
+            sx={{ border: 0 }}
+          />
+        </Box>
+      )}
 
-          {isLoading ? (
-            <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Box sx={{ width: "100%" }}>
-              <DataGrid
-                rows={volumes}
-                columns={columns}
-                getRowId={(row) => row.name}
-                density="compact"
-                autoHeight
-                disableRowSelectionOnClick
-                hideFooter
-                localeText={{ noRowsLabel: "No named volumes for this deployment." }}
-                sx={{ border: 0 }}
-              />
-            </Box>
-          )}
-
-          <Typography variant="caption" color="text.secondary">
-            Volumes come from the deployment's containers. Back up before a reset — reset erases a
-            volume's contents.
-          </Typography>
-        </Stack>
-      </CardContent>
+      <Box sx={{ fontSize: 12, color: "text.secondary" }}>
+        Volumes come from the deployment's containers. Back up before a reset — reset erases a
+        volume's contents.
+      </Box>
 
       <Dialog open={confirmReset !== null} onClose={() => setConfirmReset(null)} maxWidth="xs">
         <DialogTitle>Reset {confirmReset}?</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary">
+          <Box sx={{ fontSize: 14, color: "text.secondary" }}>
             This stops the containers using the volume, erases all its contents, and starts them
             again. This can't be undone — consider backing it up first.
-          </Typography>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmReset(null)}>Cancel</Button>
@@ -159,6 +148,6 @@ export function VolumesTab({
           </Button>
         </DialogActions>
       </Dialog>
-    </Card>
+    </Stack>
   );
 }

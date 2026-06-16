@@ -1,4 +1,4 @@
-import { Alert, Box, Card, CardContent, Stack, Typography } from "@mui/material";
+import { Alert, Box, Stack } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import type { Container } from "../api/types";
 
@@ -24,33 +24,24 @@ export function NetworkingTab({ container }: { container?: Container | undefined
   ];
 
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2}>
-          <Typography variant="overline" color="text.secondary">
-            Networks — {container.name}
-          </Typography>
+    <Stack spacing={2}>
+      <Box sx={{ width: "100%" }}>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          getRowId={(row) => row.name}
+          density="compact"
+          autoHeight
+          hideFooter
+          disableRowSelectionOnClick
+          localeText={{ noRowsLabel: "This container isn't attached to any network." }}
+          sx={{ border: 0 }}
+        />
+      </Box>
 
-          {rows.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              This container isn't attached to any network.
-            </Typography>
-          ) : (
-            <Box sx={{ width: "100%" }}>
-              <DataGrid
-                rows={rows}
-                columns={columns}
-                getRowId={(row) => row.name}
-                density="compact"
-                autoHeight
-                hideFooter
-                disableRowSelectionOnClick
-                sx={{ border: 0 }}
-              />
-            </Box>
-          )}
-        </Stack>
-      </CardContent>
-    </Card>
+      <Box sx={{ fontSize: 12, color: "text.secondary" }}>
+        Networks for {container.name}. Attach/detach is a later iteration.
+      </Box>
+    </Stack>
   );
 }
