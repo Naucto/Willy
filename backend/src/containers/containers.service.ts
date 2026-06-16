@@ -14,6 +14,8 @@ export interface DeploymentContainer {
   // Compose service name; null for single-container deployments.
   service: string | null;
   networks: ContainerNetwork[];
+  // TCP ports the image declares via EXPOSE; used to populate the domain port picker.
+  exposedPorts: number[];
 }
 
 // Discovers the live containers (and their named volumes) belonging to a deployment: compose stacks
@@ -38,6 +40,7 @@ export class ContainersService {
           volumes: info.mounts,
           service: info.service ?? null,
           networks: info.networks,
+          exposedPorts: info.exposedPorts,
         });
       }
     }

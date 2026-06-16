@@ -224,6 +224,9 @@ export class ContainerDto {
 
   @ApiProperty({ type: [NetworkInfoDto] })
   networks!: NetworkInfoDto[];
+
+  @ApiProperty({ type: [Number] })
+  exposedPorts!: number[];
 }
 
 export class CreateBackupDto {

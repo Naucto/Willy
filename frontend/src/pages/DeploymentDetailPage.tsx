@@ -44,6 +44,10 @@ import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
 
+// Tabs whose content is scoped to a single container; only these show the container selector
+// (Environment is handled separately, with an extra "Everyone" entry).
+const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
+
 function isRunning(deployment: Deployment): boolean {
   return (
     deployment.activeReleaseId !== null &&
@@ -126,12 +130,13 @@ export function DeploymentDetailPage() {
   }
 
   // The container dropdown is a persistent part of the deployment bar. On Environment it shows for
-  // any compose stack (Everyone + each service); elsewhere only when there's more than one container
-  // to focus (single-container deployments have nothing to choose).
+  // any compose stack (Everyone + each service); on the genuinely container-scoped tabs it shows
+  // only when there's more than one container to focus. It is hidden everywhere else (Overview,
+  // Build — build logs are per-release, not per-container — Runs, Domains, Webhook, Settings).
   const containerCount = containers?.length ?? 0;
   const showSelector = isEnv
     ? isCompose && containerCount >= 1
-    : containerCount > 1 && Boolean(selectedId);
+    : CONTAINER_SCOPED.has(active) && containerCount > 1 && Boolean(selectedId);
 
   return (
     <Stack spacing={3}>

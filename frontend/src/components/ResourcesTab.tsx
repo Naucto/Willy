@@ -310,7 +310,9 @@ function LimitSlider({
   onChange: (value: number) => void;
 }) {
   return (
-    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, pl: 2, pr: 3, pt: 1, pb: 0.5 }}>
+    <Box
+      sx={{ border: 1, borderColor: "divider", borderRadius: 1, pl: 2, pr: 4.5, pt: 1, pb: 0.5 }}
+    >
       <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
         <Typography variant="caption" color="text.secondary">
           {label}

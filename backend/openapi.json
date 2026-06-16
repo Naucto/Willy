@@ -3878,6 +3878,12 @@
             "items": {
               "$ref": "#/components/schemas/NetworkInfoDto"
             }
+          },
+          "exposedPorts": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
           }
         },
         "required": [
@@ -3887,7 +3893,8 @@
           "running",
           "volumes",
           "service",
-          "networks"
+          "networks",
+          "exposedPorts"
         ]
       },
       "CleanupResultDto": {

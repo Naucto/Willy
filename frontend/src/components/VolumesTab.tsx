@@ -10,6 +10,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Stack,
   Tooltip,
   Typography,
@@ -82,30 +83,21 @@ export function VolumesTab({
     {
       field: "actions",
       headerName: "",
-      width: 180,
+      width: 110,
       sortable: false,
       filterable: false,
       align: "right",
       renderCell: (params) => (
         <Box>
           <Tooltip title="Back up this volume">
-            <Button
-              size="small"
-              startIcon={<BackupIcon fontSize="small" />}
-              onClick={() => void onBackup(params.row.name)}
-            >
-              Back up
-            </Button>
+            <IconButton size="small" onClick={() => void onBackup(params.row.name)}>
+              <BackupIcon fontSize="small" />
+            </IconButton>
           </Tooltip>
           <Tooltip title="Wipe this volume's contents">
-            <Button
-              size="small"
-              color="error"
-              startIcon={<RestartAltIcon fontSize="small" />}
-              onClick={() => setConfirmReset(params.row.name)}
-            >
-              Reset
-            </Button>
+            <IconButton size="small" color="error" onClick={() => setConfirmReset(params.row.name)}>
+              <RestartAltIcon fontSize="small" />
+            </IconButton>
           </Tooltip>
         </Box>
       ),

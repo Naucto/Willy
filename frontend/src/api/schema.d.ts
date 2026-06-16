@@ -1281,6 +1281,7 @@ export interface components {
       volumes: components["schemas"]["VolumeMountDto"][];
       service: string | null;
       networks: components["schemas"]["NetworkInfoDto"][];
+      exposedPorts: number[];
     };
     CleanupResultDto: {
       /** @description Bytes reclaimed by pruning dangling images. */

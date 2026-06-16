@@ -1,23 +1,25 @@
+import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import {
+  Autocomplete,
   Box,
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Link,
   MenuItem,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import {
-  DataGrid,
-  GridActionsCellItem,
-  type GridColDef,
-  type GridRowModel,
-} from "@mui/x-data-grid";
+import { DataGrid, GridActionsCellItem, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
@@ -28,7 +30,7 @@ import {
   useRemoveDomain,
   useUpdateDomainTarget,
 } from "../api/hooks";
-import type { Deployment, DeploymentDomain } from "../api/types";
+import type { Container, Deployment, DeploymentDomain } from "../api/types";
 import { describeError } from "../errors";
 import { DomainPicker } from "./DomainPicker";
 
@@ -40,17 +42,20 @@ function isValidFqdn(value: string): boolean {
   return FQDN_RE.test(value.trim());
 }
 
+interface ServiceOption {
+  value: string;
+  label: string;
+}
+
 // Live multi-domain editor. Each domain can be pinned to a specific container/service (compose
-// only) and a specific port; blank falls back to the deployment default. Changes apply on the next
-// deploy/restart.
+// only) and a specific port; blank falls back to the deployment default. Adding and editing a route
+// both go through one modal; changes apply on the next deploy/restart.
 export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
   const { data: domains } = useDeploymentDomains(deployment.id);
   const { data: containers } = useDeploymentContainers(deployment.id);
-  const addDomain = useAddDomain(deployment.id);
   const makePrimary = useMakeDomainPrimary(deployment.id);
   const removeDomain = useRemoveDomain(deployment.id);
-  const updateTarget = useUpdateDomainTarget(deployment.id);
 
   const isCompose = deployment.buildStrategy === "COMPOSE";
   const defaultService = deployment.strategyConfig.composeWebService ?? "";
@@ -67,14 +72,14 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
       ].filter(Boolean),
     ),
   );
-  const serviceOptions = [
+  const serviceOptions: ServiceOption[] = [
     { value: "", label: defaultService ? `default (${defaultService})` : "default" },
     ...serviceNames.map((name) => ({ value: name, label: name })),
   ];
 
-  const [fqdn, setFqdn] = useState("");
-  const [service, setService] = useState("");
-  const [port, setPort] = useState("");
+  const [dialog, setDialog] = useState<
+    { mode: "add" } | { mode: "edit"; domain: DeploymentDomain }
+  >();
 
   const run = async (action: Promise<unknown>, ok: string) => {
     try {
@@ -83,43 +88,6 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     } catch (error) {
       enqueueSnackbar(describeError(error), { variant: "error" });
     }
-  };
-
-  const fqdnInvalid = fqdn.trim().length > 0 && !isValidFqdn(fqdn);
-
-  const onAdd = async () => {
-    if (!isValidFqdn(fqdn)) {
-      enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
-
-      return;
-    }
-
-    await run(
-      addDomain.mutateAsync({
-        fqdn: fqdn.trim(),
-        targetService: isCompose && service ? service : null,
-        targetPort: port.trim() ? Number(port) : null,
-      }),
-      "Domain added",
-    );
-    setFqdn("");
-    setService("");
-    setPort("");
-  };
-
-  // DataGrid commits an edited row here; persist the service/port target and surface failures so
-  // the grid reverts the cell.
-  const processRowUpdate = async (next: GridRowModel<DeploymentDomain>) => {
-    const targetService =
-      isCompose && typeof next.targetService === "string" && next.targetService.trim()
-        ? next.targetService.trim()
-        : null;
-    const targetPort = next.targetPort ? Number(next.targetPort) : null;
-
-    await updateTarget.mutateAsync({ domainId: next.id, body: { targetService, targetPort } });
-    enqueueSnackbar("Route updated", { variant: "success" });
-
-    return { ...next, targetService, targetPort };
   };
 
   const columns: GridColDef<DeploymentDomain>[] = [
@@ -140,10 +108,8 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
             field: "targetService",
             headerName: "Service",
             width: 170,
-            editable: true,
-            type: "singleSelect",
-            valueOptions: serviceOptions,
-            valueGetter: (value) => value ?? "",
+            valueGetter: (value) =>
+              value || `default${defaultService ? ` (${defaultService})` : ""}`,
           },
         ] satisfies GridColDef<DeploymentDomain>[])
       : []),
@@ -151,10 +117,6 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
       field: "targetPort",
       headerName: "Port",
       width: 110,
-      editable: true,
-      type: "number",
-      // Inline span (not a block Typography) so the value stays vertically centred in the cell;
-      // the default is shown muted.
       renderCell: ({ value }) => (
         <Box component="span" sx={{ color: value ? "inherit" : "text.disabled" }}>
           {value ?? defaultPort}
@@ -164,8 +126,14 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     {
       field: "actions",
       type: "actions",
-      width: 90,
+      width: 120,
       getActions: ({ row }) => [
+        <GridActionsCellItem
+          key="edit"
+          icon={<EditIcon />}
+          label="Edit route"
+          onClick={() => setDialog({ mode: "edit", domain: row })}
+        />,
         <GridActionsCellItem
           key="primary"
           icon={row.isPrimary ? <StarIcon color="warning" /> : <StarBorderIcon />}
@@ -187,74 +155,32 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     <Card variant="outlined">
       <CardContent>
         <Stack spacing={2}>
-          <Typography variant="overline" color="text.secondary">
-            Domains
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Typography variant="overline" color="text.secondary" sx={{ flexGrow: 1 }}>
+              Domains
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setDialog({ mode: "add" })}
+            >
+              Add domain
+            </Button>
+          </Box>
 
           <Box sx={{ width: "100%" }}>
             <DataGrid
               rows={domains ?? []}
               columns={columns}
               getRowId={(row) => row.id}
-              editMode="cell"
-              processRowUpdate={processRowUpdate}
-              onProcessRowUpdateError={(error) =>
-                enqueueSnackbar(describeError(error), { variant: "error" })
-              }
               density="compact"
               autoHeight
               hideFooter
               disableRowSelectionOnClick
-              localeText={{ noRowsLabel: "No domains yet — add one below." }}
+              localeText={{ noRowsLabel: "No domains yet — add one above." }}
               sx={{ border: 0 }}
             />
           </Box>
-
-          <Stack spacing={1.5}>
-            <Box>
-              <DomainPicker value={fqdn} onChange={setFqdn} />
-              {fqdnInvalid && (
-                <Typography variant="caption" color="error" sx={{ ml: 1.75, display: "block" }}>
-                  Enter a valid domain, e.g. app.example.com
-                </Typography>
-              )}
-            </Box>
-            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-              {isCompose && (
-                <TextField
-                  select
-                  size="small"
-                  label="Service"
-                  value={service}
-                  onChange={(event) => setService(event.target.value)}
-                  sx={{ width: 180 }}
-                >
-                  {serviceOptions.map((option) => (
-                    <MenuItem key={option.value || "default"} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-              <TextField
-                size="small"
-                label="Port"
-                type="number"
-                placeholder={String(defaultPort)}
-                value={port}
-                onChange={(event) => setPort(event.target.value)}
-                sx={{ width: 110 }}
-              />
-              <Box sx={{ flexGrow: 1 }} />
-              <Button
-                variant="contained"
-                disabled={addDomain.isPending || !isValidFqdn(fqdn)}
-                onClick={() => void onAdd()}
-              >
-                Add domain
-              </Button>
-            </Box>
-          </Stack>
 
           {isCompose && (
             <Typography variant="caption" color="text.secondary">
@@ -264,6 +190,170 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
           )}
         </Stack>
       </CardContent>
+
+      {dialog && (
+        <DomainDialog
+          deploymentId={deployment.id}
+          isCompose={isCompose}
+          defaultService={defaultService}
+          defaultPort={defaultPort}
+          serviceOptions={serviceOptions}
+          containers={containers ?? []}
+          existing={dialog.mode === "edit" ? dialog.domain : null}
+          onClose={() => setDialog(undefined)}
+        />
+      )}
     </Card>
+  );
+}
+
+// Resolves the container backing a target service so the port picker can offer that image's exposed
+// ports. For compose, an empty service means the configured web service.
+function exposedPortsFor(
+  containers: Container[],
+  isCompose: boolean,
+  service: string,
+  defaultService: string,
+): number[] {
+  if (!isCompose) {
+    return containers[0]?.exposedPorts ?? [];
+  }
+
+  const wanted = service || defaultService;
+  const match = containers.find((container) => container.service === wanted);
+
+  return match?.exposedPorts ?? [];
+}
+
+function DomainDialog({
+  deploymentId,
+  isCompose,
+  defaultService,
+  defaultPort,
+  serviceOptions,
+  containers,
+  existing,
+  onClose,
+}: {
+  deploymentId: string;
+  isCompose: boolean;
+  defaultService: string;
+  defaultPort: number;
+  serviceOptions: ServiceOption[];
+  containers: Container[];
+  existing: DeploymentDomain | null;
+  onClose: () => void;
+}) {
+  const { enqueueSnackbar } = useSnackbar();
+  const addDomain = useAddDomain(deploymentId);
+  const updateTarget = useUpdateDomainTarget(deploymentId);
+  const editing = existing !== null;
+
+  const [fqdn, setFqdn] = useState(existing?.fqdn ?? "");
+  const [service, setService] = useState(existing?.targetService ?? "");
+  const [port, setPort] = useState(existing?.targetPort ? String(existing.targetPort) : "");
+
+  const exposed = exposedPortsFor(containers, isCompose, service, defaultService);
+  const fqdnInvalid = fqdn.trim().length > 0 && !isValidFqdn(fqdn);
+  const pending = addDomain.isPending || updateTarget.isPending;
+
+  const submit = async () => {
+    if (!editing && !isValidFqdn(fqdn)) {
+      enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
+
+      return;
+    }
+
+    const targetService = isCompose && service ? service : null;
+    const targetPort = port.trim() ? Number(port) : null;
+
+    try {
+      if (editing) {
+        await updateTarget.mutateAsync({
+          domainId: existing.id,
+          body: { targetService, targetPort },
+        });
+        enqueueSnackbar("Route updated", { variant: "success" });
+      } else {
+        await addDomain.mutateAsync({ fqdn: fqdn.trim(), targetService, targetPort });
+        enqueueSnackbar("Domain added", { variant: "success" });
+      }
+
+      onClose();
+    } catch (error) {
+      enqueueSnackbar(describeError(error), { variant: "error" });
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{editing ? `Edit ${existing.fqdn}` : "Add domain"}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2.5} sx={{ mt: 1 }}>
+          {editing ? (
+            <TextField
+              label="Domain"
+              value={existing.fqdn}
+              slotProps={{ input: { readOnly: true } }}
+            />
+          ) : (
+            <Box>
+              <DomainPicker value={fqdn} onChange={setFqdn} />
+              {fqdnInvalid && (
+                <Typography variant="caption" color="error" sx={{ ml: 1.75, display: "block" }}>
+                  Enter a valid domain, e.g. app.example.com
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {isCompose && (
+            <TextField
+              select
+              label="Service"
+              value={service}
+              onChange={(event) => setService(event.target.value)}
+            >
+              {serviceOptions.map((option) => (
+                <MenuItem key={option.value || "default"} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+
+          <Autocomplete
+            freeSolo
+            options={exposed.map((p) => String(p))}
+            value={port}
+            onChange={(_, next) => setPort(next ?? "")}
+            onInputChange={(_, next) => setPort(next)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Port"
+                type="number"
+                placeholder={String(defaultPort)}
+                helperText={
+                  exposed.length > 0
+                    ? "Pick an exposed port or type one. Blank uses the default."
+                    : "No exposed ports detected — type a port, or leave blank for the default."
+                }
+              />
+            )}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          disabled={pending || (!editing && !isValidFqdn(fqdn))}
+          onClick={() => void submit()}
+        >
+          {editing ? "Save" : "Add domain"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }

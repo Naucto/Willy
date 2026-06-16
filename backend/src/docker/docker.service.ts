@@ -55,6 +55,8 @@ export interface ContainerStatus {
   service: string | undefined;
   // Networks the container is attached to, with its IP on each.
   networks: ContainerNetwork[];
+  // TCP ports the image declares via EXPOSE, ascending; drives the domain port picker.
+  exposedPorts: number[];
 }
 
 export interface OneShotOptions {
@@ -74,6 +76,17 @@ export interface OneShotOptions {
 export interface OneShotResult {
   exitCode: number;
   logs: string;
+}
+
+// Docker reports exposed ports as a set keyed "<port>/<proto>" (e.g. "80/tcp"). We surface the TCP
+// ports as a deduped, ascending list to drive the domain port picker; UDP isn't web-routable.
+export function parseExposedPorts(exposed: Record<string, unknown> | undefined): number[] {
+  const ports = Object.keys(exposed ?? {})
+    .filter((spec) => spec.endsWith("/tcp"))
+    .map((spec) => Number.parseInt(spec, 10))
+    .filter((port) => Number.isInteger(port) && port > 0);
+
+  return Array.from(new Set(ports)).sort((a, b) => a - b);
 }
 
 // De-multiplexes a non-TTY Docker log buffer (8-byte frame headers) into plain text.
@@ -305,6 +318,7 @@ export class DockerService {
           destination: mount.Destination,
           rw: mount.RW,
         }));
+      const exposedPorts = parseExposedPorts(info.Config?.ExposedPorts);
 
       return {
         id: info.Id,
@@ -316,6 +330,7 @@ export class DockerService {
         mounts,
         service: info.Config?.Labels?.["com.docker.compose.service"] || undefined,
         networks,
+        exposedPorts,
       };
     } catch {
       return undefined;
