@@ -1,6 +1,6 @@
 # Lifecycle UX, source/compose overhaul & new Health section
 
-> Dev plan — 17-06-2026. Status: proposed.
+> Dev plan — 17-06-2026. Status: implemented (all 4 phases shipped to main).
 
 ## Context
 A new development cycle covering several deployment-page fixes plus two large refactors the user
