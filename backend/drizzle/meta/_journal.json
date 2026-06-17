@@ -92,6 +92,13 @@
       "when": 1781566505303,
       "tag": "0012_managed_zones",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781729364678,
+      "tag": "0013_wise_nico_minoru",
+      "breakpoints": true
     }
   ]
 }

@@ -203,6 +203,23 @@ export class NetworkInfoDto {
   ip!: string | null;
 }
 
+export class DeclaredHealthcheckDto {
+  @ApiProperty({ type: [String], example: ["CMD-SHELL", "curl -f http://localhost/health"] })
+  test!: string[];
+
+  @ApiProperty({ type: String, nullable: true, example: "30s" })
+  interval!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: "10s" })
+  timeout!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: 3 })
+  retries!: number | null;
+
+  @ApiProperty({ type: String, nullable: true, example: "5s" })
+  startPeriod!: string | null;
+}
+
 export class ContainerDto {
   @ApiProperty({ type: String })
   id!: string;
@@ -227,6 +244,12 @@ export class ContainerDto {
 
   @ApiProperty({ type: [Number] })
   exposedPorts!: number[];
+
+  @ApiProperty({ type: String, nullable: true, example: "healthy" })
+  health!: string | null;
+
+  @ApiProperty({ type: DeclaredHealthcheckDto, nullable: true })
+  declaredHealthcheck!: DeclaredHealthcheckDto | null;
 }
 
 export class CreateBackupDto {

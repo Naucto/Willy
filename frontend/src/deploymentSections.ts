@@ -29,6 +29,7 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
     { key: "networking", label: "Networking" },
     ...(isWeb ? [{ key: "domains", label: "Domains" }] : []),
     { key: "resources", label: "Resources" },
+    { key: "health", label: "Health" },
     { key: "webhook", label: "Webhook" },
   ];
 }

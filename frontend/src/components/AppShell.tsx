@@ -2,6 +2,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
+import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import HistoryIcon from "@mui/icons-material/History";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -69,12 +70,13 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   networking: <HubOutlinedIcon />,
   domains: <LanguageIcon />,
   resources: <MemoryIcon />,
+  health: <HealthAndSafetyIcon />,
   webhook: <WebhookIcon />,
   settings: <SettingsIcon />,
 };
 
 // Tabs whose content depends on the selected container — keep ?container= when navigating to them.
-const CONTAINER_SCOPED = new Set(["runtime", "console", "resources"]);
+const CONTAINER_SCOPED = new Set(["runtime", "console", "resources", "health"]);
 
 // Recognise a deployment-detail route (/deployments/:id[/:section]); "new" and the bare list aren't.
 function matchDeployment(pathname: string): { id: string; section: string } | null {

@@ -3,6 +3,7 @@ import { type Duplex, PassThrough, type Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Docker from "dockerode";
+import type { HealthcheckSpec } from "../deployments/resource-limits";
 
 export interface BuildImageOptions {
   contextDir: string;
@@ -30,6 +31,8 @@ export interface RunContainerOptions {
   // Per-container log rotation overrides (fall back to the operator-wide default).
   logMaxSizeMb?: number | undefined;
   logMaxFiles?: number | undefined;
+  // Custom healthcheck to inject; surfaces as Docker State.Health so the deploy gate can wait on it.
+  healthcheck?: HealthcheckSpec | null | undefined;
 }
 
 export interface VolumeMount {
@@ -57,6 +60,16 @@ export interface ContainerStatus {
   networks: ContainerNetwork[];
   // TCP ports the image declares via EXPOSE, ascending; drives the domain port picker.
   exposedPorts: number[];
+  // The healthcheck the image/compose file declares (read-only), if any. Durations are humanised.
+  declaredHealthcheck: DeclaredHealthcheck | undefined;
+}
+
+export interface DeclaredHealthcheck {
+  test: string[];
+  interval: string | null;
+  timeout: string | null;
+  retries: number | null;
+  startPeriod: string | null;
 }
 
 export interface OneShotOptions {
@@ -87,6 +100,94 @@ export function parseExposedPorts(exposed: Record<string, unknown> | undefined):
     .filter((port) => Number.isInteger(port) && port > 0);
 
   return Array.from(new Set(ports)).sort((a, b) => a - b);
+}
+
+// Docker reports healthcheck durations in nanoseconds; surface them as the duration strings users
+// recognise (e.g. 30000000000 → "30s"). Null for unset/zero (Docker's "inherit the default").
+function nsToDuration(ns: number | undefined): string | null {
+  if (!ns || ns <= 0) {
+    return null;
+  }
+
+  return `${Math.round(ns / 1e9)}s`;
+}
+
+// Parses a Docker duration string ("30s", "1m30s", "500ms") into nanoseconds for the Engine API.
+// Returns undefined for blank/unparseable input so Docker falls back to its own default.
+export function durationToNs(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const matches = value.trim().matchAll(/(\d+)(ms|s|m|h)/g);
+  const unit: Record<string, number> = { ms: 1e6, s: 1e9, m: 60e9, h: 3600e9 };
+  let total = 0;
+
+  for (const [, amount, suffix] of matches) {
+    total += Number(amount) * (unit[suffix ?? "s"] ?? 0);
+  }
+
+  return total > 0 ? total : undefined;
+}
+
+interface DockerHealthConfig {
+  Test?: string[];
+  Interval?: number;
+  Timeout?: number;
+  Retries?: number;
+  StartPeriod?: number;
+}
+
+function parseDeclaredHealthcheck(
+  config: DockerHealthConfig | undefined,
+): DeclaredHealthcheck | undefined {
+  const test = config?.Test;
+
+  // No healthcheck, or one explicitly disabled (Test: ["NONE"]).
+  if (!test || test.length === 0 || test[0] === "NONE") {
+    return undefined;
+  }
+
+  return {
+    test,
+    interval: nsToDuration(config?.Interval),
+    timeout: nsToDuration(config?.Timeout),
+    retries: config?.Retries ?? null,
+    startPeriod: nsToDuration(config?.StartPeriod),
+  };
+}
+
+// Builds the Docker create-config Healthcheck block from a user's custom healthcheck (the test is a
+// shell string, wrapped CMD-SHELL). Returns undefined when there's nothing to inject.
+function buildHealthcheckConfig(
+  healthcheck: HealthcheckSpec | null | undefined,
+): DockerHealthConfig | undefined {
+  if (!healthcheck?.test.trim()) {
+    return undefined;
+  }
+
+  const config: DockerHealthConfig = { Test: ["CMD-SHELL", healthcheck.test] };
+  const interval = durationToNs(healthcheck.interval);
+  const timeout = durationToNs(healthcheck.timeout);
+  const startPeriod = durationToNs(healthcheck.startPeriod);
+
+  if (interval !== undefined) {
+    config.Interval = interval;
+  }
+
+  if (timeout !== undefined) {
+    config.Timeout = timeout;
+  }
+
+  if (healthcheck.retries) {
+    config.Retries = healthcheck.retries;
+  }
+
+  if (startPeriod !== undefined) {
+    config.StartPeriod = startPeriod;
+  }
+
+  return config;
 }
 
 // De-multiplexes a non-TTY Docker log buffer (8-byte frame headers) into plain text.
@@ -220,12 +321,14 @@ export class DockerService {
   }
 
   async runContainer(options: RunContainerOptions): Promise<string> {
+    const healthcheck = buildHealthcheckConfig(options.healthcheck);
     const container = await this.docker.createContainer({
       name: options.name,
       Image: options.image,
       Env: Object.entries(options.env ?? {}).map(([key, value]) => `${key}=${value}`),
       Labels: options.labels ?? {},
       Cmd: options.command,
+      ...(healthcheck ? { Healthcheck: healthcheck } : {}),
       HostConfig: {
         NetworkMode: options.network,
         RestartPolicy: { Name: options.restartPolicy ?? "unless-stopped" },
@@ -319,6 +422,9 @@ export class DockerService {
           rw: mount.RW,
         }));
       const exposedPorts = parseExposedPorts(info.Config?.ExposedPorts);
+      const declaredHealthcheck = parseDeclaredHealthcheck(
+        (info.Config as { Healthcheck?: DockerHealthConfig } | undefined)?.Healthcheck,
+      );
 
       return {
         id: info.Id,
@@ -331,6 +437,7 @@ export class DockerService {
         service: info.Config?.Labels?.["com.docker.compose.service"] || undefined,
         networks,
         exposedPorts,
+        declaredHealthcheck,
       };
     } catch {
       return undefined;

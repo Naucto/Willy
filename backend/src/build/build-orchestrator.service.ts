@@ -636,6 +636,7 @@ export class BuildOrchestrator {
       capDrop: deployment.capDrop ?? undefined,
       logMaxSizeMb: deployment.logMaxSizeMb ?? undefined,
       logMaxFiles: deployment.logMaxFiles ?? undefined,
+      healthcheck: deployment.healthcheck ?? undefined,
       command: deployment.runCommand ? ["sh", "-c", deployment.runCommand] : undefined,
     });
 

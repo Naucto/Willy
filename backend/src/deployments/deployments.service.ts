@@ -4,7 +4,7 @@ import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
 import { deployments, domains, gitCredentials } from "../db/schema";
-import type { ResourceLimits } from "./resource-limits";
+import type { HealthcheckSpec, ResourceLimits } from "./resource-limits";
 import type {
   ComposeConfig,
   DockerfileConfig,
@@ -122,6 +122,7 @@ export interface UpdateDeploymentInput {
   capDrop?: string[] | null;
   logMaxSizeMb?: number | null;
   logMaxFiles?: number | null;
+  healthcheck?: HealthcheckSpec | null;
   // The primary domain lives in a separate table; handled out-of-band in update().
   domain?: string;
 }
@@ -144,6 +145,7 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "capDrop",
   "logMaxSizeMb",
   "logMaxFiles",
+  "healthcheck",
 ];
 
 @Injectable()
@@ -420,8 +422,10 @@ export class DeploymentsService {
       .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)));
   }
 
-  // Sets a compose service's resource limits (merged into the serviceResources map). An empty
-  // limits object clears that service's entry. Applies on the next deploy/restart.
+  // Updates a compose service's resource limits. The Resources and Health tabs each own a disjoint
+  // subset of a service's limits (memory/cpu/caps/logs vs restart/healthcheck), so the incoming
+  // partial is *merged* onto the stored entry rather than replacing it — otherwise saving one tab
+  // would wipe the other's fields. Applies on the next deploy/restart.
   async updateServiceResources(
     id: string,
     service: string,
@@ -434,12 +438,7 @@ export class DeploymentsService {
     }
 
     const next = { ...(current.serviceResources ?? {}) };
-
-    if (Object.keys(limits).length === 0) {
-      delete next[service];
-    } else {
-      next[service] = limits;
-    }
+    next[service] = { ...(next[service] ?? {}), ...limits };
 
     const [row] = await this.db
       .update(deployments)

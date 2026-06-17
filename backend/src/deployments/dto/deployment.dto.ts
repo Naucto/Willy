@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { HealthcheckDto } from "./resource-limits.dto";
 
 const TYPES = ["WEB", "WORKER", "CRON"] as const;
 const STRATEGIES = ["DOCKERFILE", "COMPOSE", "IMAGE"] as const;
@@ -78,6 +79,9 @@ export class DeploymentDto {
 
   @ApiProperty({ type: Number, nullable: true })
   logMaxFiles!: number | null;
+
+  @ApiProperty({ type: HealthcheckDto, nullable: true })
+  healthcheck!: HealthcheckDto | null;
 
   @ApiProperty({ enum: STATES })
   state!: (typeof STATES)[number];

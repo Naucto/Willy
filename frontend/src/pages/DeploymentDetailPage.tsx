@@ -38,6 +38,7 @@ import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
 import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
+import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
 import { NetworkingTab } from "../components/NetworkingTab";
 import { ResourcesTab } from "../components/ResourcesTab";
@@ -52,7 +53,7 @@ import { formatRelativeTime } from "../format";
 // Tabs whose content is scoped to a single container; only these show the container selector
 // (Environment is handled separately, with an extra "Everyone" entry). Volumes/Networking show all
 // containers at once (so the mapping is visible), so they're deliberately not here.
-const CONTAINER_SCOPED = new Set(["runtime", "console", "resources"]);
+const CONTAINER_SCOPED = new Set(["runtime", "console", "resources", "health"]);
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -188,6 +189,7 @@ export function DeploymentDetailPage() {
       {active === "networking" && <NetworkingTab deploymentId={id} />}
       {active === "domains" && <DomainsManager deployment={deployment} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
+      {active === "health" && <HealthTab deployment={deployment} container={selected} />}
       {active === "webhook" && <WebhookTab deployment={deployment} />}
       {active === "settings" && <SettingsTab deployment={deployment} />}
     </Stack>

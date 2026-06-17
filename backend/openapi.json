@@ -2870,6 +2870,34 @@
           }
         }
       },
+      "HealthcheckDto": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "type": "string",
+            "example": "curl -f http://localhost/health"
+          },
+          "interval": {
+            "type": "string",
+            "example": "30s"
+          },
+          "timeout": {
+            "type": "string",
+            "example": "10s"
+          },
+          "retries": {
+            "type": "number",
+            "example": 3
+          },
+          "startPeriod": {
+            "type": "string",
+            "example": "5s"
+          }
+        },
+        "required": [
+          "test"
+        ]
+      },
       "DeploymentDto": {
         "type": "object",
         "properties": {
@@ -2962,6 +2990,15 @@
             "type": "number",
             "nullable": true
           },
+          "healthcheck": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthcheckDto"
+              }
+            ]
+          },
           "state": {
             "type": "string",
             "enum": [
@@ -3016,6 +3053,7 @@
           "capDrop",
           "logMaxSizeMb",
           "logMaxFiles",
+          "healthcheck",
           "state",
           "activeReleaseId",
           "gitCredentialId",
@@ -3112,6 +3150,15 @@
             "type": "number",
             "example": 3,
             "nullable": true
+          },
+          "healthcheck": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthcheckDto"
+              }
+            ]
           },
           "domain": {
             "type": "string",
@@ -3237,6 +3284,15 @@
             "type": "number",
             "nullable": true,
             "example": 3
+          },
+          "healthcheck": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HealthcheckDto"
+              }
+            ]
           }
         }
       },
@@ -3987,6 +4043,48 @@
           "ip"
         ]
       },
+      "DeclaredHealthcheckDto": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "example": [
+              "CMD-SHELL",
+              "curl -f http://localhost/health"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "interval": {
+            "type": "string",
+            "nullable": true,
+            "example": "30s"
+          },
+          "timeout": {
+            "type": "string",
+            "nullable": true,
+            "example": "10s"
+          },
+          "retries": {
+            "type": "number",
+            "nullable": true,
+            "example": 3
+          },
+          "startPeriod": {
+            "type": "string",
+            "nullable": true,
+            "example": "5s"
+          }
+        },
+        "required": [
+          "test",
+          "interval",
+          "timeout",
+          "retries",
+          "startPeriod"
+        ]
+      },
       "ContainerDto": {
         "type": "object",
         "properties": {
@@ -4023,6 +4121,20 @@
             "items": {
               "type": "number"
             }
+          },
+          "health": {
+            "type": "string",
+            "nullable": true,
+            "example": "healthy"
+          },
+          "declaredHealthcheck": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeclaredHealthcheckDto"
+              }
+            ]
           }
         },
         "required": [
@@ -4033,7 +4145,9 @@
           "volumes",
           "service",
           "networks",
-          "exposedPorts"
+          "exposedPorts",
+          "health",
+          "declaredHealthcheck"
         ]
       },
       "CleanupResultDto": {

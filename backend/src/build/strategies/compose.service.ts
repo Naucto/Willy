@@ -58,6 +58,18 @@ function resourceFragment(limits: ResourceLimits): Record<string, unknown> {
     };
   }
 
+  if (limits.healthcheck?.test.trim()) {
+    const { test, interval, timeout, retries, startPeriod } = limits.healthcheck;
+
+    out.healthcheck = {
+      test: ["CMD-SHELL", test],
+      ...(interval ? { interval } : {}),
+      ...(timeout ? { timeout } : {}),
+      ...(retries ? { retries } : {}),
+      ...(startPeriod ? { start_period: startPeriod } : {}),
+    };
+  }
+
   return out;
 }
 

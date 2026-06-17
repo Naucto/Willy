@@ -10,7 +10,6 @@ import type { SourceValue } from "./source/sourceTypes";
 
 interface FormValues {
   source: SourceValue;
-  healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
 }
@@ -32,7 +31,6 @@ function initialValues(deployment: Deployment): FormValues {
       dockerfilePath: deployment.strategyConfig.dockerfilePath ?? "",
       composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
     },
-    healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
     cronExpr: deployment.cronExpr ?? "",
   };
@@ -50,7 +48,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
   const onSubmit = async () => {
     const payload: UpdateDeploymentInput = {
       buildStrategy: source.buildStrategy,
-      healthCheckPath: values.healthCheckPath.trim() || "/",
     };
 
     const set = <K extends keyof UpdateDeploymentInput>(
@@ -114,24 +111,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
         </TextField>
         <SourceFields value={source} onChange={patchSource} />
       </SettingRow>
-
-      {deployment.type === "WEB" && source.buildStrategy !== "COMPOSE" && (
-        <>
-          <Divider />
-          <SettingRow
-            label="Health check"
-            description="HTTP path Traefik polls to confirm the container is ready before routing traffic. The port each domain routes to is set per-domain on the Domains page."
-          >
-            <TextField
-              label="Health check path"
-              value={values.healthCheckPath}
-              onChange={(event) =>
-                setValues((c) => ({ ...c, healthCheckPath: event.target.value }))
-              }
-            />
-          </SettingRow>
-        </>
-      )}
 
       {(deployment.type === "WORKER" || deployment.type === "CRON") && (
         <>

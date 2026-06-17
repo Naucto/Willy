@@ -1,6 +1,17 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from "class-validator";
 import type { Deployment } from "../deployments.service";
+import { HealthcheckDto } from "./resource-limits.dto";
 
 const STRATEGIES: Deployment["buildStrategy"][] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
 const RESTART: Deployment["restartPolicy"][] = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"];
@@ -106,6 +117,13 @@ export class UpdateDeploymentDto {
   @IsInt()
   @Min(1)
   logMaxFiles?: number | null;
+
+  // Single-container custom healthcheck; null clears it. Compose healthchecks are per-service.
+  @ApiPropertyOptional({ type: HealthcheckDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HealthcheckDto)
+  healthcheck?: HealthcheckDto | null;
 
   @ApiPropertyOptional({ type: String, example: "app.example.com" })
   @IsOptional()

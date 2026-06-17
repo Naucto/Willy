@@ -6,7 +6,6 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  MenuItem,
   Slider,
   Stack,
   TextField,
@@ -25,31 +24,6 @@ import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { describeError } from "../errors";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 import { SettingRow } from "./SettingRow";
-
-const RESTART_OPTIONS = [
-  {
-    value: "UNLESS_STOPPED",
-    label: "Unless stopped",
-    description: "Restart automatically unless explicitly stopped.",
-  },
-  {
-    value: "ALWAYS",
-    label: "Always",
-    description: "Always restart, even after a clean exit.",
-  },
-  {
-    value: "ON_FAILURE",
-    label: "On failure",
-    description: "Restart only when the container exits with a non-zero code.",
-  },
-  {
-    value: "NO",
-    label: "Never",
-    description: "Never restart — let it stop and stay stopped.",
-  },
-] as const;
-
-type RestartPolicy = (typeof RESTART_OPTIONS)[number]["value"];
 
 // Log rotation sliders: 0 means "use the operator-wide default" (LOG_MAX_SIZE / LOG_MAX_FILES).
 const LOG_SIZE_MARKS = [
@@ -180,7 +154,6 @@ function DeploymentResources({ deployment }: { deployment: Deployment }) {
     nanoCpus: deployment.nanoCpus,
     capAdd: deployment.capAdd ?? [],
     capDrop: deployment.capDrop ?? [],
-    restartPolicy: deployment.restartPolicy,
     logMaxSizeMb: deployment.logMaxSizeMb,
     logMaxFiles: deployment.logMaxFiles,
   };
@@ -192,7 +165,6 @@ function DeploymentResources({ deployment }: { deployment: Deployment }) {
         nanoCpus: limits.nanoCpus ?? null,
         capAdd: limits.capAdd ?? [],
         capDrop: limits.capDrop ?? [],
-        restartPolicy: limits.restartPolicy ?? "UNLESS_STOPPED",
         logMaxSizeMb: limits.logMaxSizeMb ?? null,
         logMaxFiles: limits.logMaxFiles ?? null,
       });
@@ -218,9 +190,6 @@ function ResourceForm({
   saving: boolean;
   onSave: (limits: ResourceLimits) => Promise<void>;
 }) {
-  const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>(
-    (initial.restartPolicy as RestartPolicy | undefined) ?? "UNLESS_STOPPED",
-  );
   const [memoryMb, setMemoryMb] = useState(initial.memoryLimitMb ?? 0);
   const [cpuCores, setCpuCores] = useState(initial.nanoCpus ? initial.nanoCpus / 1e9 : 0);
   const [capAdd, setCapAdd] = useState((initial.capAdd ?? []).join(", "));
@@ -238,7 +207,6 @@ function ResourceForm({
       nanoCpus: cpuCores > 0 ? Math.round(cpuCores * 1e9) : null,
       capAdd: parseCaps(capAdd),
       capDrop: parseCaps(capDrop),
-      restartPolicy,
       logMaxSizeMb: logMaxSizeMb > 0 ? logMaxSizeMb : null,
       logMaxFiles: logMaxFiles > 0 ? logMaxFiles : null,
     });
@@ -248,37 +216,6 @@ function ResourceForm({
       <Typography variant="overline" color="text.secondary" sx={{ mb: 1 }}>
         {title}
       </Typography>
-
-      <SettingRow
-        label="Restart policy"
-        description="How the container is restarted when it exits or the host daemon restarts."
-      >
-        <TextField
-          select
-          label="Restart policy"
-          value={restartPolicy}
-          onChange={(event) => setRestartPolicy(event.target.value as RestartPolicy)}
-          slotProps={{
-            select: {
-              renderValue: (v) =>
-                RESTART_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
-            },
-          }}
-        >
-          {RESTART_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              <Stack spacing={0.25}>
-                <Typography variant="body2">{opt.label}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {opt.description}
-                </Typography>
-              </Stack>
-            </MenuItem>
-          ))}
-        </TextField>
-      </SettingRow>
-
-      <Divider />
 
       <SettingRow
         label="Add capabilities"

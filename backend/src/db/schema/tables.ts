@@ -10,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import type { ServiceResources } from "../../deployments/resource-limits";
+import type { HealthcheckSpec, ServiceResources } from "../../deployments/resource-limits";
 import type { StrategyConfig } from "../../deployments/strategy-config";
 import {
   auditActionEnum,
@@ -69,6 +69,9 @@ export const deployments = pgTable("deployments", {
   // Per-container log rotation for single-container deployments (json-file driver).
   logMaxSizeMb: integer("log_max_size_mb"),
   logMaxFiles: integer("log_max_files"),
+  // Custom healthcheck for single-container deployments, injected at container creation. Compose
+  // deployments store theirs per service in serviceResources instead.
+  healthcheck: jsonb("healthcheck").$type<HealthcheckSpec>(),
   // Per-service resource limits for compose deployments, keyed by compose service name.
   serviceResources: jsonb("service_resources").$type<ServiceResources>().notNull().default({}),
   state: deploymentStateEnum("state").notNull().default("CREATED"),

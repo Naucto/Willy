@@ -1,6 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import type { Deployment } from "../deployments/deployments.service";
-import { type ContainerNetwork, DockerService, type VolumeMount } from "../docker/docker.service";
+import {
+  type ContainerNetwork,
+  type DeclaredHealthcheck,
+  DockerService,
+  type VolumeMount,
+} from "../docker/docker.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 
 const COMPOSE_PROJECT_LABEL = "com.docker.compose.project";
@@ -16,6 +21,10 @@ export interface DeploymentContainer {
   networks: ContainerNetwork[];
   // TCP ports the image declares via EXPOSE; used to populate the domain port picker.
   exposedPorts: number[];
+  // Runtime health (Docker State.Health.Status: starting/healthy/unhealthy), null when none.
+  health: string | null;
+  // The healthcheck declared by the image/compose file (read-only), null when none.
+  declaredHealthcheck: DeclaredHealthcheck | null;
 }
 
 // Discovers the live containers (and their named volumes) belonging to a deployment: compose stacks
@@ -41,6 +50,8 @@ export class ContainersService {
           service: info.service ?? null,
           networks: info.networks,
           exposedPorts: info.exposedPorts,
+          health: info.health ?? null,
+          declaredHealthcheck: info.declaredHealthcheck ?? null,
         });
       }
     }

@@ -1013,6 +1013,18 @@ export interface components {
       composeWebService?: string;
       imageRef?: string;
     };
+    HealthcheckDto: {
+      /** @example curl -f http://localhost/health */
+      test: string;
+      /** @example 30s */
+      interval?: string;
+      /** @example 10s */
+      timeout?: string;
+      /** @example 3 */
+      retries?: number;
+      /** @example 5s */
+      startPeriod?: string;
+    };
     DeploymentDto: {
       /** Format: uuid */
       id: string;
@@ -1037,6 +1049,7 @@ export interface components {
       capDrop: string[] | null;
       logMaxSizeMb: number | null;
       logMaxFiles: number | null;
+      healthcheck: components["schemas"]["HealthcheckDto"] | null;
       /** @enum {string} */
       state: "CREATED" | "DEPLOYING" | "RUNNING" | "DEGRADED" | "STOPPED" | "ERROR";
       /** Format: uuid */
@@ -1084,6 +1097,7 @@ export interface components {
       logMaxSizeMb?: number | null;
       /** @example 3 */
       logMaxFiles?: number | null;
+      healthcheck?: components["schemas"]["HealthcheckDto"] | null;
       /** @example app.example.com */
       domain?: string;
     };
@@ -1134,6 +1148,7 @@ export interface components {
       logMaxSizeMb?: number | null;
       /** @example 3 */
       logMaxFiles?: number | null;
+      healthcheck?: components["schemas"]["HealthcheckDto"] | null;
     };
     ZonesDto: {
       zones: string[];
@@ -1355,6 +1370,23 @@ export interface components {
       name: string;
       ip: string | null;
     };
+    DeclaredHealthcheckDto: {
+      /**
+       * @example [
+       *       "CMD-SHELL",
+       *       "curl -f http://localhost/health"
+       *     ]
+       */
+      test: string[];
+      /** @example 30s */
+      interval: string | null;
+      /** @example 10s */
+      timeout: string | null;
+      /** @example 3 */
+      retries: number | null;
+      /** @example 5s */
+      startPeriod: string | null;
+    };
     ContainerDto: {
       id: string;
       name: string;
@@ -1364,6 +1396,9 @@ export interface components {
       service: string | null;
       networks: components["schemas"]["NetworkInfoDto"][];
       exposedPorts: number[];
+      /** @example healthy */
+      health: string | null;
+      declaredHealthcheck: components["schemas"]["DeclaredHealthcheckDto"] | null;
     };
     CleanupResultDto: {
       /** @description Bytes reclaimed by pruning dangling images. */

@@ -1,8 +1,48 @@
-import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from "class-validator";
 import type { RestartPolicyName } from "../resource-limits";
 
 const RESTART: RestartPolicyName[] = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"];
+
+// A user-defined healthcheck (durations are Docker duration strings like "30s"). The test is the
+// shell command run inside the container (wrapped CMD-SHELL on injection).
+export class HealthcheckDto {
+  @ApiProperty({ type: String, example: "curl -f http://localhost/health" })
+  @IsString()
+  @IsNotEmpty()
+  test!: string;
+
+  @ApiPropertyOptional({ type: String, example: "30s" })
+  @IsOptional()
+  @IsString()
+  interval?: string;
+
+  @ApiPropertyOptional({ type: String, example: "10s" })
+  @IsOptional()
+  @IsString()
+  timeout?: string;
+
+  @ApiPropertyOptional({ type: Number, example: 3 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  retries?: number;
+
+  @ApiPropertyOptional({ type: String, example: "5s" })
+  @IsOptional()
+  @IsString()
+  startPeriod?: string;
+}
 
 // A compose service's resource limits (read + write). Every field optional; omitting all of them
 // clears the service's overrides.
@@ -47,4 +87,10 @@ export class ResourceLimitsDto {
   @IsInt()
   @Min(1)
   logMaxFiles?: number | null;
+
+  @ApiPropertyOptional({ type: HealthcheckDto, nullable: true })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HealthcheckDto)
+  healthcheck?: HealthcheckDto | null;
 }
