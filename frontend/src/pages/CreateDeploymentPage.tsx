@@ -13,6 +13,7 @@ import {
   Step,
   StepLabel,
   Stepper,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -21,6 +22,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment, useHostResources } from "../api/hooks";
 import type { CreateDeploymentInput, DeploymentType } from "../api/types";
+import { DomainPicker } from "../components/DomainPicker";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "../components/resourceScale";
 import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "../components/source/SourceFields";
 import type { SourceValue } from "../components/source/sourceTypes";
@@ -31,10 +33,10 @@ interface WizardState {
   name: string;
   type: DeploymentType;
   source: SourceValue;
+  domainEnabled: boolean;
   domain: string;
   domainService: string;
   domainPort: string;
-  healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
   memoryLimitMb: number;
@@ -49,16 +51,18 @@ const TYPE_OPTIONS: { value: DeploymentType; label: string; description: string 
 
 type StepKey = "type" | "source" | "build" | "domain" | "resources" | "review";
 
-// The Domain step only applies to WEB deployments; other types skip straight to Resources.
+// WEB deployments get a Domain step (no build inputs — readiness lives in the Health section now);
+// WORKER/CRON get a "Build & run" step for their command/schedule and have no domain.
 function stepsFor(type: DeploymentType): { key: StepKey; label: string }[] {
   const steps: { key: StepKey; label: string }[] = [
     { key: "type", label: "Type" },
     { key: "source", label: "Source" },
-    { key: "build", label: "Build & run" },
   ];
 
   if (type === "WEB") {
     steps.push({ key: "domain", label: "Domain" });
+  } else {
+    steps.push({ key: "build", label: "Build & run" });
   }
 
   steps.push({ key: "resources", label: "Resources" }, { key: "review", label: "Review" });
@@ -80,10 +84,10 @@ const INITIAL: WizardState = {
     dockerfilePath: "",
     composeFilePath: "",
   },
+  domainEnabled: false,
   domain: "",
   domainService: "",
   domainPort: "",
-  healthCheckPath: "/",
   runCommand: "",
   cronExpr: "",
   memoryLimitMb: 0,
@@ -118,7 +122,12 @@ function stepError(key: StepKey, state: WizardState): string | null {
     }
   }
 
-  if (key === "domain" && state.domain.trim() && !isValidFqdn(state.domain)) {
+  if (
+    key === "domain" &&
+    state.domainEnabled &&
+    state.domain.trim() &&
+    !isValidFqdn(state.domain)
+  ) {
     return "Enter a valid domain, e.g. app.example.com";
   }
 
@@ -166,9 +175,7 @@ function toPayload(state: WizardState): CreateDeploymentInput {
     set("composeFilePath", trimmed(source.composeFilePath));
   }
 
-  if (state.type === "WEB") {
-    set("healthCheckPath", trimmed(state.healthCheckPath));
-
+  if (state.type === "WEB" && state.domainEnabled) {
     const domain = trimmed(state.domain);
     set("domain", domain);
 
@@ -369,22 +376,6 @@ function BuildRunStep({
 }) {
   return (
     <>
-      {state.type === "WEB" && state.source.buildStrategy !== "COMPOSE" && (
-        <TextField
-          label="Health check path"
-          helperText="HTTP path polled to confirm the container is ready before routing traffic."
-          value={state.healthCheckPath}
-          onChange={(event) => patch({ healthCheckPath: event.target.value })}
-        />
-      )}
-
-      {state.type === "WEB" && state.source.buildStrategy === "COMPOSE" && (
-        <Alert severity="info">
-          Compose deployments are built and run from your compose file. Configure the domain on the
-          next step.
-        </Alert>
-      )}
-
       {state.type === "WORKER" && (
         <TextField
           label="Run command"
@@ -423,35 +414,42 @@ function DomainStep({
 
   return (
     <>
-      <Typography variant="overline" color="text.secondary">
-        Primary domain (optional)
+      <FormControlLabel
+        control={
+          <Switch
+            checked={state.domainEnabled}
+            onChange={(event) => patch({ domainEnabled: event.target.checked })}
+          />
+        }
+        label="Serve this deployment on a domain"
+      />
+      <Typography variant="caption" color="text.secondary">
+        Optional — you can add domains later from the deployment's Domains page.
       </Typography>
-      <TextField
-        label="Domain"
-        placeholder="app.example.com"
-        value={state.domain}
-        error={state.domain.trim().length > 0 && !isValidFqdn(state.domain)}
-        helperText="Leave blank to add domains later from the deployment's Domains page."
-        onChange={(event) => patch({ domain: event.target.value })}
-      />
 
-      {isCompose && (
-        <TextField
-          label="Service"
-          placeholder="web"
-          value={state.domainService}
-          helperText="Compose service this domain routes to. Blank uses the configured web service."
-          onChange={(event) => patch({ domainService: event.target.value })}
-        />
+      {state.domainEnabled && (
+        <>
+          <DomainPicker value={state.domain} onChange={(fqdn) => patch({ domain: fqdn })} />
+
+          {isCompose && (
+            <TextField
+              label="Service"
+              placeholder="web"
+              value={state.domainService}
+              helperText="Compose service this domain routes to. Blank uses the first declared service."
+              onChange={(event) => patch({ domainService: event.target.value })}
+            />
+          )}
+
+          <TextField
+            label="Port"
+            type="number"
+            value={state.domainPort}
+            helperText="Port the domain routes to. Blank uses the image's first exposed port."
+            onChange={(event) => patch({ domainPort: event.target.value })}
+          />
+        </>
       )}
-
-      <TextField
-        label="Port"
-        type="number"
-        value={state.domainPort}
-        helperText="Port the domain routes to. Blank uses the image's first exposed port."
-        onChange={(event) => patch({ domainPort: event.target.value })}
-      />
     </>
   );
 }
@@ -509,9 +507,10 @@ function ReviewStep({ state }: { state: WizardState }) {
   }
 
   if (state.type === "WEB") {
-    rows.push(["Domain", state.domain.trim() || "added later"]);
+    const domain = state.domainEnabled ? state.domain.trim() : "";
+    rows.push(["Domain", domain || "added later"]);
 
-    if (state.domain.trim()) {
+    if (domain) {
       rows.push(["Port", state.domainPort.trim() || "first exposed port"]);
     }
   }
