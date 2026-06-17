@@ -70,23 +70,20 @@ export class GitService {
     await rm(dir, { recursive: true, force: true });
   }
 
-  // Lists a remote's branches without cloning (`git ls-remote --heads`), so the create/settings UI
-  // can offer branch choices for any git remote (not GitHub-specific) before the first deploy.
+  // Lists a remote's branches and tags without cloning (`git ls-remote --heads --tags`), so the
+  // create/settings UI can offer (and validate) refs for any git remote — not GitHub-specific —
+  // before the first deploy. Tags are included so a tag-pinned ref isn't false-flagged as missing.
   async listBranches(url: string, token?: string): Promise<string[]> {
     this.assertSafeUrl(url);
     const remote = this.applyToken(url, token);
 
     try {
-      const { stdout } = await exec("git", ["ls-remote", "--heads", remote], {
+      const { stdout } = await exec("git", ["ls-remote", "--heads", "--tags", remote], {
         timeout: LS_REMOTE_TIMEOUT_MS,
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       });
 
-      return stdout
-        .split("\n")
-        .map((line) => line.split("\trefs/heads/")[1])
-        .filter((branch): branch is string => Boolean(branch))
-        .sort();
+      return parseRefs(stdout);
     } catch (error) {
       throw new GitError(`could not list branches: ${describeError(error)}`);
     }
@@ -130,4 +127,27 @@ export class GitService {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// Parses `git ls-remote --heads --tags` output into a sorted, de-duplicated list of ref names
+// (the short `main`/`v1.2.0` form). Peeled tag entries (`refs/tags/v1^{}`, which point at the
+// tag's target commit) are dropped so a tag isn't listed twice.
+export function parseRefs(stdout: string): string[] {
+  const refs = new Set<string>();
+
+  for (const line of stdout.split("\n")) {
+    const ref = line.split("\t")[1];
+
+    if (!ref || ref.endsWith("^{}")) {
+      continue;
+    }
+
+    const name = ref.replace(/^refs\/(heads|tags)\//, "");
+
+    if (name) {
+      refs.add(name);
+    }
+  }
+
+  return [...refs].sort();
 }

@@ -26,6 +26,7 @@ import {
   useDeleteRelease,
   useDeployment,
   useDeploymentContainers,
+  useDeploymentTransition,
   useReleases,
   useRollback,
 } from "../api/hooks";
@@ -98,6 +99,7 @@ export function DeploymentDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: deployment, isLoading, error } = useDeployment(id);
   const { data: containers } = useDeploymentContainers(id);
+  const transition = useDeploymentTransition(id);
 
   // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
   const active = section ?? "overview";
@@ -152,7 +154,7 @@ export function DeploymentDetailPage() {
         <Typography variant="h4" noWrap sx={{ fontWeight: 700, minWidth: 0, flexShrink: 1 }}>
           {deployment.name}
         </Typography>
-        <StatusBadge status={deployment.state} />
+        <StatusBadge status={transition ?? deployment.state} />
         <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
           {deployment.type}
         </Typography>

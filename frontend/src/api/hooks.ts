@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { tokens } from "./tokens";
 import type {
@@ -587,10 +587,15 @@ export function useRotateWebhook(id: string) {
   });
 }
 
+// The lifecycle actions share a stable, per-id mutation key so any component can observe an
+// in-flight transition for a deployment via `useDeploymentTransition` (badge + nav blocking).
+const deploymentAction = (id: string, action: string) => ["deployment-action", id, action] as const;
+
 export function useDeploy(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: deploymentAction(id, "deploy"),
     mutationFn: async () =>
       unwrap(await api.POST("/deployments/{id}/deploy", { params: { path: { id } } })),
     onSuccess: () => invalidateDeployment(queryClient, id),
@@ -629,6 +634,7 @@ export function useRestart(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: deploymentAction(id, "restart"),
     mutationFn: async () =>
       unwrap(await api.POST("/deployments/{id}/restart", { params: { path: { id } } })),
     onSuccess: () => invalidateDeployment(queryClient, id),
@@ -639,6 +645,7 @@ export function useStop(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: deploymentAction(id, "stop"),
     mutationFn: async () =>
       unwrap(await api.POST("/deployments/{id}/stop", { params: { path: { id } } })),
     onSuccess: () => invalidateDeployment(queryClient, id),
@@ -649,20 +656,62 @@ export function useStart(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: deploymentAction(id, "start"),
     mutationFn: async () =>
       unwrap(await api.POST("/deployments/{id}/start", { params: { path: { id } } })),
     onSuccess: () => invalidateDeployment(queryClient, id),
   });
 }
 
-export function useRemoveDeployment() {
+export function useRemoveDeployment(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) =>
+    mutationKey: deploymentAction(id, "delete"),
+    mutationFn: async () =>
       unwrap(await api.DELETE("/deployments/{id}", { params: { path: { id } } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.deployments }),
+    onSuccess: () => {
+      // Drop the detail + its sub-queries (containers/releases/domains) so the detail page's
+      // polling `useDeployment(id)` stops refetching the now-deleted id (404 → error Alert).
+      queryClient.removeQueries({ queryKey: queryKeys.deployment(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
+    },
   });
+}
+
+export type DeploymentTransition =
+  | "DEPLOYING"
+  | "RESTARTING"
+  | "STOPPING"
+  | "STARTING"
+  | "DELETING";
+
+const ACTION_TRANSITIONS: Record<string, DeploymentTransition> = {
+  deploy: "DEPLOYING",
+  restart: "RESTARTING",
+  stop: "STOPPING",
+  start: "STARTING",
+  delete: "DELETING",
+};
+
+// The synthetic transient state for a deployment while one of its lifecycle mutations is in flight,
+// observable from any component (list row badge, detail header) regardless of which one triggered
+// it. Null when idle. Delete is synchronous on the backend, so its pending span covers teardown.
+export function useDeploymentTransition(id: string): DeploymentTransition | null {
+  const actions = useMutationState({
+    filters: { mutationKey: ["deployment-action", id], status: "pending" },
+    select: (mutation) => mutation.options.mutationKey?.[2] as string | undefined,
+  });
+
+  for (const action of actions) {
+    const transition = action ? ACTION_TRANSITIONS[action] : undefined;
+
+    if (transition) {
+      return transition;
+    }
+  }
+
+  return null;
 }
 
 export function useSetEnvVar(id: string, service = "") {

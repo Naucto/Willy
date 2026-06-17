@@ -56,7 +56,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   const restart = useRestart(deployment.id);
   const stop = useStop(deployment.id);
   const start = useStart(deployment.id);
-  const remove = useRemoveDeployment();
+  const remove = useRemoveDeployment(deployment.id);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -194,7 +194,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
         setConfirmDelete(false);
         void (async () => {
           try {
-            await remove.mutateAsync(deployment.id);
+            await remove.mutateAsync();
             onDeleted?.();
           } catch (error) {
             enqueueSnackbar(describeError(error), { variant: "error" });

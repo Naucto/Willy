@@ -14,7 +14,8 @@ import {
   Typography,
 } from "@mui/material";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
-import { useDeployments } from "../api/hooks";
+import { useDeployments, useDeploymentTransition } from "../api/hooks";
+import type { Deployment } from "../api/types";
 import { DeployActions } from "../components/DeployActions";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
@@ -66,34 +67,48 @@ export function DeploymentsPage() {
             </TableHead>
             <TableBody>
               {data.map((deployment) => (
-                <TableRow
+                <DeploymentRow
                   key={deployment.id}
-                  hover
-                  sx={{ cursor: "pointer" }}
-                  onClick={() => navigate(`/deployments/${deployment.id}`)}
-                >
-                  <TableCell sx={{ fontWeight: 600 }}>{deployment.name}</TableCell>
-                  <TableCell>{deployment.type}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={deployment.state} />
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {deployment.gitUrl}
-                  </TableCell>
-                  <TableCell>{deployment.gitRef}</TableCell>
-                  <TableCell
-                    align="right"
-                    onClick={(event) => event.stopPropagation()}
-                    sx={{ cursor: "default" }}
-                  >
-                    <DeployActions deployment={deployment} variant="menu" />
-                  </TableCell>
-                </TableRow>
+                  deployment={deployment}
+                  onOpen={() => navigate(`/deployments/${deployment.id}`)}
+                />
               ))}
             </TableBody>
           </Table>
         </Paper>
       )}
     </Stack>
+  );
+}
+
+function DeploymentRow({ deployment, onOpen }: { deployment: Deployment; onOpen: () => void }) {
+  const transition = useDeploymentTransition(deployment.id);
+  // While a delete is in flight the row points at a deployment that's being torn down — don't let
+  // it be opened, and dim it to read as on its way out.
+  const deleting = transition === "DELETING";
+
+  return (
+    <TableRow
+      hover={!deleting}
+      sx={{ cursor: deleting ? "default" : "pointer", opacity: deleting ? 0.5 : 1 }}
+      onClick={deleting ? undefined : onOpen}
+    >
+      <TableCell sx={{ fontWeight: 600 }}>{deployment.name}</TableCell>
+      <TableCell>{deployment.type}</TableCell>
+      <TableCell>
+        <StatusBadge status={transition ?? deployment.state} />
+      </TableCell>
+      <TableCell sx={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
+        {deployment.gitUrl}
+      </TableCell>
+      <TableCell>{deployment.gitRef}</TableCell>
+      <TableCell
+        align="right"
+        onClick={(event) => event.stopPropagation()}
+        sx={{ cursor: "default" }}
+      >
+        <DeployActions deployment={deployment} variant="menu" />
+      </TableCell>
+    </TableRow>
   );
 }

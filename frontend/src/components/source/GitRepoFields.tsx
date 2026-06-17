@@ -41,6 +41,12 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
     }
   };
 
+  // Once the remote's refs are known for the current URL, flag a ref the remote doesn't have.
+  // Visual-only (non-blocking): discovery can legitimately miss a ref the user is about to push.
+  const refLoaded = branchesLoadedFor === value.gitUrl.trim() && branches.length > 0;
+  const refMissing =
+    refLoaded && value.gitRef.trim().length > 0 && !branches.includes(value.gitRef);
+
   return (
     <>
       <TextField
@@ -50,6 +56,17 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
         onChange={(event) => onChange({ gitUrl: event.target.value })}
         onBlur={() => void loadBranches()}
       />
+
+      {/* Token sits above the ref so it's present before branch discovery runs (discovery uses it
+          for private remotes). */}
+      {showToken && (
+        <TextField
+          label="Git token (private repos)"
+          type="password"
+          value={value.gitToken}
+          onChange={(event) => onChange({ gitToken: event.target.value })}
+        />
+      )}
 
       <Autocomplete
         freeSolo
@@ -66,17 +83,15 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
             void loadBranches();
           }
         }}
-        renderInput={(params) => <TextField {...params} label="Git ref (branch / tag)" />}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Git ref (branch / tag)"
+            error={refMissing}
+            helperText={refMissing ? "This ref wasn't found on the remote." : undefined}
+          />
+        )}
       />
-
-      {showToken && (
-        <TextField
-          label="Git token (private repos)"
-          type="password"
-          value={value.gitToken}
-          onChange={(event) => onChange({ gitToken: event.target.value })}
-        />
-      )}
     </>
   );
 }
