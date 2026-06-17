@@ -1,4 +1,11 @@
-import { Controller, NotFoundException, Param, Query, Sse } from "@nestjs/common";
+import {
+  BadRequestException,
+  Controller,
+  NotFoundException,
+  Param,
+  Query,
+  Sse,
+} from "@nestjs/common";
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
@@ -86,12 +93,31 @@ export class LogsController {
           return;
         }
 
-        const containerId = container
-          ? await this.containers.resolveContainerId(deployment, container)
-          : ((deployment.activeReleaseId
-              ? await this.releases.findById(deployment.activeReleaseId)
-              : undefined
-            )?.containerId ?? null);
+        let containerId: string | null;
+
+        if (container) {
+          containerId = await this.containers.resolveContainerId(deployment, container);
+        } else {
+          // Single-container deployments pin the active release's container; compose stores none,
+          // so resolve to the sole discovered one (ambiguous when several — prompt for a choice).
+          const active = deployment.activeReleaseId
+            ? await this.releases.findById(deployment.activeReleaseId)
+            : undefined;
+
+          if (active?.containerId) {
+            containerId = active.containerId;
+          } else {
+            const resolved = await this.containers.defaultContainer(deployment);
+
+            if (resolved.ambiguous) {
+              subscriber.error(new BadRequestException("multiple containers — select one"));
+
+              return;
+            }
+
+            containerId = resolved.id;
+          }
+        }
 
         // Resolve the durable key from the live container's service; when nothing is running we
         // still replay history (single-container → the "default" key).

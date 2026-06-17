@@ -31,7 +31,6 @@ function initialValues(deployment: Deployment): FormValues {
       imageRef: deployment.strategyConfig.imageRef ?? "",
       dockerfilePath: deployment.strategyConfig.dockerfilePath ?? "",
       composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
-      composeWebService: deployment.strategyConfig.composeWebService ?? "",
     },
     healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
@@ -72,7 +71,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
 
     set("dockerfilePath", trimmed(source.dockerfilePath));
     set("composeFilePath", trimmed(source.composeFilePath));
-    set("composeWebService", trimmed(source.composeWebService));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
 

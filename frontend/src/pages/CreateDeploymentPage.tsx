@@ -79,7 +79,6 @@ const INITIAL: WizardState = {
     imageRef: "",
     dockerfilePath: "",
     composeFilePath: "",
-    composeWebService: "",
   },
   domain: "",
   domainService: "",
@@ -165,7 +164,6 @@ function toPayload(state: WizardState): CreateDeploymentInput {
 
   if (source.buildStrategy === "COMPOSE") {
     set("composeFilePath", trimmed(source.composeFilePath));
-    set("composeWebService", trimmed(source.composeWebService));
   }
 
   if (state.type === "WEB") {

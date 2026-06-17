@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { WillyError } from "../common/errors";
+import { ContainersService } from "../containers/containers.service";
 import {
   type Deployment,
   DeploymentsService,
@@ -77,6 +78,7 @@ export class BuildOrchestrator {
     private readonly queue: BuildQueue,
     private readonly cron: CronService,
     private readonly runtimeLog: RuntimeLogCollector,
+    private readonly containers: ContainersService,
   ) {}
 
   // After a container-bearing deployment goes live, (re)attach runtime-log follows to its current
@@ -434,40 +436,26 @@ export class BuildOrchestrator {
       await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha });
       this.buildLog.append(releaseId, "docker compose up -d --build");
 
-      const project = this.compose.projectName(deployment);
-      let webContainerId: string;
+      let project: string;
+      let services: string[];
 
       try {
-        webContainerId = await this.compose.up(deployment, dir, (line) =>
+        ({ project, services } = await this.compose.up(deployment, dir, (line) =>
           this.buildLog.append(releaseId, line),
-        );
+        ));
       } finally {
         await this.git.cleanup(dir);
       }
 
-      await this.releases.setStatus(releaseId, "HEALTHCHECKING", {
-        containerId: webContainerId,
-        composeProject: project,
-      });
-      this.buildLog.append(releaseId, "health-checking web service");
+      // No single container anchors a compose release — it's tracked by its project label.
+      await this.releases.setStatus(releaseId, "HEALTHCHECKING", { composeProject: project });
+      this.buildLog.append(releaseId, "health-checking stack");
 
-      let healthy: boolean;
-
-      if (deployment.type === "WEB") {
-        // Probe the primary domain's pinned port, else the web container's first exposed port.
-        const status = await this.docker.inspectContainer(webContainerId);
-        const routes = await this.deployments.domainRoutes(deployment.id);
-        const probePort = routes[0]?.targetPort ?? status?.exposedPorts[0] ?? 80;
-        healthy = await this.probeWeb(webContainerId, deployment, probePort);
-      } else {
-        healthy = await this.probeWorker(webContainerId);
+      if (!(await this.composeHealthy(deployment, services))) {
+        throw new HealthCheckError("compose stack did not become healthy");
       }
 
-      if (!healthy) {
-        throw new HealthCheckError("web service did not become healthy");
-      }
-
-      await this.releases.setStatus(releaseId, "LIVE", { containerId: webContainerId });
+      await this.releases.setStatus(releaseId, "LIVE", { composeProject: project });
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
       await this.syncRuntimeLogs(deployment);
@@ -486,6 +474,89 @@ export class BuildOrchestrator {
     } finally {
       this.buildLog.finish(releaseId);
     }
+  }
+
+  // Compose health gate: wait until every project container is up to its declared bar. A service
+  // that declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a
+  // WEB service a domain routes to with no healthcheck falls back to the HTTP probe via the edge IP;
+  // any other service passes as soon as it's running. Returns false if the deadline passes first.
+  private async composeHealthy(deployment: Deployment, services: string[]): Promise<boolean> {
+    const targets = await this.webTargetPorts(deployment, services);
+    const path = deployment.healthCheckPath || "/";
+    const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      const containers = await this.containers.listForDeployment(deployment);
+
+      if (containers.length > 0 && (await this.allContainersHealthy(containers, targets, path))) {
+        return true;
+      }
+
+      await delay(HEALTH_INTERVAL_MS);
+    }
+
+    return false;
+  }
+
+  private async allContainersHealthy(
+    containers: { id: string; service: string | null }[],
+    targets: Map<string, number>,
+    path: string,
+  ): Promise<boolean> {
+    for (const container of containers) {
+      const status = await this.docker.inspectContainer(container.id, EDGE_NETWORK);
+
+      if (!status?.running) {
+        return false;
+      }
+
+      if (status.health !== undefined) {
+        // A declared/injected healthcheck is authoritative — wait for it regardless of routing.
+        if (status.health !== "healthy") {
+          return false;
+        }
+
+        continue;
+      }
+
+      const probePort = container.service ? targets.get(container.service) : undefined;
+
+      if (
+        probePort !== undefined &&
+        !(status.ip && (await this.httpProbe(status.ip, probePort, path)))
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // The (service → port) pairs a WEB deployment's domains route to, so the gate knows which
+  // healthcheck-less services to HTTP-probe and on which port. Empty for non-WEB.
+  private async webTargetPorts(
+    deployment: Deployment,
+    services: string[],
+  ): Promise<Map<string, number>> {
+    const targets = new Map<string, number>();
+
+    if (deployment.type !== "WEB") {
+      return targets;
+    }
+
+    const routes = await this.deployments.domainRoutes(deployment.id);
+    const defaultService = services[0] ?? null;
+    const defaultPort = deployment.webServicePort ?? 80;
+
+    for (const group of groupRoutes(routes, { defaultService, defaultPort })) {
+      const name = group.service ?? defaultService;
+
+      if (name && !targets.has(name)) {
+        targets.set(name, group.port);
+      }
+    }
+
+    return targets;
   }
 
   private buildImage(

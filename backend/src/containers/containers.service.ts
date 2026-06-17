@@ -63,6 +63,21 @@ export class ContainersService {
     return match?.id ?? null;
   }
 
+  // Resolves the container to target when the caller didn't pick one (console/logs). With a single
+  // container that's the one; with none, null (callers replay history / report "nothing running");
+  // with several it's ambiguous, so the caller must prompt for one (the frontend shows a selector).
+  async defaultContainer(
+    deployment: Deployment,
+  ): Promise<{ id: string | null; ambiguous: boolean }> {
+    const containers = await this.listForDeployment(deployment);
+
+    if (containers.length > 1) {
+      return { id: null, ambiguous: true };
+    }
+
+    return { id: containers[0]?.id ?? null, ambiguous: false };
+  }
+
   async containersUsingVolume(deployment: Deployment, volume: string): Promise<string[]> {
     const containers = await this.listForDeployment(deployment);
 

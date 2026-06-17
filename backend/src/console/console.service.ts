@@ -90,12 +90,31 @@ export class ConsoleService {
       return;
     }
 
-    const containerId = container
-      ? await this.containers.resolveContainerId(deployment, container)
-      : ((deployment.activeReleaseId
-          ? await this.releases.findById(deployment.activeReleaseId)
-          : undefined
-        )?.containerId ?? null);
+    let containerId: string | null;
+
+    if (container) {
+      containerId = await this.containers.resolveContainerId(deployment, container);
+    } else {
+      // Single-container deployments pin the active release's container; compose stores none, so
+      // resolve to the sole discovered container (and refuse when several exist — pick one).
+      const active = deployment.activeReleaseId
+        ? await this.releases.findById(deployment.activeReleaseId)
+        : undefined;
+
+      if (active?.containerId) {
+        containerId = active.containerId;
+      } else {
+        const resolved = await this.containers.defaultContainer(deployment);
+
+        if (resolved.ambiguous) {
+          ws.close(1011, "multiple containers — select one");
+
+          return;
+        }
+
+        containerId = resolved.id;
+      }
+    }
 
     if (!containerId) {
       ws.close(1011, "no running container");

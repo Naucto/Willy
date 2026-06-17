@@ -11,7 +11,6 @@ export interface SourceValue {
   imageRef: string;
   dockerfilePath: string;
   composeFilePath: string;
-  composeWebService: string;
 }
 
 // The shared interface every per-source-type child component implements.

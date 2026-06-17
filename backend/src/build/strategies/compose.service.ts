@@ -1,10 +1,9 @@
-import { execFile, spawn } from "node:child_process";
-import { writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { stringify as toYaml } from "yaml";
+import { parse as parseYaml, stringify as toYaml } from "yaml";
 import { WillyError } from "../../common/errors";
 import {
   type Deployment,
@@ -14,13 +13,7 @@ import {
 import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
 import { EnvVarsService } from "../../env-vars/env-vars.service";
 import { DockerService } from "../../docker/docker.service";
-import {
-  LabelGeneratorService,
-  OWNER_LABEL,
-  groupRoutes,
-} from "../../traefik/label-generator.service";
-
-const exec = promisify(execFile);
+import { LabelGeneratorService, groupRoutes } from "../../traefik/label-generator.service";
 
 // Willy's restart-policy enum → the strings `docker compose` understands.
 const RESTART_COMPOSE: Record<RestartPolicyName, string> = {
@@ -76,6 +69,58 @@ const PRIORITY_BASE = 9_000_000_000_000;
 
 export class ComposeError extends WillyError {}
 
+export interface SanitizedCompose {
+  // The rewritten compose YAML, safe to `docker compose up` once per deployment.
+  yaml: string;
+  // Service names in declaration order; the first is the routing/health default.
+  services: string[];
+  // Declared `healthcheck` blocks, keyed by service name (only services that declare one).
+  healthchecks: Record<string, unknown>;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+// Rewrites a user's compose file so two deployments from the same source don't collide. A hardcoded
+// `container_name` overrides Docker's project prefix (and an override file can't *delete* a key), so
+// two stacks would fight over one fixed name ("name already in use"); we strip it from every service
+// and let Docker derive `willy_<name>-<service>-N`. The obsolete top-level `version` is dropped too
+// (compose v2 ignores it and only warns). Pure (yaml string → result) so it can be unit-tested.
+export function sanitizeComposeYaml(raw: string): SanitizedCompose {
+  const doc = asRecord(parseYaml(raw));
+
+  delete doc.version;
+
+  const rawServices = asRecord(doc.services);
+  const services: string[] = [];
+  const healthchecks: Record<string, unknown> = {};
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [name, value] of Object.entries(rawServices)) {
+    services.push(name);
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const service = { ...(value as Record<string, unknown>) };
+      delete service.container_name;
+
+      if (service.healthcheck !== undefined) {
+        healthchecks[name] = service.healthcheck;
+      }
+
+      sanitized[name] = service;
+    } else {
+      sanitized[name] = value;
+    }
+  }
+
+  doc.services = sanitized;
+
+  return { yaml: toYaml(doc), services, healthchecks };
+}
+
 // Runs docker-compose stacks for COMPOSE deployments. Builds go through the same socket-proxy
 // with the legacy builder (BuildKit is blocked), driven by the docker CLI + compose plugin in
 // the image. A generated override attaches the web service to the edge network with Traefik
@@ -100,38 +145,45 @@ export class ComposeService {
     return `willy_${deployment.name}`;
   }
 
-  // Build + (re)create the stack in place; returns the web service container id.
-  async up(deployment: Deployment, dir: string, onLog: (line: string) => void): Promise<string> {
+  // Build + (re)create the whole stack in place. Returns the compose project and its service names
+  // (declaration order) — containers are discovered afterwards by the project label, so there is no
+  // single "web service" anchor to locate.
+  async up(
+    deployment: Deployment,
+    dir: string,
+    onLog: (line: string) => void,
+  ): Promise<{ project: string; services: string[] }> {
     const config = composeConfig(deployment);
-    const webService = config.composeWebService;
-
-    if (!webService) {
-      throw new ComposeError("compose deployment requires a web service name");
-    }
-
     const project = this.projectName(deployment);
     const composeFile = config.composeFilePath || "docker-compose.yml";
+
+    const sanitized = await this.sanitizeComposeFile(dir, composeFile);
+
+    if (sanitized.services.length === 0) {
+      throw new ComposeError("compose file declares no services");
+    }
+
     const files = ["-f", composeFile, "-f", OVERRIDE_FILE];
 
-    await this.writeOverride(deployment, dir, webService);
+    await this.writeOverride(deployment, dir, sanitized.services);
     await this.runCompose(
       ["-p", project, ...files, "up", "-d", "--build", "--remove-orphans"],
       dir,
       onLog,
     );
 
-    const { stdout } = await exec(
-      "docker",
-      ["compose", "-p", project, ...files, "ps", "-q", webService],
-      { cwd: dir, env: this.env() },
-    );
-    const containerId = stdout.trim().split("\n")[0];
+    return { project, services: sanitized.services };
+  }
 
-    if (!containerId) {
-      throw new ComposeError(`web service "${webService}" not found after compose up`);
-    }
+  // The clone dir is ephemeral, so rewriting the compose file in place keeps every relative build
+  // context valid while removing the cross-deployment collisions (see sanitizeComposeYaml).
+  private async sanitizeComposeFile(dir: string, composeFile: string): Promise<SanitizedCompose> {
+    const path = join(dir, composeFile);
+    const sanitized = sanitizeComposeYaml(await readFile(path, "utf8"));
 
-    return containerId;
+    await writeFile(path, sanitized.yaml, "utf8");
+
+    return sanitized;
   }
 
   // Remove the whole stack by its compose-project label (works without the compose file).
@@ -149,14 +201,13 @@ export class ComposeService {
   private async writeOverride(
     deployment: Deployment,
     dir: string,
-    webService: string,
+    serviceNames: string[],
   ): Promise<void> {
-    // The web service is always present so it can be located + health-checked after `up`, even if
-    // no domain happens to route to it.
-    const services: Record<string, Record<string, unknown>> = {
-      [webService]: { labels: { [OWNER_LABEL]: deployment.id } },
-    };
+    const services: Record<string, Record<string, unknown>> = {};
     const networks: Record<string, unknown> = {};
+    // Domains that don't pin a service route to the first declared service (the convention now that
+    // there's no user-chosen web-service anchor).
+    const defaultService = serviceNames[0] ?? null;
 
     if (deployment.type === "WEB") {
       const routes = await this.deployments.domainRoutes(deployment.id);
@@ -167,7 +218,7 @@ export class ComposeService {
 
       const defaultPort = deployment.webServicePort ?? 80;
       const priority = PRIORITY_BASE - Date.now();
-      const groups = groupRoutes(routes, { defaultService: webService, defaultPort });
+      const groups = groupRoutes(routes, { defaultService, defaultPort });
 
       // Labels live on the targeted container, so split the groups back out per compose service:
       // each service gets attached to the edge network and carries the routers/services for its
@@ -175,7 +226,12 @@ export class ComposeService {
       const byService = new Map<string, typeof groups>();
 
       for (const group of groups) {
-        const name = group.service ?? webService;
+        const name = group.service ?? defaultService;
+
+        if (!name) {
+          continue;
+        }
+
         const bucket = byService.get(name) ?? [];
 
         bucket.push(group);
