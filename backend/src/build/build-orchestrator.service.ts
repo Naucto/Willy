@@ -437,10 +437,10 @@ export class BuildOrchestrator {
       this.buildLog.append(releaseId, "docker compose up -d --build");
 
       let project: string;
-      let services: string[];
+      let defaultService: string | null;
 
       try {
-        ({ project, services } = await this.compose.up(deployment, dir, (line) =>
+        ({ project, defaultService } = await this.compose.up(deployment, dir, (line) =>
           this.buildLog.append(releaseId, line),
         ));
       } finally {
@@ -451,7 +451,7 @@ export class BuildOrchestrator {
       await this.releases.setStatus(releaseId, "HEALTHCHECKING", { composeProject: project });
       this.buildLog.append(releaseId, "health-checking stack");
 
-      if (!(await this.composeHealthy(deployment, services))) {
+      if (!(await this.composeHealthy(deployment, defaultService))) {
         throw new HealthCheckError("compose stack did not become healthy");
       }
 
@@ -480,8 +480,11 @@ export class BuildOrchestrator {
   // that declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a
   // WEB service a domain routes to with no healthcheck falls back to the HTTP probe via the edge IP;
   // any other service passes as soon as it's running. Returns false if the deadline passes first.
-  private async composeHealthy(deployment: Deployment, services: string[]): Promise<boolean> {
-    const targets = await this.webTargetPorts(deployment, services);
+  private async composeHealthy(
+    deployment: Deployment,
+    defaultService: string | null,
+  ): Promise<boolean> {
+    const targets = await this.webTargetPorts(deployment, defaultService);
     const path = deployment.healthCheckPath || "/";
     const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
 
@@ -536,7 +539,7 @@ export class BuildOrchestrator {
   // healthcheck-less services to HTTP-probe and on which port. Empty for non-WEB.
   private async webTargetPorts(
     deployment: Deployment,
-    services: string[],
+    defaultService: string | null,
   ): Promise<Map<string, number>> {
     const targets = new Map<string, number>();
 
@@ -545,7 +548,6 @@ export class BuildOrchestrator {
     }
 
     const routes = await this.deployments.domainRoutes(deployment.id);
-    const defaultService = services[0] ?? null;
     const defaultPort = deployment.webServicePort ?? 80;
 
     for (const group of groupRoutes(routes, { defaultService, defaultPort })) {

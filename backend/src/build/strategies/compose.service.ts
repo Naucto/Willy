@@ -157,14 +157,14 @@ export class ComposeService {
     return `willy_${deployment.name}`;
   }
 
-  // Build + (re)create the whole stack in place. Returns the compose project and its service names
-  // (declaration order) — containers are discovered afterwards by the project label, so there is no
-  // single "web service" anchor to locate.
+  // Build + (re)create the whole stack in place. Returns the compose project, its service names
+  // (declaration order), and the service untargeted domains route to — containers are discovered
+  // afterwards by the project label, so there is no single "web service" anchor to locate.
   async up(
     deployment: Deployment,
     dir: string,
     onLog: (line: string) => void,
-  ): Promise<{ project: string; services: string[] }> {
+  ): Promise<{ project: string; services: string[]; defaultService: string | null }> {
     const config = composeConfig(deployment);
     const project = this.projectName(deployment);
     const composeFile = config.composeFilePath || "docker-compose.yml";
@@ -176,15 +176,19 @@ export class ComposeService {
     }
 
     const files = ["-f", composeFile, "-f", OVERRIDE_FILE];
+    // Domains that don't pin a service route to the explicitly-configured web service when one is
+    // still set (back-compat with deployments created before the anchor was dissolved), otherwise
+    // the first declared service.
+    const defaultService = config.composeWebService || sanitized.services[0] || null;
 
-    await this.writeOverride(deployment, dir, sanitized.services);
+    await this.writeOverride(deployment, dir, defaultService);
     await this.runCompose(
       ["-p", project, ...files, "up", "-d", "--build", "--remove-orphans"],
       dir,
       onLog,
     );
 
-    return { project, services: sanitized.services };
+    return { project, services: sanitized.services, defaultService };
   }
 
   // The clone dir is ephemeral, so rewriting the compose file in place keeps every relative build
@@ -213,13 +217,10 @@ export class ComposeService {
   private async writeOverride(
     deployment: Deployment,
     dir: string,
-    serviceNames: string[],
+    defaultService: string | null,
   ): Promise<void> {
     const services: Record<string, Record<string, unknown>> = {};
     const networks: Record<string, unknown> = {};
-    // Domains that don't pin a service route to the first declared service (the convention now that
-    // there's no user-chosen web-service anchor).
-    const defaultService = serviceNames[0] ?? null;
 
     if (deployment.type === "WEB") {
       const routes = await this.deployments.domainRoutes(deployment.id);
