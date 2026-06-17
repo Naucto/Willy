@@ -16,6 +16,9 @@ playwright-report/
 .env.*
 !.env.example
 
+# Provisioner backups streamed from the host (.env, acme.json, DB dumps) — all contain secrets
+backups/
+
 # Local TLS (mkcert) + ACME cert store + generated dashboard auth
 routing/certs/
 routing/letsencrypt/
