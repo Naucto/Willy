@@ -125,6 +125,15 @@ export function DeploymentDetailPage() {
     setSearchParams(next, { replace: true });
   };
 
+  // The Build logs tab picks a release the same way container-scoped tabs pick a container: a
+  // selector in the deployment bar, persisted in the URL (?release=).
+  const releaseParam = searchParams.get("release") ?? "";
+  const selectRelease = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("release", value);
+    setSearchParams(next, { replace: true });
+  };
+
   if (isLoading) {
     return (
       <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -167,13 +176,16 @@ export function DeploymentDetailPage() {
             allowAll={isEnv}
           />
         )}
+        {active === "build" && (
+          <ReleaseSelector deploymentId={id} value={releaseParam} onChange={selectRelease} />
+        )}
         {/* DeployActions flex-grows to fill the rest of the row and right-aligns; it folds its
             buttons to icons when that remaining space gets tight. */}
         <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
       </Box>
 
       {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
-      {active === "build" && <BuildLogsTab deploymentId={id} />}
+      {active === "build" && <BuildLogsTab deploymentId={id} releaseId={releaseParam} />}
       {active === "runs" && <CronRunsTab deploymentId={id} />}
       {active === "runtime" && (
         <RuntimeLogsTab deploymentId={id} deployment={deployment} container={selectedId} />
@@ -489,22 +501,42 @@ function releaseCaption(release: Release): string {
   return release.imageTag ? `${release.imageTag} · ${when}` : when;
 }
 
-function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
+// The release picker lives in the deployment bar (see ReleaseSelector); this just renders the log
+// stream for the selected release, defaulting to the most recent until one is chosen.
+function BuildLogsTab({ deploymentId, releaseId }: { deploymentId: string; releaseId: string }) {
   const { data: releases } = useReleases(deploymentId);
-  const [releaseId, setReleaseId] = useState<string>("");
-
-  // Default to the most recent release once they load.
-  useEffect(() => {
-    const first = releases?.[0];
-
-    if (!releaseId && first) {
-      setReleaseId(first.id);
-    }
-  }, [releases, releaseId]);
 
   if (!releases || releases.length === 0) {
     return <Alert severity="info">No releases yet. Trigger a deploy to see build logs.</Alert>;
   }
+
+  const effective = releaseId || releases[0]?.id || "";
+
+  if (!effective) {
+    return <Alert severity="info">No releases yet. Trigger a deploy to see build logs.</Alert>;
+  }
+
+  return <LogViewer key={effective} path={`/releases/${effective}/logs`} />;
+}
+
+// Release picker for the Build logs tab, shown in the deployment bar like the container selector.
+// Defaults to (displays) the most recent release until the user explicitly picks one.
+function ReleaseSelector({
+  deploymentId,
+  value,
+  onChange,
+}: {
+  deploymentId: string;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const { data: releases } = useReleases(deploymentId);
+
+  if (!releases || releases.length === 0) {
+    return null;
+  }
+
+  const effective = value || releases[0]?.id || "";
 
   const labelFor = (id: string): string => {
     const release = releases.find((candidate) => candidate.id === id);
@@ -513,28 +545,24 @@ function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
   };
 
   return (
-    <Stack spacing={2}>
-      <TextField
-        select
-        size="small"
-        label="Release"
-        value={releaseId}
-        onChange={(event) => setReleaseId(event.target.value)}
-        sx={{ minWidth: 320, maxWidth: 480 }}
-        slotProps={{ select: { renderValue: (v) => labelFor(v as string) } }}
-      >
-        {releases.map((release) => (
-          <MenuItem key={release.id} value={release.id}>
-            <SelectOption
-              title={releaseRef(release)}
-              status={<StatusBadge status={release.status} />}
-              caption={releaseCaption(release)}
-            />
-          </MenuItem>
-        ))}
-      </TextField>
-
-      {releaseId && <LogViewer key={releaseId} path={`/releases/${releaseId}/logs`} />}
-    </Stack>
+    <TextField
+      select
+      size="small"
+      label="Release"
+      value={effective}
+      onChange={(event) => onChange(event.target.value)}
+      sx={{ minWidth: 240 }}
+      slotProps={{ select: { renderValue: (v) => labelFor(v as string) } }}
+    >
+      {releases.map((release) => (
+        <MenuItem key={release.id} value={release.id}>
+          <SelectOption
+            title={releaseRef(release)}
+            status={<StatusBadge status={release.status} />}
+            caption={releaseCaption(release)}
+          />
+        </MenuItem>
+      ))}
+    </TextField>
   );
 }
