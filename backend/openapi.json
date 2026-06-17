@@ -2403,6 +2403,145 @@
           "maintenance"
         ]
       }
+    },
+    "/admin/images": {
+      "get": {
+        "operationId": "AdminController_getImages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminImageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/images/{id}": {
+      "delete": {
+        "operationId": "AdminController_deleteImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Image ID or tag.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Image removed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/images/prune": {
+      "post": {
+        "operationId": "AdminController_pruneImages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/containers": {
+      "get": {
+        "operationId": "AdminController_getContainers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminContainerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/containers/prune": {
+      "post": {
+        "operationId": "AdminController_pruneContainers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
     }
   },
   "info": {
@@ -2653,11 +2792,6 @@
             "type": "string",
             "description": "Compose service to route + monitor."
           },
-          "webServicePort": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 65535
-          },
           "healthCheckPath": {
             "type": "string",
             "example": "/"
@@ -2672,6 +2806,16 @@
           "domain": {
             "type": "string",
             "example": "app.example.com"
+          },
+          "domainPort": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535,
+            "description": "Port the primary domain routes to (defaults to the image's first exposed port)."
+          },
+          "domainService": {
+            "type": "string",
+            "description": "Compose service the primary domain routes to (compose deployments)."
           },
           "gitToken": {
             "type": "string",
@@ -2909,11 +3053,6 @@
           },
           "composeWebService": {
             "type": "string"
-          },
-          "webServicePort": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 65535
           },
           "healthCheckPath": {
             "type": "string"
@@ -3915,6 +4054,129 @@
         "required": [
           "spaceReclaimedBytes",
           "removedImageTags"
+        ]
+      },
+      "DeploymentRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "AdminImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Full Docker image ID (sha256:…)."
+          },
+          "repoTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "size": {
+            "type": "number",
+            "description": "Actual on-disk size of the image in bytes."
+          },
+          "virtualSize": {
+            "type": "number",
+            "description": "Virtual size including shared layers, in bytes."
+          },
+          "created": {
+            "type": "number",
+            "description": "Unix timestamp when the image was created."
+          },
+          "deployments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentRefDto"
+            }
+          },
+          "activeContainersCount": {
+            "type": "number",
+            "description": "Number of containers based on this image."
+          }
+        },
+        "required": [
+          "id",
+          "repoTags",
+          "size",
+          "virtualSize",
+          "created",
+          "deployments",
+          "activeContainersCount"
+        ]
+      },
+      "PruneResultDto": {
+        "type": "object",
+        "properties": {
+          "spaceReclaimedBytes": {
+            "type": "number",
+            "description": "Bytes reclaimed by the prune operation."
+          },
+          "itemsRemoved": {
+            "type": "number",
+            "description": "Number of images or containers removed."
+          }
+        },
+        "required": [
+          "spaceReclaimedBytes",
+          "itemsRemoved"
+        ]
+      },
+      "AdminContainerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "description": "Image tag or ID the container was started from."
+          },
+          "state": {
+            "type": "string",
+            "description": "Docker state: running, exited, created, paused, …"
+          },
+          "status": {
+            "type": "string",
+            "description": "Human-readable status, e.g. \"Up 2 hours\"."
+          },
+          "created": {
+            "type": "number",
+            "description": "Unix timestamp when the container was created."
+          },
+          "deployment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRefDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "image",
+          "state",
+          "status",
+          "created"
         ]
       }
     }

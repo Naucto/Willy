@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min } from "class-validator";
 import type { Deployment } from "../deployments.service";
 
 const STRATEGIES: Deployment["buildStrategy"][] = ["DOCKERFILE", "COMPOSE", "IMAGE"];
@@ -41,13 +41,6 @@ export class UpdateDeploymentDto {
   @IsOptional()
   @IsString()
   composeWebService?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 65535 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(65535)
-  webServicePort?: number;
 
   @ApiPropertyOptional({ type: String })
   @IsOptional()

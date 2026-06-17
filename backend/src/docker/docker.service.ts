@@ -459,6 +459,18 @@ export class DockerService {
     }
   }
 
+  // The TCP ports an image declares via EXPOSE, ascending. Used as the fallback routing/health-check
+  // port when a deployment's domain doesn't pin an explicit port. Empty if none/uninspectable.
+  async imageExposedPorts(tag: string): Promise<number[]> {
+    try {
+      const info = await this.docker.getImage(tag).inspect();
+
+      return parseExposedPorts(info.Config?.ExposedPorts);
+    } catch {
+      return [];
+    }
+  }
+
   // Prunes only dangling images (untagged layers left behind by rebuilds). Scoped on purpose —
   // never a blanket `image prune -a`, which would delete images still referenced by deployments.
   // Returns the bytes reclaimed.
@@ -471,6 +483,48 @@ export class DockerService {
       this.logger.warn(`dangling image prune failed: ${describeError(error)}`);
 
       return 0;
+    }
+  }
+
+  // All images on the host, including untagged ones — for the admin resource overview.
+  async listAllImages() {
+    return this.docker.listImages();
+  }
+
+  // All containers (running + stopped) — for the admin resource overview.
+  async listAllContainers() {
+    return this.docker.listContainers({ all: true });
+  }
+
+  // Removes all stopped containers and returns the count and space reclaimed.
+  async pruneStoppedContainers(): Promise<{ containersDeleted: string[]; spaceReclaimed: number }> {
+    try {
+      const result = await this.docker.pruneContainers();
+
+      return {
+        containersDeleted: result.ContainersDeleted ?? [],
+        spaceReclaimed: result.SpaceReclaimed ?? 0,
+      };
+    } catch (error) {
+      this.logger.warn(`container prune failed: ${describeError(error)}`);
+
+      return { containersDeleted: [], spaceReclaimed: 0 };
+    }
+  }
+
+  // Prunes dangling images and returns both the space reclaimed and the number of deleted images.
+  async pruneDanglingImagesWithCount(): Promise<{ imagesDeleted: number; spaceReclaimed: number }> {
+    try {
+      const result = await this.docker.pruneImages({ filters: { dangling: { true: true } } });
+
+      return {
+        imagesDeleted: result.ImagesDeleted?.length ?? 0,
+        spaceReclaimed: result.SpaceReclaimed ?? 0,
+      };
+    } catch (error) {
+      this.logger.warn(`dangling image prune failed: ${describeError(error)}`);
+
+      return { imagesDeleted: 0, spaceReclaimed: 0 };
     }
   }
 }

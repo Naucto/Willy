@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackupsModule } from "./backups/backups.module";
 import { BuildModule } from "./build/build.module";
@@ -49,6 +50,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     DnsModule,
     BackupsModule,
     MaintenanceModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

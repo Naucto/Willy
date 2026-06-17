@@ -451,10 +451,17 @@ export class BuildOrchestrator {
       });
       this.buildLog.append(releaseId, "health-checking web service");
 
-      const healthy =
-        deployment.type === "WEB"
-          ? await this.probeWeb(webContainerId, deployment, deployment.webServicePort ?? 80)
-          : await this.probeWorker(webContainerId);
+      let healthy: boolean;
+
+      if (deployment.type === "WEB") {
+        // Probe the primary domain's pinned port, else the web container's first exposed port.
+        const status = await this.docker.inspectContainer(webContainerId);
+        const routes = await this.deployments.domainRoutes(deployment.id);
+        const probePort = routes[0]?.targetPort ?? status?.exposedPorts[0] ?? 80;
+        healthy = await this.probeWeb(webContainerId, deployment, probePort);
+      } else {
+        healthy = await this.probeWorker(webContainerId);
+      }
 
       if (!healthy) {
         throw new HealthCheckError("web service did not become healthy");
@@ -514,7 +521,10 @@ export class BuildOrchestrator {
 
     await this.docker.removeByName(containerName);
 
-    const defaultPort = deployment.webServicePort ?? 80;
+    // The fallback port for domains that don't pin one: a legacy webServicePort if still set,
+    // otherwise the image's first exposed port, otherwise 80.
+    const exposed = await this.docker.imageExposedPorts(imageTag);
+    const defaultPort = deployment.webServicePort ?? exposed[0] ?? 80;
     let labels: Record<string, string>;
     let network: string | undefined;
     // For a single-container deployment every domain routes to the one container; only the port

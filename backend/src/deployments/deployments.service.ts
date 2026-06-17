@@ -88,7 +88,6 @@ export interface CreateDeploymentInput {
   composeFilePath?: string;
   composeWebService?: string;
   imageRef?: string;
-  webServicePort?: number;
   healthCheckPath?: string;
   runCommand?: string;
   cronExpr?: string;
@@ -97,6 +96,9 @@ export interface CreateDeploymentInput {
   capAdd?: string[];
   capDrop?: string[];
   domain?: string;
+  // Optional binding for the primary domain created alongside the deployment (wizard).
+  domainPort?: number;
+  domainService?: string;
   gitToken?: string;
 }
 
@@ -109,7 +111,6 @@ export interface UpdateDeploymentInput {
   composeFilePath?: string | null;
   composeWebService?: string | null;
   imageRef?: string | null;
-  webServicePort?: number | null;
   healthCheckPath?: string;
   runCommand?: string | null;
   cronExpr?: string | null;
@@ -132,7 +133,6 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitUrl",
   "gitRef",
   "buildStrategy",
-  "webServicePort",
   "healthCheckPath",
   "runCommand",
   "cronExpr",
@@ -173,7 +173,6 @@ export class DeploymentsService {
         gitRef: input.gitRef ?? "main",
         buildStrategy: input.buildStrategy ?? "DOCKERFILE",
         strategyConfig: buildStrategyConfig(input.buildStrategy ?? "DOCKERFILE", input),
-        webServicePort: input.webServicePort ?? null,
         healthCheckPath: input.healthCheckPath ?? "/",
         runCommand: input.runCommand ?? null,
         cronExpr: input.cronExpr ?? null,
@@ -191,9 +190,13 @@ export class DeploymentsService {
     }
 
     if (input.domain) {
-      await this.db
-        .insert(domains)
-        .values({ deploymentId: deployment.id, fqdn: input.domain, isPrimary: true });
+      await this.db.insert(domains).values({
+        deploymentId: deployment.id,
+        fqdn: input.domain,
+        isPrimary: true,
+        targetPort: input.domainPort ?? null,
+        targetService: input.domainService ?? null,
+      });
     }
 
     if (input.gitToken) {

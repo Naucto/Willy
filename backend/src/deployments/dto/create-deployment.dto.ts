@@ -55,13 +55,6 @@ export class CreateDeploymentDto {
   @IsString()
   composeWebService?: string;
 
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 65535 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(65535)
-  webServicePort?: number;
-
   @ApiPropertyOptional({ type: String, example: "/" })
   @IsOptional()
   @IsString()
@@ -81,6 +74,26 @@ export class CreateDeploymentDto {
   @IsOptional()
   @IsString()
   domain?: string;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 65535,
+    description: "Port the primary domain routes to (defaults to the image's first exposed port).",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  domainPort?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: "Compose service the primary domain routes to (compose deployments).",
+  })
+  @IsOptional()
+  @IsString()
+  domainService?: string;
 
   @ApiPropertyOptional({
     type: String,
