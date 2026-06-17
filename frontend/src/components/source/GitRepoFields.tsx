@@ -1,4 +1,4 @@
-import { Autocomplete, Button, CircularProgress, Stack, TextField } from "@mui/material";
+import { Autocomplete, TextField } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useDiscoverBranches } from "../../api/hooks";
@@ -12,18 +12,26 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
   const { enqueueSnackbar } = useSnackbar();
   const discover = useDiscoverBranches();
   const [branches, setBranches] = useState<string[]>([]);
+  // Tracks which raw URL the current branch list was fetched for, so we can re-fetch when the URL
+  // changes without requiring a button click.
+  const [branchesLoadedFor, setBranchesLoadedFor] = useState<string | null>(null);
 
   const loadBranches = async () => {
-    const url = value.gitUrl.trim();
+    const raw = value.gitUrl.trim();
 
-    if (!url) {
+    if (!raw) {
       return;
     }
+
+    // Strip .git suffix before sending to the API — git ls-remote handles both forms, but users
+    // often paste URLs without the suffix from browser address bars.
+    const url = raw.replace(/\.git$/i, "");
 
     try {
       const token = value.gitToken.trim();
       const result = await discover.mutateAsync(token ? { url, token } : { url });
       setBranches(result.branches);
+      setBranchesLoadedFor(raw);
 
       if (result.branches.length === 0) {
         enqueueSnackbar("No branches found", { variant: "info" });
@@ -40,25 +48,26 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
         placeholder="https://github.com/owner/repo.git"
         value={value.gitUrl}
         onChange={(event) => onChange({ gitUrl: event.target.value })}
+        onBlur={() => void loadBranches()}
       />
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
-        <Autocomplete
-          freeSolo
-          fullWidth
-          options={branches}
-          inputValue={value.gitRef}
-          onInputChange={(_, input) => onChange({ gitRef: input })}
-          renderInput={(params) => <TextField {...params} label="Git ref (branch / tag)" />}
-        />
-        <Button
-          onClick={() => void loadBranches()}
-          disabled={discover.isPending || value.gitUrl.trim().length === 0}
-          sx={{ mt: 1, whiteSpace: "nowrap", flexShrink: 0 }}
-        >
-          {discover.isPending ? <CircularProgress size={18} /> : "Discover"}
-        </Button>
-      </Stack>
+      <Autocomplete
+        freeSolo
+        fullWidth
+        options={branches}
+        loading={discover.isPending}
+        loadingText="Discovering branches…"
+        inputValue={value.gitRef}
+        onInputChange={(_, input) => onChange({ gitRef: input })}
+        onFocus={() => {
+          const raw = value.gitUrl.trim();
+
+          if (raw && branchesLoadedFor !== raw && !discover.isPending) {
+            void loadBranches();
+          }
+        }}
+        renderInput={(params) => <TextField {...params} label="Git ref (branch / tag)" />}
+      />
 
       {showToken && (
         <TextField

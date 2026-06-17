@@ -28,7 +28,19 @@ import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
 import { ManageZonesDialog } from "../components/ManageZonesDialog";
 import { describeError } from "../errors";
 
-const RECORD_TYPES = ["A", "AAAA", "CNAME", "TXT", "MX"] as const;
+const RECORD_TYPE_OPTIONS = [
+  { value: "A", label: "A", description: "Maps a hostname to an IPv4 address." },
+  { value: "AAAA", label: "AAAA", description: "Maps a hostname to an IPv6 address." },
+  { value: "CNAME", label: "CNAME", description: "Aliases a hostname to another hostname." },
+  {
+    value: "TXT",
+    label: "TXT",
+    description: "Arbitrary text — used for SPF, DKIM, domain verification, etc.",
+  },
+  { value: "MX", label: "MX", description: "Designates mail servers for the domain." },
+] as const;
+
+type RecordFieldType = (typeof RECORD_TYPE_OPTIONS)[number]["value"];
 
 const EMPTY_RECORD: CreateDnsRecordInput = {
   fieldType: "A",
@@ -228,13 +240,24 @@ export function DnsPage() {
               onChange={(event) =>
                 setDraft({
                   ...draft,
-                  fieldType: event.target.value as CreateDnsRecordInput["fieldType"],
+                  fieldType: event.target.value as RecordFieldType,
                 })
               }
+              slotProps={{
+                select: {
+                  renderValue: (v) =>
+                    RECORD_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+                },
+              }}
             >
-              {RECORD_TYPES.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
+              {RECORD_TYPE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  <Stack spacing={0.25}>
+                    <Typography variant="body2">{opt.label}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {opt.description}
+                    </Typography>
+                  </Stack>
                 </MenuItem>
               ))}
             </TextField>

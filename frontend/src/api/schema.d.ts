@@ -820,6 +820,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/admin/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getImages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/images/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["AdminController_deleteImage"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/images/prune": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AdminController_pruneImages"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/containers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getContainers"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/containers/prune": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AdminController_pruneContainers"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -898,7 +978,6 @@ export interface components {
       composeFilePath?: string;
       /** @description Compose service to route + monitor. */
       composeWebService?: string;
-      webServicePort?: number;
       /** @example / */
       healthCheckPath?: string;
       runCommand?: string;
@@ -906,6 +985,10 @@ export interface components {
       cronExpr?: string;
       /** @example app.example.com */
       domain?: string;
+      /** @description Port the primary domain routes to (defaults to the image's first exposed port). */
+      domainPort?: number;
+      /** @description Compose service the primary domain routes to (compose deployments). */
+      domainService?: string;
       /** @description Personal access token for a private repo (encrypted at rest). */
       gitToken?: string;
       memoryLimitMb?: number;
@@ -976,7 +1059,6 @@ export interface components {
       dockerfilePath?: string;
       composeFilePath?: string;
       composeWebService?: string;
-      webServicePort?: number;
       healthCheckPath?: string;
       runCommand?: string;
       cronExpr?: string;
@@ -1288,6 +1370,44 @@ export interface components {
       spaceReclaimedBytes: number;
       /** @description Stale per-deployment image tags that were removed. */
       removedImageTags: string[];
+    };
+    DeploymentRefDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+    };
+    AdminImageDto: {
+      /** @description Full Docker image ID (sha256:…). */
+      id: string;
+      repoTags: string[];
+      /** @description Actual on-disk size of the image in bytes. */
+      size: number;
+      /** @description Virtual size including shared layers, in bytes. */
+      virtualSize: number;
+      /** @description Unix timestamp when the image was created. */
+      created: number;
+      deployments: components["schemas"]["DeploymentRefDto"][];
+      /** @description Number of containers based on this image. */
+      activeContainersCount: number;
+    };
+    PruneResultDto: {
+      /** @description Bytes reclaimed by the prune operation. */
+      spaceReclaimedBytes: number;
+      /** @description Number of images or containers removed. */
+      itemsRemoved: number;
+    };
+    AdminContainerDto: {
+      id: string;
+      name: string;
+      /** @description Image tag or ID the container was started from. */
+      image: string;
+      /** @description Docker state: running, exited, created, paused, … */
+      state: string;
+      /** @description Human-readable status, e.g. "Up 2 hours". */
+      status: string;
+      /** @description Unix timestamp when the container was created. */
+      created: number;
+      deployment?: components["schemas"]["DeploymentRefDto"] | null;
     };
   };
   responses: never;
@@ -2740,6 +2860,103 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["CleanupResultDto"];
+        };
+      };
+    };
+  };
+  AdminController_getImages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminImageDto"][];
+        };
+      };
+    };
+  };
+  AdminController_deleteImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Image ID or tag. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Image removed. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminController_pruneImages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PruneResultDto"];
+        };
+      };
+    };
+  };
+  AdminController_getContainers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminContainerDto"][];
+        };
+      };
+    };
+  };
+  AdminController_pruneContainers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PruneResultDto"];
         };
       };
     };

@@ -25,8 +25,18 @@ import {
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
 import { describeError } from "../errors";
 
-const TYPES = ["S3", "FTP", "SFTP", "SSH"] as const;
-type DestType = (typeof TYPES)[number];
+const DEST_OPTIONS = [
+  {
+    value: "S3",
+    label: "Amazon S3 / S3-compatible",
+    description: "Upload to an S3 bucket or any compatible object store.",
+  },
+  { value: "FTP", label: "FTP", description: "Send files over plain FTP." },
+  { value: "SFTP", label: "SFTP", description: "Secure file transfer over SSH." },
+  { value: "SSH", label: "SSH (rsync)", description: "Sync via rsync over an SSH connection." },
+] as const;
+
+type DestType = (typeof DEST_OPTIONS)[number]["value"];
 
 export function BackupDestinations() {
   const { enqueueSnackbar } = useSnackbar();
@@ -175,10 +185,20 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
             label="Type"
             value={type}
             onChange={(event) => setType(event.target.value as DestType)}
+            slotProps={{
+              select: {
+                renderValue: (v) => DEST_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+              },
+            }}
           >
-            {TYPES.map((value) => (
-              <MenuItem key={value} value={value}>
-                {value}
+            {DEST_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                <Stack spacing={0.25}>
+                  <Typography variant="body2">{opt.label}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {opt.description}
+                  </Typography>
+                </Stack>
               </MenuItem>
             ))}
           </TextField>

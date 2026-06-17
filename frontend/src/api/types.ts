@@ -35,6 +35,11 @@ export type AddDomainInput = components["schemas"]["AddDomainDto"];
 export type UpdateDomainTargetInput = components["schemas"]["UpdateDomainTargetDto"];
 export type ResourceLimits = components["schemas"]["ResourceLimitsDto"];
 
+export type AdminImage = components["schemas"]["AdminImageDto"];
+export type AdminContainer = components["schemas"]["AdminContainerDto"];
+export type AdminPruneResult = components["schemas"]["PruneResultDto"];
+export type DeploymentRef = components["schemas"]["DeploymentRefDto"];
+
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type BuildStrategy = Deployment["buildStrategy"];

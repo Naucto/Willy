@@ -1,24 +1,15 @@
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useUpdateDeployment } from "../api/hooks";
 import type { Deployment, UpdateDeploymentInput } from "../api/types";
 import { describeError } from "../errors";
-import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "./source/SourceFields";
+import { SettingRow } from "./SettingRow";
+import { SOURCE_OPTIONS, SourceFields } from "./source/SourceFields";
 import type { SourceValue } from "./source/sourceTypes";
 
 interface FormValues {
   source: SourceValue;
-  webServicePort: string;
   healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
@@ -42,7 +33,6 @@ function initialValues(deployment: Deployment): FormValues {
       composeFilePath: deployment.strategyConfig.composeFilePath ?? "",
       composeWebService: deployment.strategyConfig.composeWebService ?? "",
     },
-    webServicePort: deployment.webServicePort?.toString() ?? "",
     healthCheckPath: deployment.healthCheckPath,
     runCommand: deployment.runCommand ?? "",
     cronExpr: deployment.cronExpr ?? "",
@@ -85,7 +75,6 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("composeWebService", trimmed(source.composeWebService));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
-    set("webServicePort", values.webServicePort ? Number(values.webServicePort) : undefined);
 
     try {
       await update.mutateAsync(payload);
@@ -96,72 +85,89 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
   };
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 640 }}>
-      <Card variant="outlined">
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography variant="overline" color="text.secondary">
-              Source &amp; build
-            </Typography>
+    <Stack spacing={0} sx={{ maxWidth: 760 }}>
+      <SettingRow
+        label="Source"
+        description="Where the container image comes from — a Dockerfile, a Compose file, or a pre-built registry image."
+      >
+        <TextField
+          select
+          label="Source type"
+          value={source.buildStrategy}
+          onChange={(event) =>
+            patchSource({ buildStrategy: event.target.value as SourceValue["buildStrategy"] })
+          }
+          slotProps={{
+            select: {
+              renderValue: (v) => SOURCE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+            },
+          }}
+        >
+          {SOURCE_OPTIONS.map((opt) => (
+            <MenuItem key={opt.value} value={opt.value}>
+              <Stack spacing={0.25}>
+                <Typography variant="body2">{opt.label}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {opt.description}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          ))}
+        </TextField>
+        <SourceFields value={source} onChange={patchSource} />
+      </SettingRow>
 
+      {deployment.type === "WEB" && source.buildStrategy !== "COMPOSE" && (
+        <>
+          <Divider />
+          <SettingRow
+            label="Health check"
+            description="HTTP path Traefik polls to confirm the container is ready before routing traffic. The port each domain routes to is set per-domain on the Domains page."
+          >
             <TextField
-              select
-              label="Source type"
-              value={source.buildStrategy}
-              helperText={sourceDescription(source.buildStrategy)}
+              label="Health check path"
+              value={values.healthCheckPath}
               onChange={(event) =>
-                patchSource({ buildStrategy: event.target.value as SourceValue["buildStrategy"] })
+                setValues((c) => ({ ...c, healthCheckPath: event.target.value }))
               }
-            >
-              {SOURCE_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
+          </SettingRow>
+        </>
+      )}
 
-            <SourceFields value={source} onChange={patchSource} />
+      {(deployment.type === "WORKER" || deployment.type === "CRON") && (
+        <>
+          <Divider />
+          <SettingRow
+            label="Run command"
+            description="The command executed inside the container. Overrides the image's default CMD."
+          >
+            <TextField
+              label="Run command"
+              value={values.runCommand}
+              onChange={(event) => setValues((c) => ({ ...c, runCommand: event.target.value }))}
+            />
+          </SettingRow>
+        </>
+      )}
 
-            {deployment.type === "WEB" && (
-              <>
-                <TextField
-                  label="Service port"
-                  type="number"
-                  value={values.webServicePort}
-                  onChange={(event) =>
-                    setValues((c) => ({ ...c, webServicePort: event.target.value }))
-                  }
-                />
-                {source.buildStrategy !== "COMPOSE" && (
-                  <TextField
-                    label="Health check path"
-                    value={values.healthCheckPath}
-                    onChange={(event) =>
-                      setValues((c) => ({ ...c, healthCheckPath: event.target.value }))
-                    }
-                  />
-                )}
-              </>
-            )}
+      {deployment.type === "CRON" && (
+        <>
+          <Divider />
+          <SettingRow
+            label="Cron schedule"
+            description="Standard 5-field cron expression (minute hour day month weekday, UTC)."
+          >
+            <TextField
+              label="Cron expression"
+              value={values.cronExpr}
+              onChange={(event) => setValues((c) => ({ ...c, cronExpr: event.target.value }))}
+            />
+          </SettingRow>
+        </>
+      )}
 
-            {(deployment.type === "WORKER" || deployment.type === "CRON") && (
-              <TextField
-                label="Run command"
-                value={values.runCommand}
-                onChange={(event) => setValues((c) => ({ ...c, runCommand: event.target.value }))}
-              />
-            )}
-
-            {deployment.type === "CRON" && (
-              <TextField
-                label="Cron expression"
-                value={values.cronExpr}
-                onChange={(event) => setValues((c) => ({ ...c, cronExpr: event.target.value }))}
-              />
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
+      <Divider sx={{ mb: 2 }} />
 
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
         <Button variant="contained" disabled={update.isPending} onClick={() => void onSubmit()}>

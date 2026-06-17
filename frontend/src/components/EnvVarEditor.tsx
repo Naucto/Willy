@@ -15,6 +15,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
@@ -23,7 +24,23 @@ import { useDeleteEnvVar, useEnvVars, useSetEnvVar } from "../api/hooks";
 import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
 
-const SCOPES: EnvScope[] = ["RUNTIME", "BUILD", "BOTH"];
+const SCOPE_OPTIONS: { value: EnvScope; label: string; description: string }[] = [
+  {
+    value: "RUNTIME",
+    label: "Runtime",
+    description: "Available at runtime only, not injected into the build.",
+  },
+  {
+    value: "BUILD",
+    label: "Build",
+    description: "Injected during the build step only, not at runtime.",
+  },
+  {
+    value: "BOTH",
+    label: "Build & runtime",
+    description: "Available in both the build and runtime environments.",
+  },
+];
 
 // `service` is the focused compose service ("" = shared/everyone, or the single container) — driven
 // by the deployment bar's container selector.
@@ -179,10 +196,21 @@ function AddEnvVarDialog({
             label="Scope"
             value={scope}
             onChange={(event) => setScope(event.target.value as EnvScope)}
+            slotProps={{
+              select: {
+                renderValue: (v) =>
+                  SCOPE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+              },
+            }}
           >
-            {SCOPES.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
+            {SCOPE_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                <Stack spacing={0.25}>
+                  <Typography variant="body2">{opt.label}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {opt.description}
+                  </Typography>
+                </Stack>
               </MenuItem>
             ))}
           </TextField>

@@ -12,11 +12,13 @@ import {
   DialogTitle,
   IconButton,
   Link,
+  MenuItem,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -38,15 +40,18 @@ import { EnvVarEditor } from "../components/EnvVarEditor";
 import { LogViewer } from "../components/LogViewer";
 import { NetworkingTab } from "../components/NetworkingTab";
 import { ResourcesTab } from "../components/ResourcesTab";
+import { SelectOption } from "../components/SelectOption";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
+import { formatRelativeTime } from "../format";
 
 // Tabs whose content is scoped to a single container; only these show the container selector
-// (Environment is handled separately, with an extra "Everyone" entry).
-const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
+// (Environment is handled separately, with an extra "Everyone" entry). Volumes/Networking show all
+// containers at once (so the mapping is visible), so they're deliberately not here.
+const CONTAINER_SCOPED = new Set(["runtime", "console", "resources"]);
 
 function isRunning(deployment: Deployment): boolean {
   return (
@@ -177,8 +182,8 @@ export function DeploymentDetailPage() {
           <Alert severity="info">Console is available while the deployment is running.</Alert>
         ))}
       {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
-      {active === "volumes" && <VolumesTab deploymentId={id} containerId={selectedId} />}
-      {active === "networking" && <NetworkingTab container={selected} />}
+      {active === "volumes" && <VolumesTab deploymentId={id} />}
+      {active === "networking" && <NetworkingTab deploymentId={id} />}
       {active === "domains" && <DomainsManager deployment={deployment} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
       {active === "webhook" && <WebhookTab deployment={deployment} />}
@@ -214,7 +219,6 @@ function OverviewTab({
           />
           <DetailRow label="Ref" value={deployment.gitRef} />
           <DetailRow label="Build strategy" value={deployment.buildStrategy} />
-          <DetailRow label="Service port" value={deployment.webServicePort} />
           <DetailRow label="Health check" value={deployment.healthCheckPath} />
           <DetailRow label="Restart policy" value={deployment.restartPolicy} />
           <DetailRow label="Memory limit (MB)" value={deployment.memoryLimitMb} />
@@ -242,28 +246,12 @@ function OverviewTab({
   );
 }
 
-function PickerToolbar({ title }: { title: string }) {
-  // The new-style Toolbar provides the context GridToolbarQuickFilter needs in MUI X v9.
-  return (
-    <Toolbar>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, flexGrow: 1, pl: 1 }}>
-        {title}
-      </Typography>
-      <GridToolbarQuickFilter />
-    </Toolbar>
-  );
-}
-
-// Shared releases grid: "manage" mode (Overview) shows copy buttons + a Rollback action and
-// highlights the active release; "select" mode (passing onSelect, used by the build-log picker)
-// makes rows clickable and shows a titled toolbar instead.
+// The releases grid on Overview: copy buttons + a Rollback action, highlighting the active release.
 function ReleasesGrid({
   releases,
   activeReleaseId,
   deploymentId,
   height,
-  onSelect,
-  toolbarTitle,
   deploymentState,
   deploymentUpdatedAt,
 }: {
@@ -271,8 +259,6 @@ function ReleasesGrid({
   activeReleaseId: string | null;
   deploymentId: string;
   height: number;
-  onSelect?: (releaseId: string) => void;
-  toolbarTitle?: string;
   deploymentState?: string;
   deploymentUpdatedAt?: string;
 }) {
@@ -280,7 +266,6 @@ function ReleasesGrid({
   const rollback = useRollback(deploymentId);
   const deleteRelease = useDeleteRelease(deploymentId);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const selectMode = onSelect !== undefined;
 
   // Keep the clicked Rollback's spinner on (and the others disabled) until the deployment
   // settles — same model as the lifecycle action buttons.
@@ -331,7 +316,7 @@ function ReleasesGrid({
         params.row.gitSha ? (
           <Box sx={{ display: "flex", alignItems: "center", fontFamily: "monospace" }}>
             {params.row.gitSha.slice(0, 8)}
-            {!selectMode && <CopyButton value={params.row.gitSha} label="commit" />}
+            <CopyButton value={params.row.gitSha} label="commit" />
           </Box>
         ) : (
           "—"
@@ -347,7 +332,7 @@ function ReleasesGrid({
         params.row.imageTag ? (
           <Box sx={{ display: "flex", alignItems: "center", minWidth: 0, fontFamily: "monospace" }}>
             <Box sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{params.row.imageTag}</Box>
-            {!selectMode && <CopyButton value={params.row.imageTag} label="image" />}
+            <CopyButton value={params.row.imageTag} label="image" />
           </Box>
         ) : (
           "—"
@@ -371,46 +356,44 @@ function ReleasesGrid({
     }
   };
 
-  if (!selectMode) {
-    columns.push({
-      field: "actions",
-      headerName: "",
-      width: 170,
-      sortable: false,
-      filterable: false,
-      align: "right",
-      headerAlign: "right",
-      renderCell: (params) => (
-        <Box>
-          {params.row.imageTag && params.row.id !== activeReleaseId && (
-            <Button
+  columns.push({
+    field: "actions",
+    headerName: "",
+    width: 170,
+    sortable: false,
+    filterable: false,
+    align: "right",
+    headerAlign: "right",
+    renderCell: (params) => (
+      <Box>
+        {params.row.imageTag && params.row.id !== activeReleaseId && (
+          <Button
+            size="small"
+            disabled={rollbackBusy}
+            startIcon={
+              pendingRollbackId === params.row.id ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : undefined
+            }
+            onClick={() => void onRollback(params.row.id)}
+          >
+            Rollback
+          </Button>
+        )}
+        {params.row.id !== activeReleaseId && (
+          <Tooltip title="Delete release">
+            <IconButton
               size="small"
-              disabled={rollbackBusy}
-              startIcon={
-                pendingRollbackId === params.row.id ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : undefined
-              }
-              onClick={() => void onRollback(params.row.id)}
+              disabled={deleteRelease.isPending}
+              onClick={() => setPendingDeleteId(params.row.id)}
             >
-              Rollback
-            </Button>
-          )}
-          {params.row.id !== activeReleaseId && (
-            <Tooltip title="Delete release">
-              <IconButton
-                size="small"
-                disabled={deleteRelease.isPending}
-                onClick={() => setPendingDeleteId(params.row.id)}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      ),
-    });
-  }
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+    ),
+  });
 
   return (
     <Box sx={{ height }}>
@@ -420,10 +403,6 @@ function ReleasesGrid({
         getRowId={(row) => row.id}
         getRowClassName={(params) => (params.id === activeReleaseId ? "willy-active" : "")}
         showToolbar
-        {...(onSelect ? { onRowClick: (params) => onSelect(params.row.id) } : {})}
-        {...(toolbarTitle
-          ? { slots: { toolbar: () => <PickerToolbar title={toolbarTitle} /> } }
-          : {})}
         density="compact"
         disableRowSelectionOnClick
         initialState={{
@@ -434,7 +413,6 @@ function ReleasesGrid({
         sx={{
           border: 0,
           "& .willy-active": { bgcolor: "action.selected" },
-          ...(selectMode ? { "& .MuiDataGrid-row": { cursor: "pointer" } } : {}),
         }}
       />
 
@@ -497,16 +475,19 @@ function RuntimeLogsTab({
   return <LogViewer key={container ?? "default"} path={path} />;
 }
 
-function releaseSummary(release: Release): string {
-  const ref = release.gitSha?.slice(0, 8) ?? release.id.slice(0, 8);
+function releaseRef(release: Release): string {
+  return release.gitSha?.slice(0, 8) ?? release.id.slice(0, 8);
+}
 
-  return `${release.status} · ${ref} · ${new Date(release.queuedAt).toLocaleString()}`;
+function releaseCaption(release: Release): string {
+  const when = formatRelativeTime(new Date(release.queuedAt).getTime() / 1000);
+
+  return release.imageTag ? `${release.imageTag} · ${when}` : when;
 }
 
 function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
   const { data: releases } = useReleases(deploymentId);
   const [releaseId, setReleaseId] = useState<string>("");
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Default to the most recent release once they load.
   useEffect(() => {
@@ -521,38 +502,35 @@ function BuildLogsTab({ deploymentId }: { deploymentId: string }) {
     return <Alert severity="info">No releases yet. Trigger a deploy to see build logs.</Alert>;
   }
 
-  const current = releases.find((release) => release.id === releaseId);
+  const labelFor = (id: string): string => {
+    const release = releases.find((candidate) => candidate.id === id);
+
+    return release ? `${release.status} · ${releaseRef(release)}` : "";
+  };
 
   return (
     <Stack spacing={2}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <Button variant="outlined" onClick={() => setPickerOpen(true)}>
-          Choose release
-        </Button>
-        {current && (
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-            {releaseSummary(current)}
-          </Typography>
-        )}
-      </Box>
+      <TextField
+        select
+        size="small"
+        label="Release"
+        value={releaseId}
+        onChange={(event) => setReleaseId(event.target.value)}
+        sx={{ minWidth: 320, maxWidth: 480 }}
+        slotProps={{ select: { renderValue: (v) => labelFor(v as string) } }}
+      >
+        {releases.map((release) => (
+          <MenuItem key={release.id} value={release.id}>
+            <SelectOption
+              title={releaseRef(release)}
+              status={<StatusBadge status={release.status} />}
+              caption={releaseCaption(release)}
+            />
+          </MenuItem>
+        ))}
+      </TextField>
 
       {releaseId && <LogViewer key={releaseId} path={`/releases/${releaseId}/logs`} />}
-
-      <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} fullWidth maxWidth="md">
-        <DialogContent sx={{ p: 0 }}>
-          <ReleasesGrid
-            releases={releases}
-            activeReleaseId={releaseId || null}
-            deploymentId={deploymentId}
-            height={480}
-            toolbarTitle="Select a release"
-            onSelect={(id) => {
-              setReleaseId(id);
-              setPickerOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
     </Stack>
   );
 }

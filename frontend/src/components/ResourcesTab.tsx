@@ -3,13 +3,14 @@ import {
   Autocomplete,
   Box,
   Button,
-  Card,
-  CardContent,
+  Chip,
   CircularProgress,
+  Divider,
   MenuItem,
   Slider,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useSnackbar } from "notistack";
@@ -23,8 +24,32 @@ import {
 import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { describeError } from "../errors";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
+import { SettingRow } from "./SettingRow";
 
-const RESTART = ["UNLESS_STOPPED", "ALWAYS", "ON_FAILURE", "NO"] as const;
+const RESTART_OPTIONS = [
+  {
+    value: "UNLESS_STOPPED",
+    label: "Unless stopped",
+    description: "Restart automatically unless explicitly stopped.",
+  },
+  {
+    value: "ALWAYS",
+    label: "Always",
+    description: "Always restart, even after a clean exit.",
+  },
+  {
+    value: "ON_FAILURE",
+    label: "On failure",
+    description: "Restart only when the container exits with a non-zero code.",
+  },
+  {
+    value: "NO",
+    label: "Never",
+    description: "Never restart — let it stop and stay stopped.",
+  },
+] as const;
+
+type RestartPolicy = (typeof RESTART_OPTIONS)[number]["value"];
 
 // Log rotation sliders: 0 means "use the operator-wide default" (LOG_MAX_SIZE / LOG_MAX_FILES).
 const LOG_SIZE_MARKS = [
@@ -56,6 +81,22 @@ const COMMON_CAPS = [
   "SYS_ADMIN",
   "SYS_PTRACE",
 ];
+
+const CAP_DESCRIPTIONS: Record<string, string> = {
+  ALL: "Grant all capabilities (use with extreme caution).",
+  CHOWN: "Make arbitrary changes to file UIDs and GIDs.",
+  DAC_OVERRIDE: "Bypass file read/write/execute permission checks.",
+  FOWNER: "Bypass permission checks for file operations requiring file ownership.",
+  SETUID: "Make arbitrary manipulations of process UIDs.",
+  SETGID: "Make arbitrary manipulations of process GIDs.",
+  KILL: "Bypass permission checks for sending signals.",
+  NET_ADMIN: "Perform various network administration tasks (interfaces, routing, etc.).",
+  NET_RAW: "Use raw and packet sockets.",
+  NET_BIND_SERVICE: "Bind to ports below 1024 without running as root.",
+  SYS_TIME: "Set system clock and real-time hardware clock.",
+  SYS_ADMIN: "Wide-ranging system administration (mounts, namespaces, etc.).",
+  SYS_PTRACE: "Trace and debug other processes.",
+};
 
 function parseCaps(value: string): string[] {
   return value
@@ -121,7 +162,7 @@ function ComposeServiceResources({
   };
 
   return (
-    <ResourceCard
+    <ResourceForm
       title={`Service: ${service}`}
       initial={data}
       saving={update.isPending}
@@ -162,11 +203,11 @@ function DeploymentResources({ deployment }: { deployment: Deployment }) {
   };
 
   return (
-    <ResourceCard title="Container" initial={initial} saving={update.isPending} onSave={onSave} />
+    <ResourceForm title="Container" initial={initial} saving={update.isPending} onSave={onSave} />
   );
 }
 
-function ResourceCard({
+function ResourceForm({
   title,
   initial,
   saving,
@@ -177,8 +218,8 @@ function ResourceCard({
   saving: boolean;
   onSave: (limits: ResourceLimits) => Promise<void>;
 }) {
-  const [restartPolicy, setRestartPolicy] = useState<(typeof RESTART)[number]>(
-    (initial.restartPolicy as (typeof RESTART)[number] | undefined) ?? "UNLESS_STOPPED",
+  const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>(
+    (initial.restartPolicy as RestartPolicy | undefined) ?? "UNLESS_STOPPED",
   );
   const [memoryMb, setMemoryMb] = useState(initial.memoryLimitMb ?? 0);
   const [cpuCores, setCpuCores] = useState(initial.nanoCpus ? initial.nanoCpus / 1e9 : 0);
@@ -203,97 +244,129 @@ function ResourceCard({
     });
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 640 }}>
-      <Card variant="outlined">
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography variant="overline" color="text.secondary">
-              {title}
-            </Typography>
+    <Stack spacing={0} sx={{ maxWidth: 760 }}>
+      <Typography variant="overline" color="text.secondary" sx={{ mb: 1 }}>
+        {title}
+      </Typography>
 
-            <TextField
-              select
-              label="Restart policy"
-              value={restartPolicy}
-              onChange={(event) => setRestartPolicy(event.target.value as (typeof RESTART)[number])}
-            >
-              {RESTART.map((value) => (
-                <MenuItem key={value} value={value}>
-                  {value}
-                </MenuItem>
-              ))}
-            </TextField>
+      <SettingRow
+        label="Restart policy"
+        description="How the container is restarted when it exits or the host daemon restarts."
+      >
+        <TextField
+          select
+          label="Restart policy"
+          value={restartPolicy}
+          onChange={(event) => setRestartPolicy(event.target.value as RestartPolicy)}
+          slotProps={{
+            select: {
+              renderValue: (v) =>
+                RESTART_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+            },
+          }}
+        >
+          {RESTART_OPTIONS.map((opt) => (
+            <MenuItem key={opt.value} value={opt.value}>
+              <Stack spacing={0.25}>
+                <Typography variant="body2">{opt.label}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {opt.description}
+                </Typography>
+              </Stack>
+            </MenuItem>
+          ))}
+        </TextField>
+      </SettingRow>
 
-            <LimitSlider
-              label="Memory limit"
-              value={memoryMb}
-              max={memMax}
-              step={64}
-              marks={memoryMarks(memMax)}
-              format={(v) => (v === 0 ? "No limit" : `${v} MB`)}
-              onChange={setMemoryMb}
-            />
+      <Divider />
 
-            <LimitSlider
-              label="CPU limit"
-              value={cpuCores}
-              max={cpuCeiling}
-              step={0.5}
-              marks={cpuMarks(cpuCeiling)}
-              format={(v) => (v === 0 ? "No limit" : `${v} cores`)}
-              onChange={setCpuCores}
-            />
+      <SettingRow
+        label="Add capabilities"
+        description="Linux capabilities to grant on top of Docker's defaults."
+      >
+        <CapabilityPicker value={capAdd} onChange={setCapAdd} />
+      </SettingRow>
 
-            <CapabilityPicker
-              label="Add capabilities"
-              helperText="Linux capabilities to add on top of Docker's defaults."
-              value={capAdd}
-              onChange={setCapAdd}
-            />
+      <Divider />
 
-            <CapabilityPicker
-              label="Drop capabilities"
-              helperText="Use ALL to start from none, then add only what's needed."
-              value={capDrop}
-              onChange={setCapDrop}
-            />
+      <SettingRow
+        label="Drop capabilities"
+        description="Linux capabilities to strip. Use ALL to start from none, then add only what's needed."
+      >
+        <CapabilityPicker value={capDrop} onChange={setCapDrop} />
+      </SettingRow>
 
-            <LimitSlider
-              label="Log max size"
-              value={logMaxSizeMb}
-              max={200}
-              step={5}
-              marks={LOG_SIZE_MARKS}
-              format={(v) => (v === 0 ? "Default" : `${v} MB`)}
-              onChange={setLogMaxSizeMb}
-            />
+      <Divider sx={{ my: 1 }} />
 
-            <LimitSlider
-              label="Log max files"
-              value={logMaxFiles}
-              max={10}
-              step={1}
-              marks={LOG_FILES_MARKS}
-              format={(v) => (v === 0 ? "Default" : `${v} files`)}
-              onChange={setLogMaxFiles}
-            />
-          </Stack>
-        </CardContent>
-      </Card>
+      <SettingRow
+        label="Memory limit"
+        description="Hard cap on container memory. Unset means no limit (uses host memory freely)."
+      >
+        <LimitSlider
+          value={memoryMb}
+          max={memMax}
+          step={64}
+          marks={memoryMarks(memMax)}
+          format={(v) => (v === 0 ? "No limit" : `${v} MB`)}
+          onChange={setMemoryMb}
+        />
+      </SettingRow>
 
-      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+      <Divider />
+
+      <SettingRow
+        label="CPU limit"
+        description="Hard cap on CPU usage in cores. Unset means no limit."
+      >
+        <LimitSlider
+          value={cpuCores}
+          max={cpuCeiling}
+          step={0.5}
+          marks={cpuMarks(cpuCeiling)}
+          format={(v) => (v === 0 ? "No limit" : `${v} cores`)}
+          onChange={setCpuCores}
+        />
+      </SettingRow>
+
+      <Divider sx={{ my: 1 }} />
+
+      <SettingRow
+        label="Log rotation"
+        description="Controls Docker's json-file log driver rotation. 0 uses the operator-wide default."
+      >
+        <LimitSlider
+          value={logMaxSizeMb}
+          max={200}
+          step={5}
+          marks={LOG_SIZE_MARKS}
+          format={(v) => (v === 0 ? "Default" : `${v} MB`)}
+          onChange={setLogMaxSizeMb}
+        />
+        <LimitSlider
+          value={logMaxFiles}
+          max={10}
+          step={1}
+          marks={LOG_FILES_MARKS}
+          format={(v) => (v === 0 ? "Default" : `${v} files`)}
+          onChange={setLogMaxFiles}
+        />
+      </SettingRow>
+
+      <Divider sx={{ mb: 2 }} />
+
+      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, alignItems: "center" }}>
+        <Typography variant="caption" color="text.secondary">
+          Resource changes apply on the next deploy or restart.
+        </Typography>
         <Button variant="contained" disabled={saving} onClick={submit}>
           Save changes
         </Button>
       </Box>
-
-      <Alert severity="info">Resource changes apply on the next deploy or restart.</Alert>
     </Stack>
   );
 }
 
 function LimitSlider({
-  label,
   value,
   max,
   step,
@@ -301,7 +374,6 @@ function LimitSlider({
   format,
   onChange,
 }: {
-  label: string;
   value: number;
   max: number;
   step: number;
@@ -314,10 +386,6 @@ function LimitSlider({
       sx={{ border: 1, borderColor: "divider", borderRadius: 1, pl: 2, pr: 4.5, pt: 1, pb: 0.5 }}
     >
       <Box sx={{ display: "flex", alignItems: "baseline", mb: 1 }}>
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-        <Box sx={{ flexGrow: 1 }} />
         <Typography variant="body2" color="text.secondary">
           {format(value)}
         </Typography>
@@ -338,13 +406,9 @@ function LimitSlider({
 }
 
 function CapabilityPicker({
-  label,
-  helperText,
   value,
   onChange,
 }: {
-  label: string;
-  helperText: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -355,7 +419,30 @@ function CapabilityPicker({
       options={COMMON_CAPS}
       value={parseCaps(value)}
       onChange={(_, val) => onChange(val.map((cap) => cap.toUpperCase()).join(", "))}
-      renderInput={(params) => <TextField {...params} label={label} helperText={helperText} />}
+      renderValue={(tags, getItemProps) =>
+        tags.map((tag, index) => {
+          const { key, ...itemProps } = getItemProps({ index });
+
+          return (
+            <Tooltip key={key} title={CAP_DESCRIPTIONS[tag] ?? "Custom capability"}>
+              <Chip {...itemProps} label={tag} size="small" />
+            </Tooltip>
+          );
+        })
+      }
+      renderOption={(props, option) => (
+        <li {...props} key={option}>
+          <Stack spacing={0.25}>
+            <Typography variant="body2">{option}</Typography>
+            {CAP_DESCRIPTIONS[option] && (
+              <Typography variant="caption" color="text.secondary">
+                {CAP_DESCRIPTIONS[option]}
+              </Typography>
+            )}
+          </Stack>
+        </li>
+      )}
+      renderInput={(params) => <TextField {...params} />}
     />
   );
 }

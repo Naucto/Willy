@@ -6,6 +6,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LanguageIcon from "@mui/icons-material/Language";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import MemoryIcon from "@mui/icons-material/Memory";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
@@ -15,6 +16,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import StorageIcon from "@mui/icons-material/Storage";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import TuneIcon from "@mui/icons-material/Tune";
+import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import WebhookIcon from "@mui/icons-material/Webhook";
 import {
   AppBar,
@@ -52,6 +54,8 @@ const GLOBAL_NAV: NavItem[] = [
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
   { label: "Backups", to: "/backups", icon: <BackupIcon /> },
   { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
+  { label: "Images", to: "/images", icon: <LayersOutlinedIcon />, adminOnly: true },
+  { label: "Containers", to: "/containers", icon: <ViewInArIcon />, adminOnly: true },
 ];
 
 const SECTION_ICONS: Record<string, ReactNode> = {
@@ -70,7 +74,7 @@ const SECTION_ICONS: Record<string, ReactNode> = {
 };
 
 // Tabs whose content depends on the selected container — keep ?container= when navigating to them.
-const CONTAINER_SCOPED = new Set(["runtime", "console", "volumes", "networking", "resources"]);
+const CONTAINER_SCOPED = new Set(["runtime", "console", "resources"]);
 
 // Recognise a deployment-detail route (/deployments/:id[/:section]); "new" and the bare list aren't.
 function matchDeployment(pathname: string): { id: string; section: string } | null {

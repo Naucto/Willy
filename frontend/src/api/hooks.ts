@@ -699,3 +699,45 @@ function invalidateDeployment(queryClient: ReturnType<typeof useQueryClient>, id
   void queryClient.invalidateQueries({ queryKey: queryKeys.releases(id) });
   void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
 }
+
+export function useAdminImages() {
+  return useQuery({
+    queryKey: ["admin", "images"],
+    queryFn: async () => unwrap(await api.GET("/admin/images")),
+  });
+}
+
+export function useDeleteAdminImage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/admin/images/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "images"] }),
+  });
+}
+
+export function usePruneImages() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => unwrap(await api.POST("/admin/images/prune")),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "images"] }),
+  });
+}
+
+export function useAdminContainers() {
+  return useQuery({
+    queryKey: ["admin", "containers"],
+    queryFn: async () => unwrap(await api.GET("/admin/containers")),
+  });
+}
+
+export function usePruneContainers() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => unwrap(await api.POST("/admin/containers/prune")),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "containers"] }),
+  });
+}

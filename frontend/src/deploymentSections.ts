@@ -14,6 +14,9 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
 
   return [
     { key: "overview", label: "Overview" },
+    // "Deployment" (key kept as "settings" so routes/icons/switch stay put) sits right below
+    // Overview — it governs the core build/run config and is the first thing to set up.
+    { key: "settings", label: "Deployment" },
     { key: "build", label: "Build logs" },
     ...(isCron
       ? [{ key: "runs", label: "Runs" }]
@@ -27,6 +30,5 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
     ...(isWeb ? [{ key: "domains", label: "Domains" }] : []),
     { key: "resources", label: "Resources" },
     { key: "webhook", label: "Webhook" },
-    { key: "settings", label: "Settings" },
   ];
 }

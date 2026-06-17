@@ -19,41 +19,37 @@ import { useCreateBackupFor, useDeploymentContainers, useResetVolume } from "../
 import { describeError } from "../errors";
 
 interface VolumeRow {
+  id: string;
   name: string;
-  usedBy: string;
+  container: string;
+  destination: string;
 }
 
-export function VolumesTab({
-  deploymentId,
-  containerId,
-}: {
-  deploymentId: string;
-  containerId?: string | undefined;
-}) {
+export function VolumesTab({ deploymentId }: { deploymentId: string }) {
   const { enqueueSnackbar } = useSnackbar();
   const { data: containers, isLoading } = useDeploymentContainers(deploymentId);
   const backup = useCreateBackupFor(deploymentId);
   const reset = useResetVolume(deploymentId);
   const [confirmReset, setConfirmReset] = useState<string | null>(null);
 
-  // Scope to the focused container when one is selected; otherwise show every container's volumes.
-  // A volume can be mounted by several containers — collapse to one row per volume.
+  // One row per (container, mount) so it's clear which container maps which volume where. The same
+  // named volume can appear under several containers; the backup/reset actions act on it by name.
   const volumes = useMemo<VolumeRow[]>(() => {
-    const scoped = containerId
-      ? (containers ?? []).filter((container) => container.id === containerId)
-      : (containers ?? []);
-    const byName = new Map<string, string[]>();
+    const rows: VolumeRow[] = [];
 
-    for (const container of scoped) {
+    for (const container of containers ?? []) {
       for (const mount of container.volumes) {
-        const entries = byName.get(mount.name) ?? [];
-        entries.push(`${container.name} → ${mount.destination}`);
-        byName.set(mount.name, entries);
+        rows.push({
+          id: `${container.id}:${mount.name}:${mount.destination}`,
+          name: mount.name,
+          container: container.name,
+          destination: mount.destination,
+        });
       }
     }
 
-    return [...byName.entries()].map(([name, uses]) => ({ name, usedBy: uses.join(", ") }));
-  }, [containers, containerId]);
+    return rows;
+  }, [containers]);
 
   const onBackup = async (name: string) => {
     try {
@@ -75,8 +71,9 @@ export function VolumesTab({
   };
 
   const columns: GridColDef<VolumeRow>[] = [
-    { field: "name", headerName: "Volume", width: 280 },
-    { field: "usedBy", headerName: "Mounted at", flex: 1, minWidth: 240 },
+    { field: "name", headerName: "Volume", flex: 1, minWidth: 220 },
+    { field: "container", headerName: "Container", width: 220 },
+    { field: "destination", headerName: "Mounted at", flex: 1, minWidth: 200 },
     {
       field: "actions",
       headerName: "",
@@ -112,7 +109,7 @@ export function VolumesTab({
           <DataGrid
             rows={volumes}
             columns={columns}
-            getRowId={(row) => row.name}
+            getRowId={(row) => row.id}
             density="compact"
             autoHeight
             disableRowSelectionOnClick

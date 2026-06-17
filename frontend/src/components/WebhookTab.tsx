@@ -2,8 +2,7 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
+  Divider,
   FormControlLabel,
   Stack,
   Switch,
@@ -15,9 +14,10 @@ import { useState } from "react";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { Deployment } from "../api/types";
 import { describeError } from "../errors";
+import { SettingRow } from "./SettingRow";
 
-// GitHub webhook + auto-deploy controls — its own deployment section. Auto-deploy saves on toggle;
-// the secret is generated/rotated and shown once.
+// GitHub webhook + auto-deploy controls. Auto-deploy saves on toggle; the secret is
+// generated/rotated and shown once.
 export function WebhookTab({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
   const { data } = useWebhook(deployment.id);
@@ -49,55 +49,59 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
   };
 
   return (
-    <Card variant="outlined" sx={{ maxWidth: 640 }}>
-      <CardContent>
-        <Stack spacing={2}>
-          <Typography variant="overline" color="text.secondary">
-            GitHub webhook
+    <Stack spacing={0} sx={{ maxWidth: 760 }}>
+      <SettingRow
+        label="Auto-deploy"
+        description="Automatically redeploy on every push to the tracked branch when a webhook push event arrives."
+      >
+        <FormControlLabel
+          control={
+            <Switch
+              checked={deployment.autoDeploy}
+              disabled={update.isPending}
+              onChange={(event) => void onToggleAutoDeploy(event.target.checked)}
+            />
+          }
+          label={deployment.autoDeploy ? "Enabled" : "Disabled"}
+        />
+        {!deployment.autoDeploy && (
+          <Alert severity="info" sx={{ mt: 0 }}>
+            Pushes won't trigger a deploy until auto-deploy is enabled.
+          </Alert>
+        )}
+      </SettingRow>
+
+      <Divider />
+
+      <SettingRow
+        label="Webhook URL"
+        description="Paste this URL into your repository's webhook settings. Use content type application/json."
+      >
+        <TextField label="Payload URL" value={url} slotProps={{ input: { readOnly: true } }} />
+      </SettingRow>
+
+      <Divider />
+
+      <SettingRow
+        label="Secret"
+        description="The HMAC-SHA256 secret used to verify that webhook payloads come from GitHub."
+      >
+        {secret && (
+          <Alert severity="warning" onClose={() => setSecret(null)}>
+            Copy this secret into the GitHub webhook now — it won't be shown again:
+            <Box sx={{ fontFamily: "monospace", mt: 1, wordBreak: "break-all" }}>{secret}</Box>
+          </Alert>
+        )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            {data?.configured ? "Secret configured" : "No secret set"}
           </Typography>
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={deployment.autoDeploy}
-                disabled={update.isPending}
-                onChange={(event) => void onToggleAutoDeploy(event.target.checked)}
-              />
-            }
-            label="Auto-deploy on webhook push"
-          />
-
-          {!deployment.autoDeploy && (
-            <Alert severity="info">
-              Auto-deploy is off — pushes won't deploy until you enable it.
-            </Alert>
-          )}
-
-          <TextField
-            label="Payload URL"
-            value={url}
-            slotProps={{ input: { readOnly: true } }}
-            helperText="Content type: application/json. Configure this URL in the repo's webhooks."
-          />
-
-          {secret && (
-            <Alert severity="warning" onClose={() => setSecret(null)}>
-              Copy this secret into the GitHub webhook now — it won't be shown again:
-              <Box sx={{ fontFamily: "monospace", mt: 1, wordBreak: "break-all" }}>{secret}</Box>
-            </Alert>
-          )}
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              {data?.configured ? "Secret configured" : "No secret set"}
-            </Typography>
-            <Box sx={{ flexGrow: 1 }} />
-            <Button variant="outlined" onClick={() => void onRotate()} disabled={rotate.isPending}>
-              {data?.configured ? "Rotate secret" : "Generate secret"}
-            </Button>
-          </Box>
-        </Stack>
-      </CardContent>
-    </Card>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button variant="outlined" onClick={() => void onRotate()} disabled={rotate.isPending}>
+            {data?.configured ? "Rotate secret" : "Generate secret"}
+          </Button>
+        </Box>
+      </SettingRow>
+    </Stack>
   );
 }

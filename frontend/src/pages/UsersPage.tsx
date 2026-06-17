@@ -29,7 +29,23 @@ import type { CreateUserInput, PanelUser, Role } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { describeError } from "../errors";
 
-const ROLES: Role[] = ["ADMIN", "OPERATOR", "VIEWER"];
+const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
+  {
+    value: "ADMIN",
+    label: "Admin",
+    description: "Full access — manage users, all deployments, and panel settings.",
+  },
+  {
+    value: "OPERATOR",
+    label: "Operator",
+    description: "Deploy and configure resources; cannot manage users.",
+  },
+  {
+    value: "VIEWER",
+    label: "Viewer",
+    description: "Read-only access — cannot trigger deploys or change configuration.",
+  },
+];
 
 export function UsersPage() {
   const { enqueueSnackbar } = useSnackbar();
@@ -73,10 +89,20 @@ export function UsersPage() {
           value={params.row.role}
           disabled={params.row.id === me?.userId}
           onChange={(event) => void onRole(params.row.id, event.target.value as Role)}
+          slotProps={{
+            select: {
+              renderValue: (v) => ROLE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+            },
+          }}
         >
-          {ROLES.map((role) => (
-            <MenuItem key={role} value={role}>
-              {role}
+          {ROLE_OPTIONS.map((opt) => (
+            <MenuItem key={opt.value} value={opt.value}>
+              <Stack spacing={0.25}>
+                <Typography variant="body2">{opt.label}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {opt.description}
+                </Typography>
+              </Stack>
             </MenuItem>
           ))}
         </TextField>
@@ -188,10 +214,20 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
             label="Role"
             value={form.role}
             onChange={(event) => setForm({ ...form, role: event.target.value as Role })}
+            slotProps={{
+              select: {
+                renderValue: (v) => ROLE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+              },
+            }}
           >
-            {ROLES.map((role) => (
-              <MenuItem key={role} value={role}>
-                {role}
+            {ROLE_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                <Stack spacing={0.25}>
+                  <Typography variant="body2">{opt.label}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {opt.description}
+                  </Typography>
+                </Stack>
               </MenuItem>
             ))}
           </TextField>

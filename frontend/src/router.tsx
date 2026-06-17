@@ -2,10 +2,12 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./components/AppShell";
 import { BackupsPage } from "./pages/BackupsPage";
+import { ContainersPage } from "./pages/ContainersPage";
 import { CreateDeploymentPage } from "./pages/CreateDeploymentPage";
 import { DeploymentDetailPage } from "./pages/DeploymentDetailPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { DnsPage } from "./pages/DnsPage";
+import { ImagesPage } from "./pages/ImagesPage";
 import { LoginPage } from "./pages/LoginPage";
 import { UsersPage } from "./pages/UsersPage";
 
@@ -25,6 +27,8 @@ export const router = createBrowserRouter([
           { path: "/dns", element: <DnsPage /> },
           { path: "/backups", element: <BackupsPage /> },
           { path: "/users", element: <UsersPage /> },
+          { path: "/images", element: <ImagesPage /> },
+          { path: "/containers", element: <ContainersPage /> },
         ],
       },
     ],

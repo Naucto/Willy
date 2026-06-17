@@ -24,13 +24,16 @@ import type { CreateDeploymentInput, DeploymentType } from "../api/types";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "../components/resourceScale";
 import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "../components/source/SourceFields";
 import type { SourceValue } from "../components/source/sourceTypes";
+import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
 
 interface WizardState {
   name: string;
   type: DeploymentType;
   source: SourceValue;
-  webServicePort: string;
+  domain: string;
+  domainService: string;
+  domainPort: string;
   healthCheckPath: string;
   runCommand: string;
   cronExpr: string;
@@ -44,7 +47,24 @@ const TYPE_OPTIONS: { value: DeploymentType; label: string; description: string 
   { value: "CRON", label: "Cron", description: "Runs a command on a schedule." },
 ];
 
-const STEPS = ["Type", "Source", "Build & run", "Resources", "Review"];
+type StepKey = "type" | "source" | "build" | "domain" | "resources" | "review";
+
+// The Domain step only applies to WEB deployments; other types skip straight to Resources.
+function stepsFor(type: DeploymentType): { key: StepKey; label: string }[] {
+  const steps: { key: StepKey; label: string }[] = [
+    { key: "type", label: "Type" },
+    { key: "source", label: "Source" },
+    { key: "build", label: "Build & run" },
+  ];
+
+  if (type === "WEB") {
+    steps.push({ key: "domain", label: "Domain" });
+  }
+
+  steps.push({ key: "resources", label: "Resources" }, { key: "review", label: "Review" });
+
+  return steps;
+}
 
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
@@ -61,7 +81,9 @@ const INITIAL: WizardState = {
     composeFilePath: "",
     composeWebService: "",
   },
-  webServicePort: "",
+  domain: "",
+  domainService: "",
+  domainPort: "",
   healthCheckPath: "/",
   runCommand: "",
   cronExpr: "",
@@ -76,8 +98,8 @@ function trimmed(value: string): string | undefined {
 }
 
 // The blocking validation error for a step, or null if it's complete. Gates the Next/Create button.
-function stepError(step: number, state: WizardState): string | null {
-  if (step === 0) {
+function stepError(key: StepKey, state: WizardState): string | null {
+  if (key === "type") {
     if (!state.name.trim()) {
       return "Name is required";
     }
@@ -87,7 +109,7 @@ function stepError(step: number, state: WizardState): string | null {
     }
   }
 
-  if (step === 1) {
+  if (key === "source") {
     if (state.source.buildStrategy === "IMAGE") {
       if (!state.source.imageRef.trim()) {
         return "Image reference is required";
@@ -95,6 +117,10 @@ function stepError(step: number, state: WizardState): string | null {
     } else if (!state.source.gitUrl.trim()) {
       return "Git URL is required";
     }
+  }
+
+  if (key === "domain" && state.domain.trim() && !isValidFqdn(state.domain)) {
+    return "Enter a valid domain, e.g. app.example.com";
   }
 
   return null;
@@ -143,8 +169,18 @@ function toPayload(state: WizardState): CreateDeploymentInput {
   }
 
   if (state.type === "WEB") {
-    set("webServicePort", state.webServicePort ? Number(state.webServicePort) : undefined);
     set("healthCheckPath", trimmed(state.healthCheckPath));
+
+    const domain = trimmed(state.domain);
+    set("domain", domain);
+
+    if (domain) {
+      set("domainPort", state.domainPort ? Number(state.domainPort) : undefined);
+
+      if (source.buildStrategy === "COMPOSE") {
+        set("domainService", trimmed(state.domainService));
+      }
+    }
   }
 
   if (state.type === "WORKER") {
@@ -172,8 +208,14 @@ export function CreateDeploymentPage() {
   const patchSource = (update: Partial<SourceValue>): void =>
     setState((current) => ({ ...current, source: { ...current.source, ...update } }));
 
-  const error = stepError(step, state);
-  const isLast = step === STEPS.length - 1;
+  const steps = stepsFor(state.type);
+  // Changing the type (step 0) can shrink the step list, so never let the index run past the end.
+  const stepIndex = Math.min(step, steps.length - 1);
+  const current = steps[stepIndex];
+  const currentKey = current?.key ?? "review";
+
+  const error = stepError(currentKey, state);
+  const isLast = stepIndex === steps.length - 1;
 
   const onCreate = async () => {
     try {
@@ -191,10 +233,10 @@ export function CreateDeploymentPage() {
         New deployment
       </Typography>
 
-      <Stepper activeStep={step} alternativeLabel>
-        {STEPS.map((label) => (
-          <Step key={label}>
-            <StepLabel>{label}</StepLabel>
+      <Stepper activeStep={stepIndex} alternativeLabel>
+        {steps.map((entry) => (
+          <Step key={entry.key}>
+            <StepLabel>{entry.label}</StepLabel>
           </Step>
         ))}
       </Stepper>
@@ -202,20 +244,27 @@ export function CreateDeploymentPage() {
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={2}>
-            {step === 0 && <TypeStep state={state} patch={patch} />}
-            {step === 1 && <SourceStep state={state} patch={patch} patchSource={patchSource} />}
-            {step === 2 && <BuildRunStep state={state} patch={patch} />}
-            {step === 3 && <ResourcesStep state={state} patch={patch} host={host} />}
-            {step === 4 && <ReviewStep state={state} />}
+            {currentKey === "type" && <TypeStep state={state} patch={patch} />}
+            {currentKey === "source" && (
+              <SourceStep state={state} patch={patch} patchSource={patchSource} />
+            )}
+            {currentKey === "build" && <BuildRunStep state={state} patch={patch} />}
+            {currentKey === "domain" && <DomainStep state={state} patch={patch} />}
+            {currentKey === "resources" && (
+              <ResourcesStep state={state} patch={patch} host={host} />
+            )}
+            {currentKey === "review" && <ReviewStep state={state} />}
           </Stack>
         </CardContent>
       </Card>
 
-      {error && step !== 0 && <Alert severity="warning">{error}</Alert>}
+      {error && currentKey !== "type" && <Alert severity="warning">{error}</Alert>}
 
       <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-        <Button onClick={() => (step === 0 ? navigate("/deployments") : setStep(step - 1))}>
-          {step === 0 ? "Cancel" : "Back"}
+        <Button
+          onClick={() => (stepIndex === 0 ? navigate("/deployments") : setStep(stepIndex - 1))}
+        >
+          {stepIndex === 0 ? "Cancel" : "Back"}
         </Button>
         {isLast ? (
           <Button
@@ -226,7 +275,11 @@ export function CreateDeploymentPage() {
             Create
           </Button>
         ) : (
-          <Button variant="contained" disabled={Boolean(error)} onClick={() => setStep(step + 1)}>
+          <Button
+            variant="contained"
+            disabled={Boolean(error)}
+            onClick={() => setStep(stepIndex + 1)}
+          >
             Next
           </Button>
         )}
@@ -318,25 +371,20 @@ function BuildRunStep({
 }) {
   return (
     <>
-      {state.type === "WEB" && (
-        <>
-          <TextField
-            label="Service port"
-            type="number"
-            value={state.webServicePort}
-            onChange={(event) => patch({ webServicePort: event.target.value })}
-          />
-          {state.source.buildStrategy !== "COMPOSE" && (
-            <TextField
-              label="Health check path"
-              value={state.healthCheckPath}
-              onChange={(event) => patch({ healthCheckPath: event.target.value })}
-            />
-          )}
-          <Alert severity="info">
-            Add domains from the deployment's <strong>Domains</strong> page after it's created.
-          </Alert>
-        </>
+      {state.type === "WEB" && state.source.buildStrategy !== "COMPOSE" && (
+        <TextField
+          label="Health check path"
+          helperText="HTTP path polled to confirm the container is ready before routing traffic."
+          value={state.healthCheckPath}
+          onChange={(event) => patch({ healthCheckPath: event.target.value })}
+        />
+      )}
+
+      {state.type === "WEB" && state.source.buildStrategy === "COMPOSE" && (
+        <Alert severity="info">
+          Compose deployments are built and run from your compose file. Configure the domain on the
+          next step.
+        </Alert>
       )}
 
       {state.type === "WORKER" && (
@@ -362,6 +410,50 @@ function BuildRunStep({
           />
         </>
       )}
+    </>
+  );
+}
+
+function DomainStep({
+  state,
+  patch,
+}: {
+  state: WizardState;
+  patch: (update: Partial<WizardState>) => void;
+}) {
+  const isCompose = state.source.buildStrategy === "COMPOSE";
+
+  return (
+    <>
+      <Typography variant="overline" color="text.secondary">
+        Primary domain (optional)
+      </Typography>
+      <TextField
+        label="Domain"
+        placeholder="app.example.com"
+        value={state.domain}
+        error={state.domain.trim().length > 0 && !isValidFqdn(state.domain)}
+        helperText="Leave blank to add domains later from the deployment's Domains page."
+        onChange={(event) => patch({ domain: event.target.value })}
+      />
+
+      {isCompose && (
+        <TextField
+          label="Service"
+          placeholder="web"
+          value={state.domainService}
+          helperText="Compose service this domain routes to. Blank uses the configured web service."
+          onChange={(event) => patch({ domainService: event.target.value })}
+        />
+      )}
+
+      <TextField
+        label="Port"
+        type="number"
+        value={state.domainPort}
+        helperText="Port the domain routes to. Blank uses the image's first exposed port."
+        onChange={(event) => patch({ domainPort: event.target.value })}
+      />
     </>
   );
 }
@@ -419,7 +511,11 @@ function ReviewStep({ state }: { state: WizardState }) {
   }
 
   if (state.type === "WEB") {
-    rows.push(["Port", state.webServicePort || "default"]);
+    rows.push(["Domain", state.domain.trim() || "added later"]);
+
+    if (state.domain.trim()) {
+      rows.push(["Port", state.domainPort.trim() || "first exposed port"]);
+    }
   }
 
   if (state.type === "CRON") {

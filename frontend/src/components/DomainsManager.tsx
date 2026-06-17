@@ -29,16 +29,10 @@ import {
   useUpdateDomainTarget,
 } from "../api/hooks";
 import type { Container, Deployment, DeploymentDomain } from "../api/types";
+import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
 import { DomainPicker } from "./DomainPicker";
-
-// A valid FQDN: 2+ dot-separated labels, each 1-63 chars, no leading/trailing hyphen, ≤253 total.
-// Allows *.localhost (local dev) and real domains; rejects single labels and obviously bad input.
-const FQDN_RE = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+$/;
-
-function isValidFqdn(value: string): boolean {
-  return FQDN_RE.test(value.trim());
-}
+import { RunningChip, SelectOption } from "./SelectOption";
 
 interface ServiceOption {
   value: string;
@@ -57,7 +51,9 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
 
   const isCompose = deployment.buildStrategy === "COMPOSE";
   const defaultService = deployment.strategyConfig.composeWebService ?? "";
-  const defaultPort = deployment.webServicePort ?? 80;
+  // Port binding lives entirely here now: the fallback for a domain without an explicit port is the
+  // first container's first exposed port (matching how the backend resolves it), else 80.
+  const defaultPort = (containers ?? [])[0]?.exposedPorts[0] ?? 80;
 
   // Service options come from the running containers (plus whatever domains already reference and
   // the configured default), so the service is always picked from a list rather than typed.
@@ -305,12 +301,27 @@ function DomainDialog({
               label="Service"
               value={service}
               onChange={(event) => setService(event.target.value)}
+              slotProps={{
+                select: {
+                  renderValue: (v) =>
+                    serviceOptions.find((option) => option.value === (v as string))?.label ??
+                    (v as string),
+                },
+              }}
             >
-              {serviceOptions.map((option) => (
-                <MenuItem key={option.value || "default"} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
+              {serviceOptions.map((option) => {
+                const match = containers.find((c) => (c.service ?? "") === option.value);
+
+                return (
+                  <MenuItem key={option.value || "default"} value={option.value}>
+                    <SelectOption
+                      title={option.label}
+                      status={match ? <RunningChip running={match.running} /> : undefined}
+                      caption={match?.image}
+                    />
+                  </MenuItem>
+                );
+              })}
             </TextField>
           )}
 

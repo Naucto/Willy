@@ -1,27 +1,56 @@
-import { Alert, Box, Stack } from "@mui/material";
+import { Box, Chip, CircularProgress, Stack } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import type { Container } from "../api/types";
+import { useDeploymentContainers } from "../api/hooks";
 
 interface NetworkRow {
-  name: string;
-  ip: string;
+  id: string;
+  container: string;
+  networks: string;
+  ports: number[];
 }
 
-// Read-only view of a container's networks + IPs. (Attach/detach is a later iteration.)
-export function NetworkingTab({ container }: { container?: Container | undefined }) {
-  if (!container) {
-    return <Alert severity="info">No running container — networking appears once it's up.</Alert>;
-  }
+// Read-only overview of every container's network attachments, assigned IPs, and the ports its
+// image exposes — so it's clear which container maps to what. (Attach/detach is a later iteration.)
+export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
+  const { data: containers, isLoading } = useDeploymentContainers(deploymentId);
 
-  const rows: NetworkRow[] = container.networks.map((net) => ({
-    name: net.name,
-    ip: net.ip ?? "—",
+  const rows: NetworkRow[] = (containers ?? []).map((container) => ({
+    id: container.id,
+    container: container.name,
+    networks:
+      container.networks.map((net) => (net.ip ? `${net.name} (${net.ip})` : net.name)).join(", ") ||
+      "—",
+    ports: container.exposedPorts,
   }));
 
   const columns: GridColDef<NetworkRow>[] = [
-    { field: "name", headerName: "Network", flex: 1, minWidth: 220 },
-    { field: "ip", headerName: "IP address", width: 200 },
+    { field: "container", headerName: "Container", flex: 1, minWidth: 200 },
+    { field: "networks", headerName: "Networks", flex: 1, minWidth: 220 },
+    {
+      field: "ports",
+      headerName: "Exposed ports",
+      width: 200,
+      sortable: false,
+      renderCell: (params) =>
+        params.row.ports.length > 0 ? (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, py: 0.5 }}>
+            {params.row.ports.map((port) => (
+              <Chip key={port} label={port} size="small" variant="outlined" />
+            ))}
+          </Box>
+        ) : (
+          "—"
+        ),
+    },
   ];
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Stack spacing={2}>
@@ -29,18 +58,22 @@ export function NetworkingTab({ container }: { container?: Container | undefined
         <DataGrid
           rows={rows}
           columns={columns}
-          getRowId={(row) => row.name}
+          getRowId={(row) => row.id}
           density="compact"
           autoHeight
           hideFooter
+          getRowHeight={() => "auto"}
           disableRowSelectionOnClick
-          localeText={{ noRowsLabel: "This container isn't attached to any network." }}
+          localeText={{
+            noRowsLabel: "No running containers — networking appears once they're up.",
+          }}
           sx={{ border: 0 }}
         />
       </Box>
 
       <Box sx={{ fontSize: 12, color: "text.secondary" }}>
-        Networks for {container.name}. Attach/detach is a later iteration.
+        Each container's networks, assigned IPs, and the ports its image exposes. Attach/detach is a
+        later iteration.
       </Box>
     </Stack>
   );
