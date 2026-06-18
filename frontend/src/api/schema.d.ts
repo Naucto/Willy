@@ -385,7 +385,7 @@ export interface paths {
     delete: operations["EnvVarsController_remove"];
     options?: never;
     head?: never;
-    patch?: never;
+    patch: operations["EnvVarsController_updateMeta"];
     trace?: never;
   };
   "/git/branches": {
@@ -900,6 +900,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/admin/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getSettings"];
+    put: operations["AdminController_updateSettings"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["StatsController_deploymentStats"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["StatsController_systemStats"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["TasksController_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/audit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AuditController_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1205,9 +1285,16 @@ export interface components {
       /** @enum {string} */
       scope: "BUILD" | "RUNTIME" | "BOTH";
       isSecret: boolean;
+      /** @description Plaintext value, or null for secrets. */
+      value: string | null;
     };
     SetEnvVarDto: {
       value: string;
+      /** @enum {string} */
+      scope?: "BUILD" | "RUNTIME" | "BOTH";
+      isSecret?: boolean;
+    };
+    UpdateEnvVarMetaDto: {
       /** @enum {string} */
       scope?: "BUILD" | "RUNTIME" | "BOTH";
       isSecret?: boolean;
@@ -1424,6 +1511,8 @@ export interface components {
       deployments: components["schemas"]["DeploymentRefDto"][];
       /** @description Number of containers based on this image. */
       activeContainersCount: number;
+      /** @description Built by Willy or run by a managed deployment. */
+      managed: boolean;
     };
     PruneResultDto: {
       /** @description Bytes reclaimed by the prune operation. */
@@ -1443,6 +1532,92 @@ export interface components {
       /** @description Unix timestamp when the container was created. */
       created: number;
       deployment?: components["schemas"]["DeploymentRefDto"] | null;
+      /** @description Belongs to a Willy-managed deployment. */
+      managed: boolean;
+    };
+    AppSettingsDto: {
+      /** @description Show all host containers/images on the Images/Containers pages, not only Willy-managed ones. */
+      showAllResources: boolean;
+    };
+    UpdateAppSettingsDto: {
+      showAllResources?: boolean;
+    };
+    VolumeUsageDto: {
+      name: string;
+      bytes: number;
+    };
+    ContainerStatDto: {
+      id: string;
+      name: string;
+      /** @description CPU usage as a percentage of one core. */
+      cpuPercent: number;
+      memUsageBytes: number;
+    };
+    DeploymentStatsDto: {
+      /** @description Sum of CPU% across the deployment's containers. */
+      cpuPercent: number;
+      /** @description Configured CPU limit in cores. */
+      cpuCores: number | null;
+      memUsageBytes: number;
+      /** @description Configured memory limit in bytes. */
+      memLimitBytes: number | null;
+      swapBytes: number;
+      /** @description Named volumes + container writable layers. */
+      storageBytes: number;
+      volumes: components["schemas"]["VolumeUsageDto"][];
+      containers: components["schemas"]["ContainerStatDto"][];
+    };
+    DiskUsageDto: {
+      imagesBytes: number;
+      containersBytes: number;
+      volumesBytes: number;
+      buildCacheBytes: number;
+    };
+    SystemStatsDto: {
+      /** @description Host logical CPU count. */
+      cpus: number;
+      /** @description Host total memory in bytes. */
+      memTotalBytes: number;
+      /** @description Sum of CPU% across all running containers. */
+      cpuPercent: number;
+      /** @description Sum of memory used across all running containers. */
+      memUsageBytes: number;
+      disk: components["schemas"]["DiskUsageDto"];
+    };
+    TaskDto: {
+      id: string;
+      /** @enum {string} */
+      kind:
+        | "DEPLOY"
+        | "BACKUP"
+        | "RESTORE"
+        | "OFFSITE_PUSH"
+        | "VOLUME_RESET"
+        | "PRUNE_IMAGES"
+        | "PRUNE_CONTAINERS";
+      /** @enum {string} */
+      status: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
+      title: string;
+      deploymentId: string | null;
+      /** @description 0–100, or null when indeterminate. */
+      progress: number | null;
+      errorMessage: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      finishedAt: string | null;
+    };
+    AuditLogDto: {
+      id: string;
+      actorId: string | null;
+      /** @description Acting user's email, if known. */
+      actorEmail: string | null;
+      action: string;
+      targetType: string | null;
+      targetId: string | null;
+      ip: string | null;
+      /** Format: date-time */
+      createdAt: string;
     };
   };
   responses: never;
@@ -2223,6 +2398,32 @@ export interface operations {
       };
     };
   };
+  EnvVarsController_updateMeta: {
+    parameters: {
+      query?: {
+        service?: string;
+      };
+      header?: never;
+      path: {
+        key: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateEnvVarMetaDto"];
+      };
+    };
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   GitController_branches: {
     parameters: {
       query?: never;
@@ -2521,7 +2722,9 @@ export interface operations {
   };
   BackupsController_list: {
     parameters: {
-      query?: never;
+      query?: {
+        deploymentId?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2665,7 +2868,9 @@ export interface operations {
   };
   BackupSchedulesController_list: {
     parameters: {
-      query?: never;
+      query?: {
+        deploymentId?: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2901,7 +3106,9 @@ export interface operations {
   };
   AdminController_getImages: {
     parameters: {
-      query?: never;
+      query?: {
+        all?: boolean;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2960,7 +3167,9 @@ export interface operations {
   };
   AdminController_getContainers: {
     parameters: {
-      query?: never;
+      query?: {
+        all?: boolean;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -2992,6 +3201,128 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PruneResultDto"];
+        };
+      };
+    };
+  };
+  AdminController_getSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AppSettingsDto"];
+        };
+      };
+    };
+  };
+  AdminController_updateSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateAppSettingsDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AppSettingsDto"];
+        };
+      };
+    };
+  };
+  StatsController_deploymentStats: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeploymentStatsDto"];
+        };
+      };
+    };
+  };
+  StatsController_systemStats: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SystemStatsDto"];
+        };
+      };
+    };
+  };
+  TasksController_list: {
+    parameters: {
+      query?: {
+        scope?: "active" | "recent";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TaskDto"][];
+        };
+      };
+    };
+  };
+  AuditController_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuditLogDto"][];
         };
       };
     };

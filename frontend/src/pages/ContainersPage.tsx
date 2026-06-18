@@ -5,7 +5,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { useAdminContainers, usePruneContainers } from "../api/hooks";
+import { useAdminContainers, useAppSettings, usePruneContainers } from "../api/hooks";
 import type { AdminContainer } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { describeError } from "../errors";
@@ -24,7 +24,9 @@ export function ContainersPage() {
   const { enqueueSnackbar } = useSnackbar();
   const [pruneConfirm, setPruneConfirm] = useState(false);
 
-  const { data: containers, isLoading, error } = useAdminContainers();
+  const { data: settings } = useAppSettings();
+  const showAll = settings?.showAllResources ?? false;
+  const { data: containers, isLoading, error } = useAdminContainers(showAll);
   const pruneContainers = usePruneContainers();
 
   const stoppedCount = (containers ?? []).filter((c) => c.state !== "running").length;
@@ -153,7 +155,9 @@ export function ContainersPage() {
   return (
     <Stack spacing={3}>
       <Box sx={{ display: "flex", alignItems: "center" }}>
-        <Typography variant="h5">Containers</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          Containers
+        </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <Button
           variant="outlined"

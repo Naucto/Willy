@@ -30,6 +30,8 @@ import {
   releaseStatusEnum,
   restartPolicyEnum,
   roleEnum,
+  taskKindEnum,
+  taskStatusEnum,
 } from "./enums";
 
 const createdAt = timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -302,6 +304,35 @@ export const backupSchedules = pgTable("backup_schedules", {
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
   createdAt,
 });
+
+// Global, admin-editable panel preferences as a small key→JSON store, so new toggles don't each
+// need a migration. Defaults live in code (SettingsService); a row exists only once overridden.
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt,
+});
+
+// Long-running administrative operations (deploys, backups, prunes, …) surfaced in the top-bar
+// activity tracker. A thin activity record alongside the operation's own status (releases/backups),
+// not a replacement for it. `progress` is null when the operation can't report determinate progress.
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: taskKindEnum("kind").notNull(),
+    status: taskStatusEnum("status").notNull().default("PENDING"),
+    title: text("title").notNull(),
+    deploymentId: uuid("deployment_id").references(() => deployments.id, { onDelete: "set null" }),
+    actorId: uuid("actor_id"),
+    progress: integer("progress"),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index("tasks_created_idx").on(t.createdAt), index("tasks_status_idx").on(t.status)],
+);
 
 export const auditLogs = pgTable(
   "audit_logs",

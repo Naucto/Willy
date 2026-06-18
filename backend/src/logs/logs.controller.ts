@@ -20,6 +20,10 @@ interface LogEvent {
   data: string;
 }
 
+// Final frame sent before completing a build-log stream, so the client can tell a normal end
+// (build finished) from a dropped connection and never render it as an error.
+export const LOG_STREAM_EOF = "__willy_eof__";
+
 // SSE streams are consumed by a fetch-based reader on the client (so the bearer token can be sent),
 // not the generated OpenAPI client — hence excluded from the spec. Both endpoints replay the
 // durable history first (survives restarts / stopped containers) then stream live lines.
@@ -55,8 +59,12 @@ export class LogsController {
 
         if (this.buildLog.isLive(id)) {
           detachLine = this.buildLog.onLine(id, (line) => subscriber.next({ data: line }));
-          detachDone = this.buildLog.onDone(id, () => subscriber.complete());
+          detachDone = this.buildLog.onDone(id, () => {
+            subscriber.next({ data: LOG_STREAM_EOF });
+            subscriber.complete();
+          });
         } else {
+          subscriber.next({ data: LOG_STREAM_EOF });
           subscriber.complete();
         }
       })().catch((error: unknown) => {

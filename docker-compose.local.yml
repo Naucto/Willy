@@ -17,3 +17,23 @@ services:
     # Bind to localhost on a non-default port to avoid clashing with a host Postgres.
     ports:
       - "127.0.0.1:5433:5432"
+
+  # Dev-only FTP target for exercising offsite backup push. Lives on willy_internal so the offsite
+  # helper (which now joins that network) reaches it by name. ADDRESS=ftp makes passive-mode replies
+  # advertise the container's own resolvable name. Add an FTP destination in the panel with
+  # host "ftp", port 21, user "willy", password "willy".
+  ftp:
+    image: delfer/alpine-ftp-server:latest
+    restart: unless-stopped
+    environment:
+      USERS: "willy|willy|/ftp/willy"
+      ADDRESS: ftp
+    volumes:
+      - ftp-data:/ftp/willy
+    networks:
+      - willy_internal
+    labels:
+      willy.internal: "true"
+
+volumes:
+  ftp-data:

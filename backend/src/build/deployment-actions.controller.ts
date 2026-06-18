@@ -1,8 +1,18 @@
-import { Controller, Delete, Get, HttpCode, NotFoundException, Param, Post } from "@nestjs/common";
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Ip,
+  NotFoundException,
+  Param,
+  Post,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/jwt-payload.interface";
+import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { BuildOrchestrator } from "./build-orchestrator.service";
@@ -35,6 +45,7 @@ export class DeploymentActionsController {
     private readonly releases: ReleasesService,
     private readonly cron: CronService,
     private readonly cronRuns: CronRunsService,
+    private readonly audit: AuditService,
   ) {}
 
   @Roles("ADMIN", "OPERATOR")
@@ -57,16 +68,40 @@ export class DeploymentActionsController {
   @HttpCode(202)
   @ApiOkResponse({ type: ReleaseDto })
   @Post("deployments/:id/deploy")
-  deploy(@Param("id") id: string, @CurrentUser() user: AuthUser): Promise<Release> {
-    return this.orchestrator.deploy(id, user.userId);
+  async deploy(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<Release> {
+    const release = await this.orchestrator.deploy(id, user.userId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "DEPLOY",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
+
+    return release;
   }
 
   @Roles("ADMIN", "OPERATOR")
   @HttpCode(202)
   @ApiOkResponse({ type: OkResponseDto })
   @Post("deployments/:id/stop")
-  async stop(@Param("id") id: string): Promise<{ ok: true }> {
+  async stop(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
     await this.orchestrator.stop(id);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "STOP",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }
@@ -75,8 +110,19 @@ export class DeploymentActionsController {
   @HttpCode(202)
   @ApiOkResponse({ type: OkResponseDto })
   @Post("deployments/:id/start")
-  async start(@Param("id") id: string): Promise<{ ok: true }> {
+  async start(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
     await this.orchestrator.start(id);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "START",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }
@@ -85,8 +131,19 @@ export class DeploymentActionsController {
   @HttpCode(202)
   @ApiOkResponse({ type: OkResponseDto })
   @Post("deployments/:id/restart")
-  async restart(@Param("id") id: string): Promise<{ ok: true }> {
+  async restart(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
     await this.orchestrator.restart(id);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "REDEPLOY",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }
@@ -99,8 +156,18 @@ export class DeploymentActionsController {
   async rollback(
     @Param("id") id: string,
     @Param("releaseId") releaseId: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
   ): Promise<{ ok: true }> {
     await this.orchestrator.rollback(id, releaseId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "ROLLBACK",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+      metadata: { releaseId },
+    });
 
     return { ok: true };
   }

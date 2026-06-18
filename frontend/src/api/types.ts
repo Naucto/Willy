@@ -11,6 +11,7 @@ export type AuthUser = components["schemas"]["AuthUserDto"];
 export type CreateDeploymentInput = components["schemas"]["CreateDeploymentDto"];
 export type UpdateDeploymentInput = components["schemas"]["UpdateDeploymentDto"];
 export type SetEnvVarInput = components["schemas"]["SetEnvVarDto"];
+export type UpdateEnvVarMetaInput = components["schemas"]["UpdateEnvVarMetaDto"];
 export type WebhookStatus = components["schemas"]["WebhookStatusDto"];
 export type WebhookSecret = components["schemas"]["WebhookSecretDto"];
 
@@ -40,6 +41,12 @@ export type DeclaredHealthcheck = components["schemas"]["DeclaredHealthcheckDto"
 export type AdminImage = components["schemas"]["AdminImageDto"];
 export type AdminContainer = components["schemas"]["AdminContainerDto"];
 export type AdminPruneResult = components["schemas"]["PruneResultDto"];
+export type AppSettings = components["schemas"]["AppSettingsDto"];
+export type UpdateAppSettings = components["schemas"]["UpdateAppSettingsDto"];
+export type DeploymentStats = components["schemas"]["DeploymentStatsDto"];
+export type SystemStats = components["schemas"]["SystemStatsDto"];
+export type Task = components["schemas"]["TaskDto"];
+export type AuditLog = components["schemas"]["AuditLogDto"];
 export type DeploymentRef = components["schemas"]["DeploymentRefDto"];
 
 export type DeploymentType = Deployment["type"];

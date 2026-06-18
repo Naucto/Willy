@@ -11,6 +11,7 @@ import { WillyError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
+import { INTERNAL_LABEL } from "../traefik/label-generator.service";
 import { backups } from "../db/schema";
 import { ContainersService } from "../containers/containers.service";
 import { BackupQueue } from "./backup-queue";
@@ -20,6 +21,7 @@ import {
   type DestinationType,
 } from "./destinations.service";
 import { OffsiteService } from "./offsite/offsite.service";
+import { TasksService } from "../tasks/tasks.service";
 
 export class BackupError extends WillyError {}
 
@@ -31,6 +33,7 @@ export interface CreateBackupInput {
   kind: Backup["kind"];
   target: string;
   deploymentId?: string;
+  actorId?: string | null;
 }
 
 function describeError(error: unknown): string {
@@ -55,6 +58,7 @@ export class BackupsService {
     private readonly containers: ContainersService,
     private readonly destinations: BackupDestinationsService,
     private readonly offsite: OffsiteService,
+    private readonly tasks: TasksService,
     config: ConfigService,
   ) {
     this.dir = config.get<string>("BACKUPS_DIR") ?? "/var/lib/willy/backups";
@@ -65,7 +69,15 @@ export class BackupsService {
     return this.docker.listVolumes();
   }
 
-  list(): Promise<Backup[]> {
+  list(deploymentId?: string): Promise<Backup[]> {
+    if (deploymentId) {
+      return this.db
+        .select()
+        .from(backups)
+        .where(eq(backups.deploymentId, deploymentId))
+        .orderBy(desc(backups.createdAt));
+    }
+
     return this.db.select().from(backups).orderBy(desc(backups.createdAt));
   }
 
@@ -100,9 +112,31 @@ export class BackupsService {
       throw new BackupError("Failed to record backup");
     }
 
-    this.queue.enqueue(input.target, () => this.runVolumeTar(row.id, input.target));
+    const task = await this.tasks.create({
+      kind: "BACKUP",
+      title: `Back up ${input.target}`,
+      deploymentId: input.deploymentId ?? null,
+      actorId: input.actorId ?? null,
+    });
+
+    this.enqueueTracked(input.target, task.id, () => this.runVolumeTar(row.id, input.target));
 
     return row;
+  }
+
+  // Enqueues queued work whose lifecycle is mirrored onto an activity task (start → succeed/fail).
+  private enqueueTracked(key: string, taskId: string, work: () => Promise<void>): void {
+    this.queue.enqueue(key, async () => {
+      await this.tasks.start(taskId);
+
+      try {
+        await work();
+        await this.tasks.succeed(taskId);
+      } catch (error) {
+        await this.tasks.fail(taskId, describeError(error));
+        throw error;
+      }
+    });
   }
 
   // Prune a target's SUCCESS backups down to the newest `keep`, deleting artifacts + rows.
@@ -117,7 +151,11 @@ export class BackupsService {
 
   // Push a finished artifact to an offsite destination (S3 / FTP / SFTP / SSH). Runs in the
   // background; offsiteUrl is set on success.
-  async pushOffsite(backupId: string, destinationId: string): Promise<void> {
+  async pushOffsite(
+    backupId: string,
+    destinationId: string,
+    actorId?: string | null,
+  ): Promise<void> {
     const backup = await this.get(backupId);
 
     if (backup.status !== "SUCCESS" || !backup.location || !backup.target) {
@@ -127,7 +165,14 @@ export class BackupsService {
     const { type, config } = await this.destinations.resolve(destinationId);
     const { target, location } = backup;
 
-    this.queue.enqueue(target, () => this.runOffsite(backupId, location, type, config));
+    const task = await this.tasks.create({
+      kind: "OFFSITE_PUSH",
+      title: `Push ${target} offsite`,
+      deploymentId: backup.deploymentId,
+      actorId: actorId ?? null,
+    });
+
+    this.enqueueTracked(target, task.id, () => this.runOffsite(backupId, location, type, config));
   }
 
   async remove(id: string): Promise<void> {
@@ -151,7 +196,7 @@ export class BackupsService {
   }
 
   // Restore an artifact back into the volume it came from, on the deployment it belongs to.
-  async restore(id: string): Promise<void> {
+  async restore(id: string, actorId?: string | null): Promise<void> {
     const row = await this.get(id);
 
     if (row.status !== "SUCCESS" || !row.location || !row.target || !row.deploymentId) {
@@ -161,14 +206,28 @@ export class BackupsService {
     const deployment = await this.requireDeployment(row.deploymentId);
     const { target, location } = row;
 
-    this.queue.enqueue(target, () => this.runVolumeOp(deployment, target, location));
+    const task = await this.tasks.create({
+      kind: "RESTORE",
+      title: `Restore ${target}`,
+      deploymentId: row.deploymentId,
+      actorId: actorId ?? null,
+    });
+
+    this.enqueueTracked(target, task.id, () => this.runVolumeOp(deployment, target, location));
   }
 
   // Wipe a deployment volume back to empty.
-  async resetVolume(deploymentId: string, volume: string): Promise<void> {
+  async resetVolume(deploymentId: string, volume: string, actorId?: string | null): Promise<void> {
     const deployment = await this.requireDeployment(deploymentId);
 
-    this.queue.enqueue(volume, () => this.runVolumeOp(deployment, volume));
+    const task = await this.tasks.create({
+      kind: "VOLUME_RESET",
+      title: `Reset volume ${volume}`,
+      deploymentId,
+      actorId: actorId ?? null,
+    });
+
+    this.enqueueTracked(volume, task.id, () => this.runVolumeOp(deployment, volume));
   }
 
   private async runVolumeTar(id: string, target: string): Promise<void> {
@@ -184,6 +243,7 @@ export class BackupsService {
         image: "alpine:3.20",
         binds: [`${target}:/data:ro`, `${this.volume}:/backup`],
         command: ["sh", "-c", `tar -czf /backup/${file} -C /data .`],
+        labels: { [INTERNAL_LABEL]: "true" },
       });
 
       if (result.exitCode !== 0) {
@@ -264,6 +324,7 @@ export class BackupsService {
         image: "alpine:3.20",
         binds,
         command: ["sh", "-c", command],
+        labels: { [INTERNAL_LABEL]: "true" },
       });
 
       if (result.exitCode !== 0) {

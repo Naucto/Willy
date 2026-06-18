@@ -1,5 +1,22 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import {
@@ -28,10 +45,11 @@ function toDto(row: BackupSchedule): BackupScheduleDto {
 export class BackupSchedulesController {
   constructor(private readonly schedules: BackupSchedulesService) {}
 
+  @ApiQuery({ name: "deploymentId", required: false, type: String })
   @ApiOkResponse({ type: [BackupScheduleDto] })
   @Get()
-  async list(): Promise<BackupScheduleDto[]> {
-    return (await this.schedules.list()).map(toDto);
+  async list(@Query("deploymentId") deploymentId?: string): Promise<BackupScheduleDto[]> {
+    return (await this.schedules.list(deploymentId)).map(toDto);
   }
 
   @Roles("ADMIN", "OPERATOR")

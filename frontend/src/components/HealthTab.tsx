@@ -109,7 +109,6 @@ function DeploymentHealth({
 
   return (
     <HealthForm
-      title="Container"
       initial={{
         restartPolicy: (deployment.restartPolicy as RestartPolicy) ?? "UNLESS_STOPPED",
         healthcheck: deployment.healthcheck ?? null,
@@ -169,7 +168,6 @@ function ComposeServiceHealth({
 
   return (
     <HealthForm
-      title={`Service: ${service}`}
       initial={{
         restartPolicy: (data.restartPolicy as RestartPolicy) ?? "UNLESS_STOPPED",
         healthcheck: data.healthcheck ?? null,
@@ -185,7 +183,6 @@ function ComposeServiceHealth({
 }
 
 function HealthForm({
-  title,
   initial,
   declared,
   runtimeHealth,
@@ -193,7 +190,6 @@ function HealthForm({
   saving,
   onSave,
 }: {
-  title: string;
   initial: HealthValues;
   declared: DeclaredHealthcheck | null;
   runtimeHealth: string | null;
@@ -227,10 +223,6 @@ function HealthForm({
 
   return (
     <Stack spacing={0} sx={{ maxWidth: 760 }}>
-      <Typography variant="overline" color="text.secondary" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-
       <SettingRow
         label="Restart policy"
         description="How the container is restarted when it exits or the host daemon restarts."

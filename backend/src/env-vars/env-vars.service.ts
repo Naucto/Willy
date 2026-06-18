@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
@@ -11,12 +11,24 @@ export interface MaskedEnvVar {
   key: string;
   scope: EnvScope;
   isSecret: boolean;
+  // Plaintext for regular vars; null for secrets (never returned in plaintext).
+  value: string | null;
 }
 
 export interface SetEnvVarInput {
   scope?: EnvScope | undefined;
   isSecret?: boolean | undefined;
   targetService?: string | undefined;
+}
+
+export interface UpdateEnvVarMetaInput {
+  scope?: EnvScope | undefined;
+  isSecret?: boolean | undefined;
+}
+
+// A secret's value is never exposed; a regular var shows its value. Pure for unit-testing.
+export function maskedEnvValue(isSecret: boolean, value: string): string | null {
+  return isSecret ? null : value;
 }
 
 @Injectable()
@@ -64,12 +76,76 @@ export class EnvVarsService {
       );
   }
 
-  // Reads never expose plaintext values. Scoped to a service ("" = deployment-wide/shared).
+  // Lists vars for a service ("" = deployment-wide/shared). Regular vars carry their plaintext
+  // value; secrets are returned with value === null.
   async listMasked(deploymentId: string, targetService = ""): Promise<MaskedEnvVar[]> {
-    return this.db
-      .select({ key: envVars.key, scope: envVars.scope, isSecret: envVars.isSecret })
+    const rows = await this.db
+      .select()
       .from(envVars)
       .where(and(eq(envVars.deploymentId, deploymentId), eq(envVars.targetService, targetService)));
+
+    return rows.map((row) => ({
+      key: row.key,
+      scope: row.scope,
+      isSecret: row.isSecret,
+      value: maskedEnvValue(
+        row.isSecret,
+        row.isSecret
+          ? ""
+          : this.crypto.decrypt({
+              cipherText: row.cipherText,
+              nonce: row.nonce,
+              authTag: row.authTag,
+              keyVersion: row.keyVersion,
+            }),
+      ),
+    }));
+  }
+
+  // Changes a var's scope and/or type without re-supplying the value. Converting a secret to a
+  // regular var is refused here — that must go through `set` with a fresh value, so a stored secret
+  // is never auto-revealed.
+  async updateMeta(
+    deploymentId: string,
+    key: string,
+    targetService: string,
+    input: UpdateEnvVarMetaInput,
+  ): Promise<void> {
+    const [row] = await this.db
+      .select({ isSecret: envVars.isSecret })
+      .from(envVars)
+      .where(
+        and(
+          eq(envVars.deploymentId, deploymentId),
+          eq(envVars.targetService, targetService),
+          eq(envVars.key, key),
+        ),
+      );
+
+    if (!row) {
+      throw new BadRequestException("Variable not found");
+    }
+
+    if (row.isSecret && input.isSecret === false) {
+      throw new BadRequestException(
+        "Converting a secret to a regular variable requires a new value",
+      );
+    }
+
+    await this.db
+      .update(envVars)
+      .set({
+        ...(input.scope !== undefined ? { scope: input.scope } : {}),
+        ...(input.isSecret !== undefined ? { isSecret: input.isSecret } : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(envVars.deploymentId, deploymentId),
+          eq(envVars.targetService, targetService),
+          eq(envVars.key, key),
+        ),
+      );
   }
 
   // Distinct compose services that have service-specific vars (excludes the "" shared scope).

@@ -186,6 +186,7 @@ export class ComposeService {
       ["-p", project, ...files, "up", "-d", "--build", "--remove-orphans"],
       dir,
       onLog,
+      await this.interpolationEnv(deployment),
     );
 
     return { project, services: sanitized.services, defaultService };
@@ -301,8 +302,24 @@ export class ComposeService {
     await writeFile(join(dir, OVERRIDE_FILE), toYaml(override), "utf8");
   }
 
-  private runCompose(args: string[], dir: string, onLog: (line: string) => void): Promise<void> {
-    const child = spawn("docker", ["compose", ...args], { cwd: dir, env: this.env() });
+  // The deployment-wide env vars, exposed to the `docker compose` process so `${VAR}` references in
+  // the compose file interpolate (otherwise compose warns "variable is not set"). Both phases are
+  // merged since interpolation is file-global, not build/runtime-specific. Passed via the process
+  // env (not a .env file) so secrets never touch disk and arbitrary values need no escaping.
+  private async interpolationEnv(deployment: Deployment): Promise<Record<string, string>> {
+    return {
+      ...(await this.envVars.resolveForInjection(deployment.id, "BUILD")),
+      ...(await this.envVars.resolveForInjection(deployment.id, "RUNTIME")),
+    };
+  }
+
+  private runCompose(
+    args: string[],
+    dir: string,
+    onLog: (line: string) => void,
+    extraEnv: Record<string, string> = {},
+  ): Promise<void> {
+    const child = spawn("docker", ["compose", ...args], { cwd: dir, env: this.env(extraEnv) });
 
     child.stdout.on("data", (chunk: Buffer) => this.emit(chunk, onLog));
     child.stderr.on("data", (chunk: Buffer) => this.emit(chunk, onLog));
@@ -321,9 +338,11 @@ export class ComposeService {
     });
   }
 
-  private env(): NodeJS.ProcessEnv {
+  // App env vars override the inherited process env, but Willy's docker control vars always win.
+  private env(extraEnv: Record<string, string> = {}): NodeJS.ProcessEnv {
     return {
       ...process.env,
+      ...extraEnv,
       DOCKER_HOST: this.dockerHost,
       DOCKER_BUILDKIT: "0",
       COMPOSE_BAKE: "false",

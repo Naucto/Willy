@@ -22,4 +22,7 @@ export class AdminImageDto {
 
   @ApiProperty({ type: Number, description: "Number of containers based on this image." })
   activeContainersCount!: number;
+
+  @ApiProperty({ type: Boolean, description: "Built by Willy or run by a managed deployment." })
+  managed!: boolean;
 }

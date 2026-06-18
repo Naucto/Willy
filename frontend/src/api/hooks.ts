@@ -12,9 +12,11 @@ import type {
   ResourceLimits,
   Role,
   SetEnvVarInput,
+  UpdateAppSettings,
   UpdateDeploymentInput,
   UpdateDnsRecordInput,
   UpdateDomainTargetInput,
+  UpdateEnvVarMetaInput,
 } from "./types";
 
 export const queryKeys = {
@@ -140,10 +142,15 @@ export function useDiscoverBranches() {
   });
 }
 
-export function useBackups() {
+export function useBackups(deploymentId?: string) {
   return useQuery({
-    queryKey: ["backups"],
-    queryFn: async () => unwrap(await api.GET("/backups")),
+    queryKey: deploymentId ? ["backups", "deployment", deploymentId] : ["backups"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/backups", {
+          ...(deploymentId ? { params: { query: { deploymentId } } } : {}),
+        }),
+      ),
     // Reflect PENDING → RUNNING → SUCCESS without manual refresh.
     refetchInterval: 4000,
   });
@@ -243,10 +250,17 @@ export function usePushBackup() {
   });
 }
 
-export function useBackupSchedules() {
+export function useBackupSchedules(deploymentId?: string) {
   return useQuery({
-    queryKey: ["backups", "schedules"],
-    queryFn: async () => unwrap(await api.GET("/backups/schedules")),
+    queryKey: deploymentId
+      ? ["backups", "schedules", "deployment", deploymentId]
+      : ["backups", "schedules"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/backups/schedules", {
+          ...(deploymentId ? { params: { query: { deploymentId } } } : {}),
+        }),
+      ),
   });
 }
 
@@ -729,6 +743,21 @@ export function useSetEnvVar(id: string, service = "") {
   });
 }
 
+export function useUpdateEnvVarMeta(id: string, service = "") {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { key: string; body: UpdateEnvVarMetaInput }) =>
+      unwrap(
+        await api.PATCH("/deployments/{id}/env/{key}", {
+          params: { path: { id, key: input.key }, query: { service } },
+          body: input.body,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
+  });
+}
+
 export function useDeleteEnvVar(id: string, service = "") {
   const queryClient = useQueryClient();
 
@@ -749,10 +778,10 @@ function invalidateDeployment(queryClient: ReturnType<typeof useQueryClient>, id
   void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
 }
 
-export function useAdminImages() {
+export function useAdminImages(all = false) {
   return useQuery({
-    queryKey: ["admin", "images"],
-    queryFn: async () => unwrap(await api.GET("/admin/images")),
+    queryKey: ["admin", "images", { all }],
+    queryFn: async () => unwrap(await api.GET("/admin/images", { params: { query: { all } } })),
   });
 }
 
@@ -775,10 +804,10 @@ export function usePruneImages() {
   });
 }
 
-export function useAdminContainers() {
+export function useAdminContainers(all = false) {
   return useQuery({
-    queryKey: ["admin", "containers"],
-    queryFn: async () => unwrap(await api.GET("/admin/containers")),
+    queryKey: ["admin", "containers", { all }],
+    queryFn: async () => unwrap(await api.GET("/admin/containers", { params: { query: { all } } })),
   });
 }
 
@@ -788,5 +817,55 @@ export function usePruneContainers() {
   return useMutation({
     mutationFn: async () => unwrap(await api.POST("/admin/containers/prune")),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "containers"] }),
+  });
+}
+
+export function useAppSettings() {
+  return useQuery({
+    queryKey: ["admin", "settings"],
+    queryFn: async () => unwrap(await api.GET("/admin/settings")),
+  });
+}
+
+export function useDeploymentStats(id: string, enabled = true) {
+  return useQuery({
+    queryKey: ["deployments", id, "stats"],
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/stats", { params: { path: { id } } })),
+    enabled: enabled && Boolean(id),
+    refetchInterval: 4000,
+  });
+}
+
+export function useSystemStats() {
+  return useQuery({
+    queryKey: ["admin", "stats"],
+    queryFn: async () => unwrap(await api.GET("/admin/stats")),
+    refetchInterval: 5000,
+  });
+}
+
+export function useTasks(scope: "active" | "recent" = "recent") {
+  return useQuery({
+    queryKey: ["tasks", scope],
+    queryFn: async () => unwrap(await api.GET("/tasks", { params: { query: { scope } } })),
+    refetchInterval: 3000,
+  });
+}
+
+export function useAuditLogs() {
+  return useQuery({
+    queryKey: ["audit"],
+    queryFn: async () => unwrap(await api.GET("/audit")),
+  });
+}
+
+export function useUpdateAppSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: UpdateAppSettings) =>
+      unwrap(await api.PUT("/admin/settings", { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
   });
 }

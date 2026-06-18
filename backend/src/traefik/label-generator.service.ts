@@ -2,6 +2,10 @@ import { Injectable } from "@nestjs/common";
 
 export const OWNER_LABEL = "willy.deploymentId";
 
+// Marks a container as Willy's own infrastructure (control plane + throwaway helpers) so the admin
+// panel can hide it from the Images/Containers views by default.
+export const INTERNAL_LABEL = "willy.internal";
+
 // A domain's routing target: the compose service it points at (null = the deployment's single
 // container) and the internal port (null = fall back to the deployment's default port).
 export interface DomainTarget {

@@ -1,5 +1,6 @@
 import { WillyError } from "../../common/errors";
 import type { DockerService, OneShotOptions } from "../../docker/docker.service";
+import { INTERNAL_LABEL } from "../../traefik/label-generator.service";
 import type { DestinationConfig, DestinationType } from "../destinations.service";
 
 export class OffsiteError extends WillyError {}
@@ -15,13 +16,20 @@ export interface OffsiteDriver {
   push(file: string, config: DestinationConfig): Promise<string>;
 }
 
-// Runs a helper container to completion and fails loudly on a non-zero exit.
+// Runs a helper container to completion and fails loudly on a non-zero exit. The helper joins
+// `network` (so destinations resolvable on a Willy network work) and is tagged internal so the
+// admin panel hides it.
 export async function runHelper(
   docker: DockerService,
   label: string,
+  network: string | undefined,
   options: OneShotOptions,
 ): Promise<void> {
-  const result = await docker.runToCompletion(options);
+  const result = await docker.runToCompletion({
+    ...options,
+    network,
+    labels: { [INTERNAL_LABEL]: "true", ...options.labels },
+  });
 
   if (result.exitCode !== 0) {
     throw new OffsiteError(

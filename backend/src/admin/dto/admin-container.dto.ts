@@ -22,4 +22,7 @@ export class AdminContainerDto {
 
   @ApiPropertyOptional({ type: () => DeploymentRefDto, nullable: true })
   deployment!: DeploymentRefDto | null;
+
+  @ApiProperty({ type: Boolean, description: "Belongs to a Willy-managed deployment." })
+  managed!: boolean;
 }

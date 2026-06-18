@@ -36,6 +36,7 @@ import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelect
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
+import { DeploymentBackupsTab } from "../components/DeploymentBackupsTab";
 import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { HealthTab } from "../components/HealthTab";
@@ -198,6 +199,7 @@ export function DeploymentDetailPage() {
         ))}
       {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
       {active === "volumes" && <VolumesTab deploymentId={id} />}
+      {active === "backups" && <DeploymentBackupsTab deploymentId={id} />}
       {active === "networking" && <NetworkingTab deploymentId={id} />}
       {active === "domains" && <DomainsManager deployment={deployment} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}

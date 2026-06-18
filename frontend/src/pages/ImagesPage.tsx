@@ -5,7 +5,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { useAdminImages, useDeleteAdminImage, usePruneImages } from "../api/hooks";
+import { useAdminImages, useAppSettings, useDeleteAdminImage, usePruneImages } from "../api/hooks";
 import type { AdminImage } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { describeError } from "../errors";
@@ -142,7 +142,9 @@ export function ImagesPage() {
   const [toDelete, setToDelete] = useState<AdminImage | null>(null);
   const [pruneConfirm, setPruneConfirm] = useState(false);
 
-  const { data: images, isLoading, error } = useAdminImages();
+  const { data: settings } = useAppSettings();
+  const showAll = settings?.showAllResources ?? false;
+  const { data: images, isLoading, error } = useAdminImages(showAll);
   const deleteImage = useDeleteAdminImage();
   const pruneImages = usePruneImages();
 
@@ -305,7 +307,9 @@ export function ImagesPage() {
   return (
     <Stack spacing={3}>
       <Box sx={{ display: "flex", alignItems: "center" }}>
-        <Typography variant="h5">Images</Typography>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          Images
+        </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <Button variant="outlined" onClick={() => setPruneConfirm(true)}>
           Prune dangling
@@ -314,13 +318,13 @@ export function ImagesPage() {
 
       {error && <Alert severity="error">{describeError(error)}</Alert>}
 
-      {images && images.length > 0 && (
+      {(images ?? []).length > 0 && (
         <Box>
           <Typography variant="overline" sx={{ color: "text.secondary" }}>
             Disk usage
           </Typography>
           <Box sx={{ mt: 1 }}>
-            <ImageSizeChart images={images} />
+            <ImageSizeChart images={images ?? []} />
           </Box>
         </Box>
       )}

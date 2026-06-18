@@ -1,11 +1,12 @@
 import { Box, Chip, CircularProgress, Stack } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useDeploymentContainers } from "../api/hooks";
+import type { Container } from "../api/types";
 
 interface NetworkRow {
   id: string;
   container: string;
-  networks: string;
+  networks: Container["networks"];
   ports: number[];
 }
 
@@ -17,15 +18,29 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
   const rows: NetworkRow[] = (containers ?? []).map((container) => ({
     id: container.id,
     container: container.name,
-    networks:
-      container.networks.map((net) => (net.ip ? `${net.name} (${net.ip})` : net.name)).join(", ") ||
-      "—",
+    networks: container.networks,
     ports: container.exposedPorts,
   }));
 
   const columns: GridColDef<NetworkRow>[] = [
     { field: "container", headerName: "Container", flex: 1, minWidth: 200 },
-    { field: "networks", headerName: "Networks", flex: 1, minWidth: 220 },
+    {
+      field: "networks",
+      headerName: "Networks",
+      flex: 1,
+      minWidth: 220,
+      sortable: false,
+      renderCell: (params) =>
+        params.row.networks.length > 0 ? (
+          <Box sx={{ display: "flex", flexDirection: "column", py: 0.5 }}>
+            {params.row.networks.map((net) => (
+              <Box key={net.name}>{net.ip ? `${net.name} (${net.ip})` : net.name}</Box>
+            ))}
+          </Box>
+        ) : (
+          "—"
+        ),
+    },
     {
       field: "ports",
       headerName: "Exposed ports",

@@ -22,6 +22,7 @@ import {
 } from "../api/hooks";
 import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { describeError } from "../errors";
+import { DeploymentUtilization } from "./ResourceUtilization";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 import { SettingRow } from "./SettingRow";
 
@@ -89,22 +90,27 @@ export function ResourcesTab({
   deployment: Deployment;
   container?: Container | undefined;
 }) {
-  if (deployment.buildStrategy === "COMPOSE") {
-    const service = container?.service ?? null;
-
-    if (!service) {
-      return (
+  const service = container?.service ?? null;
+  const form =
+    deployment.buildStrategy === "COMPOSE" ? (
+      service ? (
+        <ComposeServiceResources key={service} deploymentId={deployment.id} service={service} />
+      ) : (
         <Alert severity="info">
           Select a running container above to tune its resources. Each compose service is limited
           independently.
         </Alert>
-      );
-    }
+      )
+    ) : (
+      <DeploymentResources deployment={deployment} />
+    );
 
-    return <ComposeServiceResources key={service} deploymentId={deployment.id} service={service} />;
-  }
-
-  return <DeploymentResources deployment={deployment} />;
+  return (
+    <Stack spacing={3}>
+      <DeploymentUtilization deploymentId={deployment.id} />
+      {form}
+    </Stack>
+  );
 }
 
 function ComposeServiceResources({
@@ -135,14 +141,7 @@ function ComposeServiceResources({
     }
   };
 
-  return (
-    <ResourceForm
-      title={`Service: ${service}`}
-      initial={data}
-      saving={update.isPending}
-      onSave={onSave}
-    />
-  );
+  return <ResourceForm initial={data} saving={update.isPending} onSave={onSave} />;
 }
 
 function DeploymentResources({ deployment }: { deployment: Deployment }) {
@@ -174,18 +173,14 @@ function DeploymentResources({ deployment }: { deployment: Deployment }) {
     }
   };
 
-  return (
-    <ResourceForm title="Container" initial={initial} saving={update.isPending} onSave={onSave} />
-  );
+  return <ResourceForm initial={initial} saving={update.isPending} onSave={onSave} />;
 }
 
 function ResourceForm({
-  title,
   initial,
   saving,
   onSave,
 }: {
-  title: string;
   initial: ResourceLimits;
   saving: boolean;
   onSave: (limits: ResourceLimits) => Promise<void>;
@@ -213,10 +208,6 @@ function ResourceForm({
 
   return (
     <Stack spacing={0} sx={{ maxWidth: 760 }}>
-      <Typography variant="overline" color="text.secondary" sx={{ mb: 1 }}>
-        {title}
-      </Typography>
-
       <SettingRow
         label="Add capabilities"
         description="Linux capabilities to grant on top of Docker's defaults."

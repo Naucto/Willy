@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Put, Query } from "@nestjs/common";
 import {
   ApiBearerAuth,
   ApiBody,
@@ -9,8 +9,9 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { SetEnvVarDto } from "./dto/set-env-var.dto";
 import { MaskedEnvVarDto } from "./dto/masked-env-var.dto";
+import { SetEnvVarDto } from "./dto/set-env-var.dto";
+import { UpdateEnvVarMetaDto } from "./dto/update-env-var-meta.dto";
 import { type MaskedEnvVar, EnvVarsService } from "./env-vars.service";
 
 @ApiTags("env")
@@ -47,6 +48,25 @@ export class EnvVarsController {
       scope: dto.scope,
       isSecret: dto.isSecret,
       targetService: service ?? "",
+    });
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(204)
+  @ApiParam({ name: "key", type: String })
+  @ApiQuery({ name: "service", required: false, type: String })
+  @ApiBody({ type: UpdateEnvVarMetaDto })
+  @ApiNoContentResponse()
+  @Patch(":key")
+  async updateMeta(
+    @Param("id") deploymentId: string,
+    @Param("key") key: string,
+    @Body() dto: UpdateEnvVarMetaDto,
+    @Query("service") service?: string,
+  ): Promise<void> {
+    await this.envVars.updateMeta(deploymentId, key, service ?? "", {
+      scope: dto.scope,
+      isSecret: dto.isSecret,
     });
   }
 

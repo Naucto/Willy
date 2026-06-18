@@ -26,6 +26,7 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
         ]),
     { key: "env", label: "Environment" },
     { key: "volumes", label: "Volumes" },
+    { key: "backups", label: "Backups" },
     { key: "networking", label: "Networking" },
     ...(isWeb ? [{ key: "domains", label: "Domains" }] : []),
     { key: "resources", label: "Resources" },

@@ -1,8 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { eq, inArray, or } from "drizzle-orm";
+import { eq, inArray, isNotNull, or } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
 import { deployments, releases } from "../db/schema";
 import { DockerService } from "../docker/docker.service";
+import { OWNER_LABEL } from "../traefik/label-generator.service";
 import type { AdminContainerDto } from "./dto/admin-container.dto";
 import type { AdminImageDto } from "./dto/admin-image.dto";
 import type { DeploymentRefDto } from "./dto/deployment-ref.dto";
@@ -11,6 +12,29 @@ import type { PruneResultDto } from "./dto/prune-result.dto";
 // Image tags produced by Willy follow willy/<deploymentName>:<hash> — extract the name component.
 const WILLY_IMAGE_RE = /^willy\/([^:]+):/;
 
+// Images Willy itself builds for a deployment: "willy/<name>:<hash>" (single) or the compose project
+// prefix "willy_<name>-<service>". Note the control plane uses "willy-server"/"willy-web" (hyphen),
+// which deliberately does NOT match — that's infra, not a managed deployment image.
+const WILLY_BUILT_IMAGE_RE = /^willy[/_]/;
+
+// A container is Willy-managed when it belongs to a deployment — it maps to one through a release, or
+// carries the deploymentId owner label (covers the window before the release row is written).
+export function isManagedContainer(
+  labels: Record<string, string> | undefined,
+  deployment: DeploymentRefDto | null,
+): boolean {
+  return deployment !== null || Boolean(labels?.[OWNER_LABEL]);
+}
+
+// An image is Willy-managed when Willy built it for a deployment, or it's an external image a
+// deployment runs (IMAGE strategy) — i.e. referenced by some release's image tag.
+export function isManagedImage(
+  repoTags: readonly string[],
+  managedImageTags: ReadonlySet<string>,
+): boolean {
+  return repoTags.some((tag) => WILLY_BUILT_IMAGE_RE.test(tag) || managedImageTags.has(tag));
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -18,10 +42,22 @@ export class AdminService {
     private readonly docker: DockerService,
   ) {}
 
-  async getImages(): Promise<AdminImageDto[]> {
+  // By default only Willy-managed images are returned; `all` reveals every host image (e.g. so an
+  // admin can prune dangling/system images for disk).
+  async getImages(all = false): Promise<AdminImageDto[]> {
     const images = await this.docker.listAllImages();
 
-    // Collect unique deployment names referenced by willy/* tags.
+    // The set of image tags any deployment runs — covers IMAGE-strategy external refs (nginx:1.27)
+    // that aren't named willy/*.
+    const tagRows = await this.db
+      .selectDistinct({ imageTag: releases.imageTag })
+      .from(releases)
+      .where(isNotNull(releases.imageTag));
+    const managedImageTags = new Set(
+      tagRows.map((row) => row.imageTag).filter((tag): tag is string => Boolean(tag)),
+    );
+
+    // Collect unique deployment names referenced by willy/* tags (for the Deployments column).
     const allDeploymentNames = new Set<string>();
 
     for (const image of images) {
@@ -47,8 +83,16 @@ export class AdminService {
       }
     }
 
-    return images.map((image) => {
+    const result: AdminImageDto[] = [];
+
+    for (const image of images) {
       const repoTags = (image.RepoTags ?? []).filter((t) => t !== "<none>:<none>");
+      const managed = isManagedImage(repoTags, managedImageTags);
+
+      if (!all && !managed) {
+        continue;
+      }
+
       const imageDeploymentNames = new Set<string>();
 
       for (const tag of repoTags) {
@@ -63,7 +107,7 @@ export class AdminService {
         .map((name) => deploymentByName.get(name))
         .filter((d): d is DeploymentRefDto => d !== undefined);
 
-      return {
+      result.push({
         id: image.Id,
         repoTags,
         size: image.Size,
@@ -71,8 +115,11 @@ export class AdminService {
         created: image.Created,
         deployments: imageDeployments,
         activeContainersCount: image.Containers ?? 0,
-      };
-    });
+        managed,
+      });
+    }
+
+    return result;
   }
 
   async deleteImage(id: string): Promise<void> {
@@ -85,7 +132,9 @@ export class AdminService {
     return { spaceReclaimedBytes: result.spaceReclaimed, itemsRemoved: result.imagesDeleted };
   }
 
-  async getContainers(): Promise<AdminContainerDto[]> {
+  // By default only Willy-managed containers are returned; `all` reveals every host container
+  // (control plane, helpers, foreign containers) for pruning/inspection.
+  async getContainers(all = false): Promise<AdminContainerDto[]> {
     const allContainers = await this.docker.listAllContainers();
 
     if (allContainers.length === 0) {
@@ -132,13 +181,20 @@ export class AdminService {
       }
     }
 
-    return allContainers.map((container) => {
+    const result: AdminContainerDto[] = [];
+
+    for (const container of allContainers) {
       const composeProject = container.Labels?.["com.docker.compose.project"];
       const deployment =
         byContainerId.get(container.Id) ??
         (composeProject ? (byComposeProject.get(composeProject) ?? null) : null);
+      const managed = isManagedContainer(container.Labels, deployment);
 
-      return {
+      if (!all && !managed) {
+        continue;
+      }
+
+      result.push({
         id: container.Id,
         name: (container.Names[0] ?? "").replace(/^\//, ""),
         image: container.Image,
@@ -146,8 +202,11 @@ export class AdminService {
         status: container.Status,
         created: container.Created,
         deployment,
-      };
-    });
+        managed,
+      });
+    }
+
+    return result;
   }
 
   async pruneContainers(): Promise<PruneResultDto> {

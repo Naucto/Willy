@@ -1247,6 +1247,58 @@
           "env"
         ]
       },
+      "patch": {
+        "operationId": "EnvVarsController_updateMeta",
+        "parameters": [
+          {
+            "name": "service",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnvVarMetaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "env"
+        ]
+      },
       "delete": {
         "operationId": "EnvVarsController_remove",
         "parameters": [
@@ -1795,7 +1847,16 @@
     "/backups": {
       "get": {
         "operationId": "BackupsController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "deploymentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2025,7 +2086,16 @@
     "/backups/schedules": {
       "get": {
         "operationId": "BackupSchedulesController_list",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "deploymentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2407,7 +2477,16 @@
     "/admin/images": {
       "get": {
         "operationId": "AdminController_getImages",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2491,7 +2570,16 @@
     "/admin/containers": {
       "get": {
         "operationId": "AdminController_getContainers",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -2540,6 +2628,198 @@
         ],
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "AdminController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "AdminController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/deployments/{id}/stats": {
+      "get": {
+        "operationId": "StatsController_deploymentStats",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stats"
+        ]
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "operationId": "StatsController_systemStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stats"
+        ]
+      }
+    },
+    "/tasks": {
+      "get": {
+        "operationId": "TasksController_list",
+        "parameters": [
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "active",
+                "recent"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditLogDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "audit"
         ]
       }
     }
@@ -3494,12 +3774,18 @@
           },
           "isSecret": {
             "type": "boolean"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plaintext value, or null for secrets."
           }
         },
         "required": [
           "key",
           "scope",
-          "isSecret"
+          "isSecret",
+          "value"
         ]
       },
       "SetEnvVarDto": {
@@ -3523,6 +3809,22 @@
         "required": [
           "value"
         ]
+      },
+      "UpdateEnvVarMetaDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "BUILD",
+              "RUNTIME",
+              "BOTH"
+            ]
+          },
+          "isSecret": {
+            "type": "boolean"
+          }
+        }
       },
       "DiscoverBranchesDto": {
         "type": "object",
@@ -4220,6 +4522,10 @@
           "activeContainersCount": {
             "type": "number",
             "description": "Number of containers based on this image."
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "Built by Willy or run by a managed deployment."
           }
         },
         "required": [
@@ -4229,7 +4535,8 @@
           "virtualSize",
           "created",
           "deployments",
-          "activeContainersCount"
+          "activeContainersCount",
+          "managed"
         ]
       },
       "PruneResultDto": {
@@ -4282,6 +4589,10 @@
                 "$ref": "#/components/schemas/DeploymentRefDto"
               }
             ]
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "Belongs to a Willy-managed deployment."
           }
         },
         "required": [
@@ -4290,7 +4601,283 @@
           "image",
           "state",
           "status",
-          "created"
+          "created",
+          "managed"
+        ]
+      },
+      "AppSettingsDto": {
+        "type": "object",
+        "properties": {
+          "showAllResources": {
+            "type": "boolean",
+            "description": "Show all host containers/images on the Images/Containers pages, not only Willy-managed ones."
+          }
+        },
+        "required": [
+          "showAllResources"
+        ]
+      },
+      "UpdateAppSettingsDto": {
+        "type": "object",
+        "properties": {
+          "showAllResources": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VolumeUsageDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "bytes"
+        ]
+      },
+      "ContainerStatDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cpuPercent": {
+            "type": "number",
+            "description": "CPU usage as a percentage of one core."
+          },
+          "memUsageBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "cpuPercent",
+          "memUsageBytes"
+        ]
+      },
+      "DeploymentStatsDto": {
+        "type": "object",
+        "properties": {
+          "cpuPercent": {
+            "type": "number",
+            "description": "Sum of CPU% across the deployment's containers."
+          },
+          "cpuCores": {
+            "type": "number",
+            "nullable": true,
+            "description": "Configured CPU limit in cores."
+          },
+          "memUsageBytes": {
+            "type": "number"
+          },
+          "memLimitBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Configured memory limit in bytes."
+          },
+          "swapBytes": {
+            "type": "number"
+          },
+          "storageBytes": {
+            "type": "number",
+            "description": "Named volumes + container writable layers."
+          },
+          "volumes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VolumeUsageDto"
+            }
+          },
+          "containers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerStatDto"
+            }
+          }
+        },
+        "required": [
+          "cpuPercent",
+          "cpuCores",
+          "memUsageBytes",
+          "memLimitBytes",
+          "swapBytes",
+          "storageBytes",
+          "volumes",
+          "containers"
+        ]
+      },
+      "DiskUsageDto": {
+        "type": "object",
+        "properties": {
+          "imagesBytes": {
+            "type": "number"
+          },
+          "containersBytes": {
+            "type": "number"
+          },
+          "volumesBytes": {
+            "type": "number"
+          },
+          "buildCacheBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "imagesBytes",
+          "containersBytes",
+          "volumesBytes",
+          "buildCacheBytes"
+        ]
+      },
+      "SystemStatsDto": {
+        "type": "object",
+        "properties": {
+          "cpus": {
+            "type": "number",
+            "description": "Host logical CPU count."
+          },
+          "memTotalBytes": {
+            "type": "number",
+            "description": "Host total memory in bytes."
+          },
+          "cpuPercent": {
+            "type": "number",
+            "description": "Sum of CPU% across all running containers."
+          },
+          "memUsageBytes": {
+            "type": "number",
+            "description": "Sum of memory used across all running containers."
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsageDto"
+          }
+        },
+        "required": [
+          "cpus",
+          "memTotalBytes",
+          "cpuPercent",
+          "memUsageBytes",
+          "disk"
+        ]
+      },
+      "TaskDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "DEPLOY",
+              "BACKUP",
+              "RESTORE",
+              "OFFSITE_PUSH",
+              "VOLUME_RESET",
+              "PRUNE_IMAGES",
+              "PRUNE_CONTAINERS"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "RUNNING",
+              "SUCCESS",
+              "FAILED"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "deploymentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "progress": {
+            "type": "number",
+            "nullable": true,
+            "description": "0–100, or null when indeterminate."
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "title",
+          "deploymentId",
+          "progress",
+          "errorMessage",
+          "createdAt",
+          "finishedAt"
+        ]
+      },
+      "AuditLogDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string",
+            "nullable": true
+          },
+          "actorEmail": {
+            "type": "string",
+            "nullable": true,
+            "description": "Acting user's email, if known."
+          },
+          "action": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetId": {
+            "type": "string",
+            "nullable": true
+          },
+          "ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorId",
+          "actorEmail",
+          "action",
+          "targetType",
+          "targetId",
+          "ip",
+          "createdAt"
         ]
       }
     }

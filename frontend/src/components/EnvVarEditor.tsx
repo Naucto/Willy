@@ -1,10 +1,10 @@
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import EditIcon from "@mui/icons-material/EditOutlined";
 import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,14 +15,16 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import { useDeleteEnvVar, useEnvVars, useSetEnvVar } from "../api/hooks";
+import { useDeleteEnvVar, useEnvVars, useSetEnvVar, useUpdateEnvVarMeta } from "../api/hooks";
 import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
+import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
 
 const SCOPE_OPTIONS: { value: EnvScope; label: string; description: string }[] = [
   {
@@ -57,6 +59,7 @@ export function EnvVarEditor({
   const { data, isLoading, error } = useEnvVars(deploymentId, service);
   const deleteEnvVar = useDeleteEnvVar(deploymentId, service);
 
+  const [editing, setEditing] = useState<MaskedEnvVar | null>(null);
   const [adding, setAdding] = useState(false);
 
   const remove = async (envKey: string) => {
@@ -69,25 +72,44 @@ export function EnvVarEditor({
   };
 
   const columns: GridColDef<MaskedEnvVar>[] = [
-    { field: "key", headerName: "Key", flex: 1, minWidth: 200, cellClassName: "willy-mono" },
+    { field: "key", headerName: "Key", flex: 1, minWidth: 180, cellClassName: "willy-mono" },
     { field: "scope", headerName: "Scope", width: 120 },
     {
-      field: "isSecret",
-      headerName: "Secret",
-      width: 110,
-      renderCell: (params) => (params.row.isSecret ? <Chip label="secret" size="small" /> : "—"),
+      field: "value",
+      headerName: "Value",
+      flex: 1,
+      minWidth: 180,
+      sortable: false,
+      cellClassName: "willy-mono",
+      renderCell: (params) =>
+        params.row.isSecret ? (
+          <Typography variant="body2" sx={{ color: "text.disabled" }}>
+            —
+          </Typography>
+        ) : (
+          envValueDisplay(params.row)
+        ),
     },
     {
       field: "actions",
       headerName: "",
-      width: 70,
+      width: 96,
       sortable: false,
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <IconButton size="small" onClick={() => void remove(params.row.key)}>
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+        <Box>
+          <Tooltip title="Edit">
+            <IconButton size="small" onClick={() => setEditing(params.row)}>
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete">
+            <IconButton size="small" onClick={() => void remove(params.row.key)}>
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
@@ -119,49 +141,52 @@ export function EnvVarEditor({
       </Box>
 
       <Box sx={{ fontSize: 12, color: "text.secondary" }}>
-        Values are encrypted at rest and never shown again. Re-save a key to change its value.
+        Regular values are shown and editable. Secret values are encrypted and never shown — enter a
+        new value to change one.
       </Box>
 
-      <AddEnvVarDialog
-        open={adding}
-        deploymentId={deploymentId}
-        service={service}
-        onClose={() => setAdding(false)}
-      />
+      {(adding || editing !== null) && (
+        // Keyed so switching between Add / editing a specific var remounts with fresh form state.
+        <EnvVarDialog
+          key={editing?.key ?? "__add__"}
+          deploymentId={deploymentId}
+          service={service}
+          existing={editing}
+          onClose={() => {
+            setAdding(false);
+            setEditing(null);
+          }}
+        />
+      )}
     </Stack>
   );
 }
 
-function AddEnvVarDialog({
-  open,
+function EnvVarDialog({
   deploymentId,
   service,
+  existing,
   onClose,
 }: {
-  open: boolean;
   deploymentId: string;
   service: string;
+  existing: MaskedEnvVar | null;
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const setEnvVar = useSetEnvVar(deploymentId, service);
+  const updateMeta = useUpdateEnvVarMeta(deploymentId, service);
 
-  const [key, setKey] = useState("");
-  const [value, setValue] = useState("");
-  const [scope, setScope] = useState<EnvScope>("RUNTIME");
-  const [isSecret, setIsSecret] = useState(true);
+  const editing = existing !== null;
+  const existingIsSecret = existing?.isSecret ?? false;
 
-  const reset = () => {
-    setKey("");
-    setValue("");
-    setScope("RUNTIME");
-    setIsSecret(true);
-  };
+  // Re-seed the form whenever the dialog target changes (keyed remount below handles this).
+  const [key, setKey] = useState(existing?.key ?? "");
+  const [value, setValue] = useState(existing && !existing.isSecret ? (existing.value ?? "") : "");
+  const [scope, setScope] = useState<EnvScope>(existing?.scope ?? "RUNTIME");
+  const [isSecret, setIsSecret] = useState(existing?.isSecret ?? true);
 
-  const close = () => {
-    reset();
-    onClose();
-  };
+  const blocked = envSaveBlocked({ editing, existingIsSecret, nextIsSecret: isSecret, value });
 
   const save = async () => {
     if (!key.trim()) {
@@ -171,25 +196,43 @@ function AddEnvVarDialog({
     }
 
     try {
-      await setEnvVar.mutateAsync({ key: key.trim(), body: { value, scope, isSecret } });
+      if (envSaveMode({ editing, existingIsSecret, value }) === "meta") {
+        await updateMeta.mutateAsync({ key: key.trim(), body: { scope, isSecret } });
+      } else {
+        await setEnvVar.mutateAsync({ key: key.trim(), body: { value, scope, isSecret } });
+      }
+
       enqueueSnackbar(`Saved ${key.trim()}`, { variant: "success" });
-      close();
+      onClose();
     } catch (caught) {
       enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 
+  const valueHelper =
+    editing && existingIsSecret
+      ? blocked
+        ? "Enter a new value to convert this secret to a regular variable."
+        : "Leave blank to keep the current secret; enter a value to change it."
+      : " ";
+
   return (
-    <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
-      <DialogTitle>Add environment variable</DialogTitle>
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{editing ? `Edit ${existing.key}` : "Add environment variable"}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField label="Key" value={key} onChange={(event) => setKey(event.target.value)} />
+          <TextField
+            label="Key"
+            value={key}
+            disabled={editing}
+            onChange={(event) => setKey(event.target.value)}
+          />
           <TextField
             label="Value"
             value={value}
             onChange={(event) => setValue(event.target.value)}
             type={isSecret ? "password" : "text"}
+            helperText={valueHelper}
           />
           <TextField
             select
@@ -223,8 +266,12 @@ function AddEnvVarDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={close}>Cancel</Button>
-        <Button variant="contained" onClick={() => void save()} disabled={setEnvVar.isPending}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          onClick={() => void save()}
+          disabled={setEnvVar.isPending || updateMeta.isPending || blocked}
+        >
           Save
         </Button>
       </DialogActions>

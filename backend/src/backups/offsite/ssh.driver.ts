@@ -12,12 +12,13 @@ export class SshOffsiteDriver implements OffsiteDriver {
   constructor(
     private readonly docker: DockerService,
     private readonly volume: string,
+    private readonly network: string | undefined,
   ) {}
 
   test(config: DestinationConfig): Promise<void> {
     const c = config as SshConfig;
 
-    return runHelper(this.docker, "SSH connection", {
+    return runHelper(this.docker, "SSH connection", this.network, {
       image: "alpine:3.20",
       entrypoint: ["sh", "-c"],
       env: this.env(c),
@@ -29,7 +30,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
     const c = config as SshConfig;
     const dir = c.path ? `/${c.path.replace(/^\/+|\/+$/g, "")}/` : "";
 
-    await runHelper(this.docker, "scp", {
+    await runHelper(this.docker, "scp", this.network, {
       image: "alpine:3.20",
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],

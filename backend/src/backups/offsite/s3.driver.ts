@@ -9,12 +9,13 @@ export class S3OffsiteDriver implements OffsiteDriver {
   constructor(
     private readonly docker: DockerService,
     private readonly volume: string,
+    private readonly network: string | undefined,
   ) {}
 
   test(config: DestinationConfig): Promise<void> {
     const c = config as S3Config;
 
-    return runHelper(this.docker, "S3 connection", {
+    return runHelper(this.docker, "S3 connection", this.network, {
       image: "amazon/aws-cli:2.15.30",
       env: this.env(c),
       command: ["s3", "ls", `s3://${c.bucket}`, ...this.endpointArgs(c)],
@@ -26,7 +27,7 @@ export class S3OffsiteDriver implements OffsiteDriver {
     const key = `${c.prefix ? `${c.prefix.replace(/\/+$/, "")}/` : ""}${file}`;
     const url = `s3://${c.bucket}/${key}`;
 
-    await runHelper(this.docker, "s3 cp", {
+    await runHelper(this.docker, "s3 cp", this.network, {
       image: "amazon/aws-cli:2.15.30",
       binds: [`${this.volume}:/backup:ro`],
       env: this.env(c),

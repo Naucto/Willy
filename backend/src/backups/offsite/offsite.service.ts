@@ -14,11 +14,14 @@ export class OffsiteService {
 
   constructor(docker: DockerService, config: ConfigService) {
     const volume = config.get<string>("BACKUPS_VOLUME") ?? "willy_backups";
+    // Helpers join this network so destinations reachable on a Willy network (e.g. a dev FTP
+    // container) resolve by name; it still has egress, so external destinations keep working.
+    const network = config.get<string>("BACKUPS_NETWORK") ?? "willy_internal";
     const drivers: OffsiteDriver[] = [
-      new S3OffsiteDriver(docker, volume),
-      new FtpOffsiteDriver(docker, volume),
-      new SftpOffsiteDriver(docker, volume),
-      new SshOffsiteDriver(docker, volume),
+      new S3OffsiteDriver(docker, volume, network),
+      new FtpOffsiteDriver(docker, volume, network),
+      new SftpOffsiteDriver(docker, volume, network),
+      new SshOffsiteDriver(docker, volume, network),
     ];
 
     this.drivers = new Map(drivers.map((driver) => [driver.type, driver]));

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AdminModule } from "./admin/admin.module";
+import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackupsModule } from "./backups/backups.module";
 import { BuildModule } from "./build/build.module";
@@ -20,7 +21,9 @@ import { LogsModule } from "./logs/logs.module";
 import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { OvhModule } from "./ovh/ovh.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
+import { StatsModule } from "./stats/stats.module";
 import { SystemModule } from "./system/system.module";
+import { TasksModule } from "./tasks/tasks.module";
 import { TraefikModule } from "./traefik/traefik.module";
 import { UsersModule } from "./users/users.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
@@ -51,6 +54,9 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     BackupsModule,
     MaintenanceModule,
     AdminModule,
+    StatsModule,
+    TasksModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

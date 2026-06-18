@@ -4,13 +4,25 @@ import {
   Delete,
   Get,
   HttpCode,
+  Ip,
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   StreamableFile,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import type { AuthUser } from "../auth/jwt-payload.interface";
+import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { type Backup, BackupsService } from "./backups.service";
 import { BackupDto, CreateBackupDto, VolumesDto } from "./dto/backup.dto";
@@ -34,12 +46,16 @@ function toDto(row: Backup): BackupDto {
 @ApiBearerAuth()
 @Controller("backups")
 export class BackupsController {
-  constructor(private readonly backups: BackupsService) {}
+  constructor(
+    private readonly backups: BackupsService,
+    private readonly audit: AuditService,
+  ) {}
 
+  @ApiQuery({ name: "deploymentId", required: false, type: String })
   @ApiOkResponse({ type: [BackupDto] })
   @Get()
-  async list(): Promise<BackupDto[]> {
-    return (await this.backups.list()).map(toDto);
+  async list(@Query("deploymentId") deploymentId?: string): Promise<BackupDto[]> {
+    return (await this.backups.list(deploymentId)).map(toDto);
   }
 
   @ApiOkResponse({ type: VolumesDto })
@@ -52,14 +68,28 @@ export class BackupsController {
   @ApiBody({ type: CreateBackupDto })
   @ApiOkResponse({ type: BackupDto })
   @Post()
-  async create(@Body() dto: CreateBackupDto): Promise<BackupDto> {
-    return toDto(
-      await this.backups.create({
-        kind: dto.kind,
-        target: dto.target,
-        ...(dto.deploymentId ? { deploymentId: dto.deploymentId } : {}),
-      }),
-    );
+  async create(
+    @Body() dto: CreateBackupDto,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<BackupDto> {
+    const backup = await this.backups.create({
+      kind: dto.kind,
+      target: dto.target,
+      actorId: user.userId,
+      ...(dto.deploymentId ? { deploymentId: dto.deploymentId } : {}),
+    });
+
+    await this.audit.record({
+      actorId: user.userId,
+      action: "BACKUP_CREATE",
+      targetType: "volume",
+      targetId: dto.target,
+      ip,
+      ...(dto.deploymentId ? { metadata: { deploymentId: dto.deploymentId } } : {}),
+    });
+
+    return toDto(backup);
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -67,8 +97,19 @@ export class BackupsController {
   @ApiParam({ name: "id", type: String })
   @ApiOkResponse({ type: OkResponseDto })
   @Post(":id/restore")
-  async restore(@Param("id", ParseUUIDPipe) id: string): Promise<{ ok: true }> {
-    await this.backups.restore(id);
+  async restore(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
+    await this.backups.restore(id, user.userId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "RESTORE",
+      targetType: "backup",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }
@@ -82,8 +123,18 @@ export class BackupsController {
   async push(
     @Param("id", ParseUUIDPipe) id: string,
     @Param("destinationId", ParseUUIDPipe) destinationId: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
   ): Promise<{ ok: true }> {
-    await this.backups.pushOffsite(id, destinationId);
+    await this.backups.pushOffsite(id, destinationId, user.userId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "OFFSITE_PUSH",
+      targetType: "backup",
+      targetId: id,
+      ip,
+      metadata: { destinationId },
+    });
 
     return { ok: true };
   }

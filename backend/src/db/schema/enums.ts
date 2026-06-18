@@ -81,4 +81,23 @@ export const auditActionEnum = pgEnum("audit_action", [
   "CONSOLE_OPEN",
   "WEBHOOK_TRIGGER",
   "USER_CREATE",
+  // Appended (Postgres only allows ALTER TYPE ADD VALUE at the end).
+  "PRUNE_IMAGES",
+  "PRUNE_CONTAINERS",
+  "VOLUME_RESET",
+  "OFFSITE_PUSH",
+  "SETTINGS_CHANGE",
 ]);
+
+// Long-running administrative operations surfaced in the top-bar activity tracker.
+export const taskKindEnum = pgEnum("task_kind", [
+  "DEPLOY",
+  "BACKUP",
+  "RESTORE",
+  "OFFSITE_PUSH",
+  "VOLUME_RESET",
+  "PRUNE_IMAGES",
+  "PRUNE_CONTAINERS",
+]);
+
+export const taskStatusEnum = pgEnum("task_status", ["PENDING", "RUNNING", "SUCCESS", "FAILED"]);

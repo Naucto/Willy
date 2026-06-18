@@ -45,7 +45,15 @@ export class BackupSchedulesService implements OnApplicationBootstrap {
     }
   }
 
-  list(): Promise<BackupSchedule[]> {
+  list(deploymentId?: string): Promise<BackupSchedule[]> {
+    if (deploymentId) {
+      return this.db
+        .select()
+        .from(backupSchedules)
+        .where(eq(backupSchedules.deploymentId, deploymentId))
+        .orderBy(desc(backupSchedules.createdAt));
+    }
+
     return this.db.select().from(backupSchedules).orderBy(desc(backupSchedules.createdAt));
   }
 

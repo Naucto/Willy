@@ -4,6 +4,7 @@ import { ReleasesService } from "../build/releases.service";
 import { RuntimeLogCollector } from "../build/runtime-log.collector";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
+import { TasksService } from "../tasks/tasks.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 
 function describeError(error: unknown): string {
@@ -23,6 +24,7 @@ export class ReconcileService implements OnApplicationBootstrap {
     private readonly docker: DockerService,
     private readonly orchestrator: BuildOrchestrator,
     private readonly runtimeLog: RuntimeLogCollector,
+    private readonly tasks: TasksService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -33,6 +35,7 @@ export class ReconcileService implements OnApplicationBootstrap {
     }
 
     await this.releases.markInterrupted();
+    await this.tasks.markInterrupted();
 
     const deployments = await this.deployments.findAll();
 

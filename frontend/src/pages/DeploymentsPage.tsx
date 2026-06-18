@@ -16,12 +16,15 @@ import {
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useDeployments, useDeploymentTransition } from "../api/hooks";
 import type { Deployment } from "../api/types";
+import { useAuth } from "../auth/AuthContext";
 import { DeployActions } from "../components/DeployActions";
+import { SystemUtilization } from "../components/ResourceUtilization";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
 
 export function DeploymentsPage() {
   const { data, isLoading, error } = useDeployments();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -39,6 +42,8 @@ export function DeploymentsPage() {
           New deployment
         </Button>
       </Box>
+
+      {user?.role === "ADMIN" && <SystemUtilization />}
 
       {isLoading && (
         <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>

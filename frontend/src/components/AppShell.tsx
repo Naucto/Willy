@@ -39,6 +39,7 @@ import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useDeployment, useDeploymentContainers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { deploymentSections } from "../deploymentSections";
+import { ActivityMenu } from "./ActivityMenu";
 
 const DRAWER_WIDTH = 220;
 const COLLAPSED_WIDTH = 64;
@@ -57,6 +58,8 @@ const GLOBAL_NAV: NavItem[] = [
   { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
   { label: "Images", to: "/images", icon: <LayersOutlinedIcon />, adminOnly: true },
   { label: "Containers", to: "/containers", icon: <ViewInArIcon />, adminOnly: true },
+  { label: "Audit", to: "/audit", icon: <ReceiptLongIcon />, adminOnly: true },
+  { label: "Settings", to: "/settings", icon: <SettingsIcon />, adminOnly: true },
 ];
 
 const SECTION_ICONS: Record<string, ReactNode> = {
@@ -67,6 +70,7 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   console: <TerminalIcon />,
   env: <TuneIcon />,
   volumes: <StorageIcon />,
+  backups: <BackupIcon />,
   networking: <HubOutlinedIcon />,
   domains: <LanguageIcon />,
   resources: <MemoryIcon />,
@@ -103,18 +107,28 @@ export function AppShell() {
 
   const width = open ? DRAWER_WIDTH : COLLAPSED_WIDTH;
 
+  // Icon stays at a constant left offset in both states; the label is always mounted and revealed
+  // as the drawer widens (clipped by the paper's overflowX while collapsed), so nothing slides.
   const item = (key: string, to: string, label: string, icon: ReactNode, selected: boolean) => (
     <Tooltip key={key} title={label} placement="right" disableHoverListener={open}>
       <ListItemButton
         component={RouterLink}
         to={to}
         selected={selected}
-        sx={{ minHeight: 48, justifyContent: open ? "initial" : "center", px: 2.5 }}
+        sx={{ minHeight: 48, justifyContent: "flex-start", px: 2.5 }}
       >
-        <ListItemIcon sx={{ minWidth: 0, mr: open ? 3 : 0, justifyContent: "center" }}>
-          {icon}
-        </ListItemIcon>
-        {open && <ListItemText primary={label} />}
+        <ListItemIcon sx={{ minWidth: 0, mr: 3, justifyContent: "center" }}>{icon}</ListItemIcon>
+        <ListItemText
+          primary={label}
+          sx={{
+            my: 0,
+            opacity: open ? 1 : 0,
+            transition: (theme) =>
+              theme.transitions.create("opacity", {
+                duration: theme.transitions.duration.standard,
+              }),
+          }}
+        />
       </ListItemButton>
     </Tooltip>
   );
@@ -164,6 +178,8 @@ export function AppShell() {
             </Typography>
           )}
 
+          <ActivityMenu />
+
           <Button color="inherit" onClick={() => void logout()}>
             Sign out
           </Button>
@@ -176,6 +192,13 @@ export function AppShell() {
           width,
           flexShrink: 0,
           whiteSpace: "nowrap",
+          // Animate the root width too (not just the paper) so the main content reflows in sync
+          // instead of snapping to the new width while the drawer is still animating.
+          transition: (theme) =>
+            theme.transitions.create("width", {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.standard,
+            }),
           "& .MuiDrawer-paper": {
             width,
             boxSizing: "border-box",

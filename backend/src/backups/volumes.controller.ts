@@ -1,6 +1,9 @@
-import { Controller, Get, HttpCode, NotFoundException, Param, Post } from "@nestjs/common";
+import { Controller, Get, HttpCode, Ip, NotFoundException, Param, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import type { AuthUser } from "../auth/jwt-payload.interface";
+import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { ContainersService } from "../containers/containers.service";
@@ -16,6 +19,7 @@ export class DeploymentVolumesController {
     private readonly deployments: DeploymentsService,
     private readonly containers: ContainersService,
     private readonly backups: BackupsService,
+    private readonly audit: AuditService,
   ) {}
 
   @ApiOkResponse({ type: [ContainerDto] })
@@ -35,8 +39,21 @@ export class DeploymentVolumesController {
   @ApiParam({ name: "name", type: String })
   @ApiOkResponse({ type: OkResponseDto })
   @Post(":id/volumes/:name/reset")
-  async reset(@Param("id") id: string, @Param("name") name: string): Promise<{ ok: true }> {
-    await this.backups.resetVolume(id, name);
+  async reset(
+    @Param("id") id: string,
+    @Param("name") name: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
+    await this.backups.resetVolume(id, name, user.userId);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "VOLUME_RESET",
+      targetType: "volume",
+      targetId: name,
+      ip,
+      metadata: { deploymentId: id },
+    });
 
     return { ok: true };
   }

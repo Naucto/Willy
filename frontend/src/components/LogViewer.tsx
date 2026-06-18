@@ -8,6 +8,10 @@ interface LogViewerProps {
   path: string;
 }
 
+// Matches the backend's LOG_STREAM_EOF marker: the last frame of a build-log stream. Its arrival
+// means the build finished — so any subsequent connection close is expected, not an error.
+const LOG_STREAM_EOF = "__willy_eof__";
+
 export function LogViewer({ path }: LogViewerProps) {
   const [lines, setLines] = useState<string[]>([]);
   const [status, setStatus] = useState<"connecting" | "open" | "closed" | "error">("connecting");
@@ -17,6 +21,7 @@ export function LogViewer({ path }: LogViewerProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    let endedCleanly = false;
     setLines([]);
     setStatus("connecting");
     setErrorText(null);
@@ -24,6 +29,12 @@ export function LogViewer({ path }: LogViewerProps) {
     streamSse(
       path,
       (line) => {
+        if (line === LOG_STREAM_EOF) {
+          endedCleanly = true;
+
+          return;
+        }
+
         setStatus("open");
         setLines((prev) => [...prev, line]);
       },
@@ -31,10 +42,14 @@ export function LogViewer({ path }: LogViewerProps) {
     )
       .then(() => setStatus("closed"))
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          setStatus("error");
-          setErrorText(describeError(error));
+        if (controller.signal.aborted || endedCleanly) {
+          setStatus("closed");
+
+          return;
         }
+
+        setStatus("error");
+        setErrorText(describeError(error));
       });
 
     return () => controller.abort();

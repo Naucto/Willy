@@ -22,15 +22,14 @@ import {
   useCreateSchedule,
   useDeleteSchedule,
   useDeploymentContainers,
-  useDeployments,
   useSetScheduleEnabled,
 } from "../api/hooks";
 import type { BackupSchedule } from "../api/types";
 import { describeError } from "../errors";
 
-export function BackupSchedules() {
+export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
   const { enqueueSnackbar } = useSnackbar();
-  const { data: schedules, isLoading } = useBackupSchedules();
+  const { data: schedules, isLoading } = useBackupSchedules(deploymentId);
   const setEnabled = useSetScheduleEnabled();
   const deleteSchedule = useDeleteSchedule();
   const [adding, setAdding] = useState(false);
@@ -114,21 +113,32 @@ export function BackupSchedules() {
           density="compact"
           disableRowSelectionOnClick
           hideFooter
+          localeText={{ noRowsLabel: "No schedules yet." }}
           sx={{ border: 0 }}
         />
       </Box>
 
-      <NewScheduleDialog open={adding} onClose={() => setAdding(false)} />
+      <NewScheduleDialog
+        deploymentId={deploymentId}
+        open={adding}
+        onClose={() => setAdding(false)}
+      />
     </Box>
   );
 }
 
-function NewScheduleDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function NewScheduleDialog({
+  deploymentId,
+  open,
+  onClose,
+}: {
+  deploymentId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
   const { enqueueSnackbar } = useSnackbar();
-  const { data: deployments } = useDeployments();
   const createSchedule = useCreateSchedule();
 
-  const [deploymentId, setDeploymentId] = useState("");
   const [containerId, setContainerId] = useState("");
   const [volume, setVolume] = useState("");
   const [cron, setCron] = useState("0 3 * * *");
@@ -139,7 +149,6 @@ function NewScheduleDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const volumes = selectedContainer?.volumes ?? [];
 
   const reset = () => {
-    setDeploymentId("");
     setContainerId("");
     setVolume("");
     setCron("0 3 * * *");
@@ -164,26 +173,9 @@ function NewScheduleDialog({ open, onClose }: { open: boolean; onClose: () => vo
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
             select
-            label="Deployment"
-            value={deploymentId}
-            onChange={(event) => {
-              setDeploymentId(event.target.value);
-              setContainerId("");
-              setVolume("");
-            }}
-          >
-            {(deployments ?? []).map((deployment) => (
-              <MenuItem key={deployment.id} value={deployment.id}>
-                {deployment.name}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            select
             label="Container"
             value={containerId}
-            disabled={!deploymentId || (containers ?? []).length === 0}
+            disabled={(containers ?? []).length === 0}
             onChange={(event) => {
               setContainerId(event.target.value);
               setVolume("");

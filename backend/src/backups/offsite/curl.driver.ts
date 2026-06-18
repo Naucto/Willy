@@ -14,12 +14,13 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
   constructor(
     private readonly docker: DockerService,
     private readonly volume: string,
+    private readonly network: string | undefined,
   ) {}
 
   test(config: DestinationConfig): Promise<void> {
     const c = config as FileTransferConfig;
 
-    return runHelper(this.docker, `${this.scheme} connection`, {
+    return runHelper(this.docker, `${this.scheme} connection`, this.network, {
       image: IMAGE,
       entrypoint: ["sh", "-c"],
       env: { WILLY_USER: c.username, WILLY_PASS: c.password },
@@ -31,7 +32,7 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
     const c = config as FileTransferConfig;
     const base = this.base(c);
 
-    await runHelper(this.docker, `${this.scheme} upload`, {
+    await runHelper(this.docker, `${this.scheme} upload`, this.network, {
       image: IMAGE,
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],
