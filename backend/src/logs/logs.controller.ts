@@ -9,7 +9,7 @@ import {
 import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
-import { ReleasesService } from "../build/releases.service";
+import { ReleasesService, isTerminalReleaseStatus } from "../build/releases.service";
 import { runtimeLogKey } from "../build/runtime-log.collector";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
@@ -49,7 +49,17 @@ export class LogsController {
       let detachDone = (): void => {};
 
       void (async () => {
-        for (const line of await this.buildLog.history(id)) {
+        const attachLive = (): void => {
+          detachLine = this.buildLog.onLine(id, (line) => subscriber.next({ data: line }));
+          detachDone = this.buildLog.onDone(id, () => {
+            subscriber.next({ data: LOG_STREAM_EOF });
+            subscriber.complete();
+          });
+        };
+
+        const history = await this.buildLog.history(id);
+
+        for (const line of history) {
           subscriber.next({ data: line });
         }
 
@@ -58,15 +68,30 @@ export class LogsController {
         }
 
         if (this.buildLog.isLive(id)) {
-          detachLine = this.buildLog.onLine(id, (line) => subscriber.next({ data: line }));
-          detachDone = this.buildLog.onDone(id, () => {
-            subscriber.next({ data: LOG_STREAM_EOF });
-            subscriber.complete();
-          });
-        } else {
+          attachLive();
+
+          return;
+        }
+
+        // Not live yet. Distinguish "build is over" (terminal release, or persisted history to
+        // cold-replay) from "the build just hasn't logged its first line yet" — a console opened in
+        // that startup gap must not end instantly, or it shows an empty, already-closed build.
+        const release = await this.releases.findById(id);
+
+        if (this.buildLog.isLive(id)) {
+          attachLive();
+
+          return;
+        }
+
+        if (!release || history.length > 0 || isTerminalReleaseStatus(release.status)) {
           subscriber.next({ data: LOG_STREAM_EOF });
           subscriber.complete();
+
+          return;
         }
+
+        attachLive();
       })().catch((error: unknown) => {
         subscriber.error(error instanceof Error ? error : new Error(String(error)));
       });

@@ -18,6 +18,11 @@ export interface ReleaseUpdate {
 
 const TERMINAL: ReleaseStatus[] = ["LIVE", "FAILED", "ROLLEDBACK", "SUPERSEDED", "INTERRUPTED"];
 
+// A release in a terminal state can produce no further build-log lines, so its log stream can end.
+export function isTerminalReleaseStatus(status: ReleaseStatus): boolean {
+  return TERMINAL.includes(status);
+}
+
 // Coarse progress for the activity tracker — deploys don't report finer granularity than their
 // release phase.
 const PROGRESS: Partial<Record<ReleaseStatus, number>> = {
