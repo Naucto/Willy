@@ -55,11 +55,6 @@ export class CreateDeploymentDto {
   @IsString()
   composeWebService?: string;
 
-  @ApiPropertyOptional({ type: String, example: "/" })
-  @IsOptional()
-  @IsString()
-  healthCheckPath?: string;
-
   @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()

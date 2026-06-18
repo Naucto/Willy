@@ -53,9 +53,6 @@ export class DeploymentDto {
   @ApiProperty({ type: Number, nullable: true })
   webServicePort!: number | null;
 
-  @ApiProperty({ type: String })
-  healthCheckPath!: string;
-
   @ApiProperty({ type: Boolean })
   autoDeploy!: boolean;
 

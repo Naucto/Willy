@@ -1058,8 +1058,6 @@ export interface components {
       composeFilePath?: string;
       /** @description Compose service to route + monitor. */
       composeWebService?: string;
-      /** @example / */
-      healthCheckPath?: string;
       runCommand?: string;
       /** @example 0 3 * * * */
       cronExpr?: string;
@@ -1119,7 +1117,6 @@ export interface components {
       runCommand: string | null;
       cronExpr: string | null;
       webServicePort: number | null;
-      healthCheckPath: string;
       autoDeploy: boolean;
       /** @enum {string} */
       restartPolicy: "NO" | "ON_FAILURE" | "ALWAYS" | "UNLESS_STOPPED";
@@ -1152,7 +1149,6 @@ export interface components {
       dockerfilePath?: string;
       composeFilePath?: string;
       composeWebService?: string;
-      healthCheckPath?: string;
       runCommand?: string;
       cronExpr?: string;
       autoDeploy?: boolean;

@@ -685,9 +685,9 @@ export function useRemoveDeployment(id: string) {
     mutationFn: async () =>
       unwrap(await api.DELETE("/deployments/{id}", { params: { path: { id } } })),
     onSuccess: () => {
-      // Drop the detail + its sub-queries (containers/releases/domains) so the detail page's
-      // polling `useDeployment(id)` stops refetching the now-deleted id (404 → error Alert).
-      queryClient.removeQueries({ queryKey: queryKeys.deployment(id) });
+      // Only refresh the list. Leave the detail query intact so the detail page stays mounted
+      // through its post-delete `navigate(...)` — dropping it here would flip the page to its
+      // "not found" Alert and defeat the redirect. Navigating away stops the polling on its own.
       void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
     },
   });

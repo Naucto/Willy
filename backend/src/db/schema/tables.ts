@@ -60,7 +60,6 @@ export const deployments = pgTable("deployments", {
   runCommand: text("run_command"),
   cronExpr: text("cron_expr"),
   webServicePort: integer("web_service_port"),
-  healthCheckPath: text("health_check_path").notNull().default("/"),
   autoDeploy: boolean("auto_deploy").notNull().default(false),
   restartPolicy: restartPolicyEnum("restart_policy").notNull().default("UNLESS_STOPPED"),
   memoryLimitMb: integer("memory_limit_mb"),

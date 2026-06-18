@@ -215,6 +215,18 @@ export class ComposeService {
     await this.docker.removeNetwork(`${project}_default`);
   }
 
+  // Stop (but keep) every container in the stack by its compose-project label. Used when a redeploy's
+  // healthcheck fails: the unhealthy stack must stop serving, but the containers are left in place so
+  // they can be inspected.
+  async stopAll(deployment: Deployment): Promise<void> {
+    const project = this.projectName(deployment);
+    const ids = await this.docker.listByLabel(COMPOSE_PROJECT_LABEL, project);
+
+    for (const id of ids) {
+      await this.docker.stopContainer(id);
+    }
+  }
+
   private async writeOverride(
     deployment: Deployment,
     dir: string,

@@ -37,7 +37,6 @@ const PRIORITY_BASE = 9_000_000_000_000;
 const WEB_HEALTH_TIMEOUT_MS = 90_000;
 const WORKER_HEALTH_GRACE_MS = 6_000;
 const HEALTH_INTERVAL_MS = 2_000;
-const HTTP_PROBE_TIMEOUT_MS = 3_000;
 const KEEP_IMAGES = 3;
 
 const RESTART_MAP: Record<Deployment["restartPolicy"], RestartPolicyName> = {
@@ -437,10 +436,9 @@ export class BuildOrchestrator {
       this.buildLog.append(releaseId, "docker compose up -d --build");
 
       let project: string;
-      let defaultService: string | null;
 
       try {
-        ({ project, defaultService } = await this.compose.up(deployment, dir, (line) =>
+        ({ project } = await this.compose.up(deployment, dir, (line) =>
           this.buildLog.append(releaseId, line),
         ));
       } finally {
@@ -451,7 +449,12 @@ export class BuildOrchestrator {
       await this.releases.setStatus(releaseId, "HEALTHCHECKING", { composeProject: project });
       this.buildLog.append(releaseId, "health-checking stack");
 
-      if (!(await this.composeHealthy(deployment, defaultService))) {
+      if (!(await this.composeHealthy(deployment))) {
+        // Compose recreates the stack in place, so an unhealthy result has no prior version to fall
+        // back to — stop the brought-up containers so they aren't left serving while unhealthy.
+        this.buildLog.append(releaseId, "stack unhealthy — stopping containers");
+        await this.compose.stopAll(deployment);
+
         throw new HealthCheckError("compose stack did not become healthy");
       }
 
@@ -470,28 +473,28 @@ export class BuildOrchestrator {
       this.logger.warn(`compose release ${releaseId} failed: ${message}`);
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
-      await this.deployments.setState(deployment.id, priorActiveReleaseId ? "DEGRADED" : "ERROR");
+      // A failed healthcheck stops the in-place-recreated stack, so nothing is serving → ERROR.
+      // Other failures (e.g. clone) leave the prior stack untouched and still serving → DEGRADED.
+      const stoppedStack = error instanceof HealthCheckError;
+      await this.deployments.setState(
+        deployment.id,
+        !stoppedStack && priorActiveReleaseId ? "DEGRADED" : "ERROR",
+      );
     } finally {
       this.buildLog.finish(releaseId);
     }
   }
 
-  // Compose health gate: wait until every project container is up to its declared bar. A service
-  // that declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a
-  // WEB service a domain routes to with no healthcheck falls back to the HTTP probe via the edge IP;
-  // any other service passes as soon as it's running. Returns false if the deadline passes first.
-  private async composeHealthy(
-    deployment: Deployment,
-    defaultService: string | null,
-  ): Promise<boolean> {
-    const targets = await this.webTargetPorts(deployment, defaultService);
-    const path = deployment.healthCheckPath || "/";
+  // Compose health gate: wait until every project container is up to its bar. A service that
+  // declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a service
+  // with no healthcheck passes as soon as it's running. Returns false if the deadline passes first.
+  private async composeHealthy(deployment: Deployment): Promise<boolean> {
     const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
       const containers = await this.containers.listForDeployment(deployment);
 
-      if (containers.length > 0 && (await this.allContainersHealthy(containers, targets, path))) {
+      if (containers.length > 0 && (await this.allContainersHealthy(containers))) {
         return true;
       }
 
@@ -503,62 +506,22 @@ export class BuildOrchestrator {
 
   private async allContainersHealthy(
     containers: { id: string; service: string | null }[],
-    targets: Map<string, number>,
-    path: string,
   ): Promise<boolean> {
     for (const container of containers) {
-      const status = await this.docker.inspectContainer(container.id, EDGE_NETWORK);
+      const status = await this.docker.inspectContainer(container.id);
 
       if (!status?.running) {
         return false;
       }
 
-      if (status.health !== undefined) {
-        // A declared/injected healthcheck is authoritative — wait for it regardless of routing.
-        if (status.health !== "healthy") {
-          return false;
-        }
-
-        continue;
-      }
-
-      const probePort = container.service ? targets.get(container.service) : undefined;
-
-      if (
-        probePort !== undefined &&
-        !(status.ip && (await this.httpProbe(status.ip, probePort, path)))
-      ) {
+      // Only gate on a healthcheck when one exists (declared or injected); otherwise running is
+      // enough — we don't health-check a container that defines no healthcheck.
+      if (status.health !== undefined && status.health !== "healthy") {
         return false;
       }
     }
 
     return true;
-  }
-
-  // The (service → port) pairs a WEB deployment's domains route to, so the gate knows which
-  // healthcheck-less services to HTTP-probe and on which port. Empty for non-WEB.
-  private async webTargetPorts(
-    deployment: Deployment,
-    defaultService: string | null,
-  ): Promise<Map<string, number>> {
-    const targets = new Map<string, number>();
-
-    if (deployment.type !== "WEB") {
-      return targets;
-    }
-
-    const routes = await this.deployments.domainRoutes(deployment.id);
-    const defaultPort = deployment.webServicePort ?? 80;
-
-    for (const group of groupRoutes(routes, { defaultService, defaultPort })) {
-      const name = group.service ?? defaultService;
-
-      if (name && !targets.has(name)) {
-        targets.set(name, group.port);
-      }
-    }
-
-    return targets;
   }
 
   private buildImage(
@@ -600,9 +563,6 @@ export class BuildOrchestrator {
     const defaultPort = deployment.webServicePort ?? exposed[0] ?? 80;
     let labels: Record<string, string>;
     let network: string | undefined;
-    // For a single-container deployment every domain routes to the one container; only the port
-    // can vary (no compose service name), so probe whichever port the primary domain points at.
-    let probePort = defaultPort;
 
     if (deployment.type === "WEB") {
       const routes = await this.deployments.domainRoutes(deployment.id);
@@ -611,7 +571,6 @@ export class BuildOrchestrator {
         throw new BadRequestException("WEB deployment requires a domain");
       }
 
-      probePort = routes[0]?.targetPort ?? defaultPort;
       labels = this.labels.forWebRoutes({
         deploymentId: deployment.id,
         routerPrefix: `${deployment.name}-${releaseShort}`,
@@ -644,7 +603,7 @@ export class BuildOrchestrator {
 
     const healthy =
       deployment.type === "WEB"
-        ? await this.probeWeb(containerId, deployment, probePort)
+        ? await this.probeWeb(containerId)
         : await this.probeWorker(containerId);
 
     if (!healthy) {
@@ -656,27 +615,18 @@ export class BuildOrchestrator {
     return containerId;
   }
 
-  // WEB: container running + an HTTP response (<500) at healthCheckPath on the edge IP. If the
-  // image declares its own Docker HEALTHCHECK, also wait until it reports "healthy" — Traefik
-  // refuses to route a "starting"/"unhealthy" container, so cutting over before then would
-  // briefly drop traffic.
-  private async probeWeb(
-    containerId: string,
-    deployment: Deployment,
-    port: number,
-  ): Promise<boolean> {
-    const path = deployment.healthCheckPath || "/";
+  // WEB: healthy once the container is running. If it declares a healthcheck (image HEALTHCHECK or a
+  // Willy-injected custom one) also wait until it reports "healthy" — Traefik refuses to route a
+  // "starting"/"unhealthy" container, so cutting over before then would briefly drop traffic. A
+  // container with no healthcheck is considered ready as soon as it's running.
+  private async probeWeb(containerId: string): Promise<boolean> {
     const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
-      const status = await this.docker.inspectContainer(containerId, EDGE_NETWORK);
-      // undefined = no HEALTHCHECK in the image (Traefik routes it immediately).
-      const dockerReady = status?.health === undefined || status.health === "healthy";
+      const status = await this.docker.inspectContainer(containerId);
 
-      if (status?.running && status.ip && dockerReady) {
-        if (await this.httpProbe(status.ip, port, path)) {
-          return true;
-        }
+      if (status?.running && (status.health === undefined || status.health === "healthy")) {
+        return true;
       }
 
       await delay(HEALTH_INTERVAL_MS);
@@ -700,18 +650,6 @@ export class BuildOrchestrator {
     }
 
     return true;
-  }
-
-  private async httpProbe(ip: string, port: number, path: string): Promise<boolean> {
-    const url = `http://${ip}:${port}${path.startsWith("/") ? path : `/${path}`}`;
-
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(HTTP_PROBE_TIMEOUT_MS) });
-
-      return response.status < 500;
-    } catch {
-      return false;
-    }
   }
 
   // Keep the most recent images for the deployment; drop the rest.

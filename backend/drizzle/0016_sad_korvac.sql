@@ -1,0 +1,1 @@
+ALTER TABLE "deployments" DROP COLUMN "health_check_path";

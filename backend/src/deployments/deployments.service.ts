@@ -88,7 +88,6 @@ export interface CreateDeploymentInput {
   composeFilePath?: string;
   composeWebService?: string;
   imageRef?: string;
-  healthCheckPath?: string;
   runCommand?: string;
   cronExpr?: string;
   memoryLimitMb?: number;
@@ -111,7 +110,6 @@ export interface UpdateDeploymentInput {
   composeFilePath?: string | null;
   composeWebService?: string | null;
   imageRef?: string | null;
-  healthCheckPath?: string;
   runCommand?: string | null;
   cronExpr?: string | null;
   autoDeploy?: boolean;
@@ -134,7 +132,6 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitUrl",
   "gitRef",
   "buildStrategy",
-  "healthCheckPath",
   "runCommand",
   "cronExpr",
   "autoDeploy",
@@ -175,7 +172,6 @@ export class DeploymentsService {
         gitRef: input.gitRef ?? "main",
         buildStrategy: input.buildStrategy ?? "DOCKERFILE",
         strategyConfig: buildStrategyConfig(input.buildStrategy ?? "DOCKERFILE", input),
-        healthCheckPath: input.healthCheckPath ?? "/",
         runCommand: input.runCommand ?? null,
         cronExpr: input.cronExpr ?? null,
         memoryLimitMb: input.memoryLimitMb ?? null,

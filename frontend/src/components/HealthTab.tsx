@@ -43,13 +43,12 @@ type RestartPolicy = (typeof RESTART_OPTIONS)[number]["value"];
 interface HealthValues {
   restartPolicy: RestartPolicy;
   healthcheck: Healthcheck | null;
-  healthCheckPath: string;
 }
 
 // Health is container-scoped like Resources: for compose, the selected service's restart policy +
 // custom healthcheck live per service (serviceResources); for single-container they live on the
-// deployment. The readiness path (WEB) is always deployment-level. Declared healthchecks (from the
-// image/compose file) are surfaced read-only.
+// deployment. Declared healthchecks (from the image/compose file) are surfaced read-only; a
+// container with no healthcheck at all is simply considered ready once it's running.
 export function HealthTab({
   deployment,
   container,
@@ -97,9 +96,6 @@ function DeploymentHealth({
       await update.mutateAsync({
         restartPolicy: values.restartPolicy,
         healthcheck: values.healthcheck,
-        ...(deployment.type === "WEB"
-          ? { healthCheckPath: values.healthCheckPath.trim() || "/" }
-          : {}),
       });
       enqueueSnackbar("Health settings saved", { variant: "success" });
     } catch (error) {
@@ -112,11 +108,9 @@ function DeploymentHealth({
       initial={{
         restartPolicy: (deployment.restartPolicy as RestartPolicy) ?? "UNLESS_STOPPED",
         healthcheck: deployment.healthcheck ?? null,
-        healthCheckPath: deployment.healthCheckPath ?? "/",
       }}
       declared={container?.declaredHealthcheck ?? null}
       runtimeHealth={container?.health ?? null}
-      showReadiness={deployment.type === "WEB"}
       saving={update.isPending}
       onSave={onSave}
     />
@@ -135,7 +129,6 @@ function ComposeServiceHealth({
   const { enqueueSnackbar } = useSnackbar();
   const { data, isLoading } = useServiceResources(deployment.id, service);
   const updateResources = useUpdateServiceResources(deployment.id);
-  const updateDeployment = useUpdateDeployment(deployment.id);
 
   if (isLoading || !data) {
     return (
@@ -147,18 +140,10 @@ function ComposeServiceHealth({
 
   const onSave = async (values: HealthValues) => {
     try {
-      // Restart + healthcheck are per service; the readiness path is a single deployment-level
-      // setting, so it's saved separately on the deployment.
       await updateResources.mutateAsync({
         service,
         body: { restartPolicy: values.restartPolicy, healthcheck: values.healthcheck },
       });
-
-      if (deployment.type === "WEB") {
-        await updateDeployment.mutateAsync({
-          healthCheckPath: values.healthCheckPath.trim() || "/",
-        });
-      }
 
       enqueueSnackbar(`Health settings saved for ${service}`, { variant: "success" });
     } catch (error) {
@@ -171,12 +156,10 @@ function ComposeServiceHealth({
       initial={{
         restartPolicy: (data.restartPolicy as RestartPolicy) ?? "UNLESS_STOPPED",
         healthcheck: data.healthcheck ?? null,
-        healthCheckPath: deployment.healthCheckPath ?? "/",
       }}
       declared={container?.declaredHealthcheck ?? null}
       runtimeHealth={container?.health ?? null}
-      showReadiness={deployment.type === "WEB"}
-      saving={updateResources.isPending || updateDeployment.isPending}
+      saving={updateResources.isPending}
       onSave={onSave}
     />
   );
@@ -186,19 +169,16 @@ function HealthForm({
   initial,
   declared,
   runtimeHealth,
-  showReadiness,
   saving,
   onSave,
 }: {
   initial: HealthValues;
   declared: DeclaredHealthcheck | null;
   runtimeHealth: string | null;
-  showReadiness: boolean;
   saving: boolean;
   onSave: (values: HealthValues) => Promise<void>;
 }) {
   const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>(initial.restartPolicy);
-  const [healthCheckPath, setHealthCheckPath] = useState(initial.healthCheckPath);
   const [enabled, setEnabled] = useState(Boolean(initial.healthcheck));
   const [test, setTest] = useState(initial.healthcheck?.test ?? "");
   const [interval, setInterval] = useState(initial.healthcheck?.interval ?? "");
@@ -218,7 +198,7 @@ function HealthForm({
           }
         : null;
 
-    void onSave({ restartPolicy, healthcheck, healthCheckPath });
+    void onSave({ restartPolicy, healthcheck });
   };
 
   return (
@@ -251,22 +231,6 @@ function HealthForm({
           ))}
         </TextField>
       </SettingRow>
-
-      {showReadiness && (
-        <>
-          <Divider />
-          <SettingRow
-            label="Readiness path"
-            description="HTTP path Traefik polls to confirm the container is ready before routing traffic. Used when no Docker healthcheck is declared/defined."
-          >
-            <TextField
-              label="Readiness path"
-              value={healthCheckPath}
-              onChange={(event) => setHealthCheckPath(event.target.value)}
-            />
-          </SettingRow>
-        </>
-      )}
 
       <Divider sx={{ my: 1 }} />
 

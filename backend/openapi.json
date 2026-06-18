@@ -3072,10 +3072,6 @@
             "type": "string",
             "description": "Compose service to route + monitor."
           },
-          "healthCheckPath": {
-            "type": "string",
-            "example": "/"
-          },
           "runCommand": {
             "type": "string"
           },
@@ -3225,9 +3221,6 @@
             "type": "number",
             "nullable": true
           },
-          "healthCheckPath": {
-            "type": "string"
-          },
           "autoDeploy": {
             "type": "boolean"
           },
@@ -3324,7 +3317,6 @@
           "runCommand",
           "cronExpr",
           "webServicePort",
-          "healthCheckPath",
           "autoDeploy",
           "restartPolicy",
           "memoryLimitMb",
@@ -3370,9 +3362,6 @@
             "type": "string"
           },
           "composeWebService": {
-            "type": "string"
-          },
-          "healthCheckPath": {
             "type": "string"
           },
           "runCommand": {

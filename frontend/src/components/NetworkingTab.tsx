@@ -32,7 +32,7 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
       sortable: false,
       renderCell: (params) =>
         params.row.networks.length > 0 ? (
-          <Box sx={{ display: "flex", flexDirection: "column", py: 0.5 }}>
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
             {params.row.networks.map((net) => (
               <Box key={net.name}>{net.ip ? `${net.name} (${net.ip})` : net.name}</Box>
             ))}
@@ -48,7 +48,7 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
       sortable: false,
       renderCell: (params) =>
         params.row.ports.length > 0 ? (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, py: 0.5 }}>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
             {params.row.ports.map((port) => (
               <Chip key={port} label={port} size="small" variant="outlined" />
             ))}
@@ -82,7 +82,7 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
           localeText={{
             noRowsLabel: "No running containers — networking appears once they're up.",
           }}
-          sx={{ border: 0 }}
+          sx={{ border: 0, "& .MuiDataGrid-cell": { display: "flex", alignItems: "center" } }}
         />
       </Box>
 

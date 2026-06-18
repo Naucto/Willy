@@ -182,7 +182,10 @@ export function DeploymentDetailPage() {
         )}
         {/* DeployActions flex-grows to fill the rest of the row and right-aligns; it folds its
             buttons to icons when that remaining space gets tight. */}
-        <DeployActions deployment={deployment} onDeleted={() => navigate("/deployments")} />
+        <DeployActions
+          deployment={deployment}
+          onDeleted={() => navigate("/deployments", { replace: true })}
+        />
       </Box>
 
       {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
@@ -237,7 +240,6 @@ function OverviewTab({
           />
           <DetailRow label="Ref" value={deployment.gitRef} />
           <DetailRow label="Build strategy" value={deployment.buildStrategy} />
-          <DetailRow label="Health check" value={deployment.healthCheckPath} />
           <DetailRow label="Restart policy" value={deployment.restartPolicy} />
           <DetailRow label="Memory limit (MB)" value={deployment.memoryLimitMb} />
         </CardContent>

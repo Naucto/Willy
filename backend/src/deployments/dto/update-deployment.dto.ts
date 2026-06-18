@@ -56,11 +56,6 @@ export class UpdateDeploymentDto {
   @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
-  healthCheckPath?: string;
-
-  @ApiPropertyOptional({ type: String })
-  @IsOptional()
-  @IsString()
   runCommand?: string;
 
   @ApiPropertyOptional({ type: String })
