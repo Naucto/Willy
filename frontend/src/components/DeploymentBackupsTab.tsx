@@ -12,7 +12,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   IconButton,
   MenuItem,
   Stack,
@@ -226,8 +225,6 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
           sx={{ border: 0 }}
         />
       </Box>
-
-      <Divider />
 
       <BackupSchedules deploymentId={deploymentId} />
 

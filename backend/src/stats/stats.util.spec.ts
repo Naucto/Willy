@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cpuPercent, memUsage } from "./stats.util";
+import { cpuPercent, memUsage, StatsWindow, windowToMs } from "./stats.util";
 
 describe("cpuPercent", () => {
   it("scales the cpu delta over the system delta by core count", () => {
@@ -44,5 +44,14 @@ describe("memUsage", () => {
 
   it("never reports negative usage", () => {
     expect(memUsage({ usage: 100, limit: 4000, stats: { cache: 999 } }).usageBytes).toBe(0);
+  });
+});
+
+describe("windowToMs", () => {
+  it("maps each window to its duration in milliseconds", () => {
+    expect(windowToMs(StatsWindow.FifteenMinutes)).toBe(15 * 60 * 1000);
+    expect(windowToMs(StatsWindow.OneHour)).toBe(60 * 60 * 1000);
+    expect(windowToMs(StatsWindow.SixHours)).toBe(6 * 60 * 60 * 1000);
+    expect(windowToMs(StatsWindow.TwentyFourHours)).toBe(24 * 60 * 60 * 1000);
   });
 });

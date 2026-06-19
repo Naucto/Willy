@@ -2726,6 +2726,55 @@
         ]
       }
     },
+    "/deployments/{id}/stats/history": {
+      "get": {
+        "operationId": "StatsController_deploymentHistory",
+        "parameters": [
+          {
+            "name": "window",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentStatsHistoryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stats"
+        ]
+      }
+    },
     "/admin/stats": {
       "get": {
         "operationId": "StatsController_systemStats",
@@ -2737,6 +2786,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SystemStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "stats"
+        ]
+      }
+    },
+    "/admin/stats/history": {
+      "get": {
+        "operationId": "StatsController_systemHistory",
+        "parameters": [
+          {
+            "name": "window",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostStatsHistoryDto"
                 }
               }
             }
@@ -2782,6 +2872,51 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      },
+      "delete": {
+        "operationId": "TasksController_clearAll",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/tasks/{id}": {
+      "delete": {
+        "operationId": "TasksController_clear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
           }
         },
         "security": [
@@ -4704,6 +4839,61 @@
           "containers"
         ]
       },
+      "DeploymentStatsSampleDto": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "number",
+            "description": "Sample time (epoch ms)."
+          },
+          "cpuPercent": {
+            "type": "number"
+          },
+          "cpuCores": {
+            "type": "number",
+            "nullable": true,
+            "description": "Configured CPU limit in cores."
+          },
+          "memUsageBytes": {
+            "type": "number"
+          },
+          "memLimitBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Configured memory limit in bytes."
+          },
+          "swapBytes": {
+            "type": "number"
+          },
+          "storageBytes": {
+            "type": "number",
+            "description": "Named volumes + container writable layers."
+          }
+        },
+        "required": [
+          "ts",
+          "cpuPercent",
+          "cpuCores",
+          "memUsageBytes",
+          "memLimitBytes",
+          "swapBytes",
+          "storageBytes"
+        ]
+      },
+      "DeploymentStatsHistoryDto": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentStatsSampleDto"
+            }
+          }
+        },
+        "required": [
+          "samples"
+        ]
+      },
       "DiskUsageDto": {
         "type": "object",
         "properties": {
@@ -4756,6 +4946,56 @@
           "cpuPercent",
           "memUsageBytes",
           "disk"
+        ]
+      },
+      "HostStatsSampleDto": {
+        "type": "object",
+        "properties": {
+          "cpus": {
+            "type": "number",
+            "description": "Host logical CPU count."
+          },
+          "memTotalBytes": {
+            "type": "number",
+            "description": "Host total memory in bytes."
+          },
+          "cpuPercent": {
+            "type": "number",
+            "description": "Sum of CPU% across all running containers."
+          },
+          "memUsageBytes": {
+            "type": "number",
+            "description": "Sum of memory used across all running containers."
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsageDto"
+          },
+          "ts": {
+            "type": "number",
+            "description": "Sample time (epoch ms)."
+          }
+        },
+        "required": [
+          "cpus",
+          "memTotalBytes",
+          "cpuPercent",
+          "memUsageBytes",
+          "disk",
+          "ts"
+        ]
+      },
+      "HostStatsHistoryDto": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostStatsSampleDto"
+            }
+          }
+        },
+        "required": [
+          "samples"
         ]
       },
       "TaskDto": {

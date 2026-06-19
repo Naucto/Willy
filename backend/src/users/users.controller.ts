@@ -5,12 +5,14 @@ import {
   Delete,
   Get,
   HttpCode,
+  Ip,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
+import { AuditService } from "../audit/audit.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/jwt-payload.interface";
@@ -33,7 +35,10 @@ function toDto(user: User): UserDto {
 @Roles("ADMIN")
 @Controller("users")
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly audit: AuditService,
+  ) {}
 
   @ApiOkResponse({ type: [UserDto] })
   @Get()
@@ -44,8 +49,22 @@ export class UsersController {
   @ApiBody({ type: CreateUserDto })
   @ApiOkResponse({ type: UserDto })
   @Post()
-  async create(@Body() dto: CreateUserDto): Promise<UserDto> {
-    return toDto(await this.users.createWithPassword(dto.email, dto.password, dto.role));
+  async create(
+    @Body() dto: CreateUserDto,
+    @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
+  ): Promise<UserDto> {
+    const user = await this.users.createWithPassword(dto.email, dto.password, dto.role);
+    await this.audit.record({
+      actorId: actor.userId,
+      action: "USER_CREATE",
+      targetType: "user",
+      targetId: user.id,
+      ip,
+      metadata: { email: user.email, role: user.role },
+    });
+
+    return toDto(user);
   }
 
   @ApiParam({ name: "id", type: String })
@@ -56,6 +75,7 @@ export class UsersController {
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserRoleDto,
     @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
   ): Promise<UserDto> {
     // Don't let the last admin demote themselves into a lockout.
     if (id === actor.userId && dto.role !== "ADMIN") {
@@ -69,6 +89,15 @@ export class UsersController {
       throw new BadRequestException("user not found");
     }
 
+    await this.audit.record({
+      actorId: actor.userId,
+      action: "USER_ROLE_CHANGE",
+      targetType: "user",
+      targetId: id,
+      ip,
+      metadata: { role: dto.role },
+    });
+
     return toDto(user);
   }
 
@@ -80,8 +109,17 @@ export class UsersController {
   async setPassword(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: SetPasswordDto,
+    @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
   ): Promise<{ ok: true }> {
     await this.users.setPassword(id, dto.password);
+    await this.audit.record({
+      actorId: actor.userId,
+      action: "USER_PASSWORD_RESET",
+      targetType: "user",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }
@@ -92,12 +130,20 @@ export class UsersController {
   async remove(
     @Param("id", ParseUUIDPipe) id: string,
     @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
   ): Promise<{ ok: true }> {
     if (id === actor.userId) {
       throw new BadRequestException("you cannot delete your own account");
     }
 
     await this.users.remove(id);
+    await this.audit.record({
+      actorId: actor.userId,
+      action: "USER_DELETE",
+      targetType: "user",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }

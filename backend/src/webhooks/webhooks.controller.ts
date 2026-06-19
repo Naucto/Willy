@@ -3,6 +3,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  Ip,
   Param,
   Post,
   type RawBodyRequest,
@@ -16,8 +17,11 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import type { Request } from "express";
+import { AuditService } from "../audit/audit.service";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Public } from "../auth/decorators/public.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import type { AuthUser } from "../auth/jwt-payload.interface";
 import { WebhookSecretDto, WebhookStatusDto } from "./dto/webhook.dto";
 import { type WebhookOutcome, WebhooksService } from "./webhooks.service";
 
@@ -28,7 +32,10 @@ function webhookPath(deploymentId: string): string {
 @ApiTags("webhooks")
 @Controller()
 export class WebhooksController {
-  constructor(private readonly webhooks: WebhooksService) {}
+  constructor(
+    private readonly webhooks: WebhooksService,
+    private readonly audit: AuditService,
+  ) {}
 
   // Called by GitHub, not the panel — authenticated by the HMAC signature, not a JWT.
   @Public()
@@ -62,7 +69,20 @@ export class WebhooksController {
   @ApiParam({ name: "id", type: String })
   @ApiOkResponse({ type: WebhookSecretDto })
   @Post("deployments/:id/webhook")
-  async rotate(@Param("id") id: string): Promise<WebhookSecretDto> {
-    return { secret: await this.webhooks.rotateSecret(id), path: webhookPath(id) };
+  async rotate(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
+  ): Promise<WebhookSecretDto> {
+    const secret = await this.webhooks.rotateSecret(id);
+    await this.audit.record({
+      actorId: actor.userId,
+      action: "WEBHOOK_ROTATE",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
+
+    return { secret, path: webhookPath(id) };
   }
 }

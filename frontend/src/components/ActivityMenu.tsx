@@ -1,9 +1,11 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CloseIcon from "@mui/icons-material/Close";
 import ErrorIcon from "@mui/icons-material/Error";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
 import {
   Badge,
   Box,
+  Button,
   CircularProgress,
   IconButton,
   LinearProgress,
@@ -13,7 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useState } from "react";
-import { useTasks } from "../api/hooks";
+import { useClearTask, useClearTasks, useTasks } from "../api/hooks";
 import type { Task } from "../api/types";
 import { formatRelativeTime } from "../format";
 
@@ -34,6 +36,7 @@ function isActive(task: Task): boolean {
 function TaskRow({ task }: { task: Task }) {
   const active = isActive(task);
   const createdUnix = Math.floor(new Date(task.createdAt).getTime() / 1000);
+  const clear = useClearTask();
 
   return (
     <Box sx={{ px: 2, py: 1.25 }}>
@@ -53,6 +56,17 @@ function TaskRow({ task }: { task: Task }) {
         <Typography variant="caption" sx={{ color: "text.secondary", flexShrink: 0 }}>
           {formatRelativeTime(createdUnix)}
         </Typography>
+        {/* Only finished tasks can be cleared — dismissing a live one would orphan its operation. */}
+        {!active &&
+          (clear.isPending ? (
+            <CircularProgress size={16} sx={{ mr: 0.25 }} />
+          ) : (
+            <Tooltip title="Clear">
+              <IconButton size="small" edge="end" onClick={() => clear.mutate(task.id)}>
+                <CloseIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Tooltip>
+          ))}
       </Box>
       {active && (
         <LinearProgress
@@ -68,8 +82,11 @@ function TaskRow({ task }: { task: Task }) {
 export function ActivityMenu() {
   const { data: tasks } = useTasks("recent");
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const clearAll = useClearTasks();
 
-  const activeCount = (tasks ?? []).filter(isActive).length;
+  const list = tasks ?? [];
+  const activeCount = list.filter(isActive).length;
+  const hasFinished = list.some((task) => !isActive(task));
 
   return (
     <>
@@ -104,13 +121,34 @@ export function ActivityMenu() {
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { width: 380, maxHeight: 460 } } }}
       >
-        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: "divider" }}>
-          <Typography variant="subtitle2">Activity</Typography>
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderBottom: 1,
+            borderColor: "divider",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>
+            Activity
+          </Typography>
+          {hasFinished && (
+            <Button
+              size="small"
+              color="inherit"
+              disabled={clearAll.isPending}
+              onClick={() => clearAll.mutate()}
+            >
+              Clear all
+            </Button>
+          )}
         </Box>
 
-        {tasks && tasks.length > 0 ? (
+        {list.length > 0 ? (
           <Stack divider={<Box sx={{ borderBottom: 1, borderColor: "divider" }} />}>
-            {tasks.map((task) => (
+            {list.map((task) => (
               <TaskRow key={task.id} task={task} />
             ))}
           </Stack>

@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 export const OWNER_LABEL = "willy.deploymentId";
 
@@ -40,6 +41,22 @@ function sanitize(value: string): string {
   return value.replace(/[^a-zA-Z0-9-]/g, "-");
 }
 
+// A `*.BASE_DOMAIN` wildcard (obtained once on the panel's own router) covers exactly one label
+// under the base domain. Hosts it covers don't need their own per-domain ACME issuance.
+function coveredByWildcard(host: string, baseDomain: string): boolean {
+  if (!baseDomain || host === baseDomain) {
+    return host === baseDomain;
+  }
+
+  if (!host.endsWith(`.${baseDomain}`)) {
+    return false;
+  }
+
+  const label = host.slice(0, host.length - baseDomain.length - 1);
+
+  return label.length > 0 && !label.includes(".");
+}
+
 // Collapse per-domain targets into route groups keyed by (service, port). For single-container
 // deployments pass defaultService: null so every domain lands on the one container, grouped by
 // port; for compose pass the default web service so untargeted domains route there.
@@ -72,7 +89,10 @@ export function groupRoutes(
 // the owner label (no routing).
 @Injectable()
 export class LabelGeneratorService {
+  constructor(private readonly config: ConfigService) {}
+
   forWebRoutes(input: WebRoutesInput): Record<string, string> {
+    const baseDomain = this.config.get<string>("BASE_DOMAIN") ?? "";
     const labels: Record<string, string> = {
       "traefik.enable": "true",
       "traefik.docker.network": input.network,
@@ -86,7 +106,13 @@ export class LabelGeneratorService {
       labels[`traefik.http.routers.${router}.rule`] = rule;
       labels[`traefik.http.routers.${router}.entrypoints`] = "websecure";
       labels[`traefik.http.routers.${router}.tls`] = "true";
-      labels[`traefik.http.routers.${router}.tls.certresolver`] = "ovh";
+
+      // Base-domain subdomains are served by the panel's `*.BASE_DOMAIN` wildcard, so they need no
+      // resolver. Anything outside the base domain (a custom external domain) gets its own cert.
+      if (!group.hosts.every((host) => coveredByWildcard(host, baseDomain))) {
+        labels[`traefik.http.routers.${router}.tls.certresolver`] = "ovh";
+      }
+
       labels[`traefik.http.routers.${router}.middlewares`] = "sec-headers@file";
       labels[`traefik.http.routers.${router}.priority`] = String(input.priority);
       labels[`traefik.http.services.${router}.loadbalancer.server.port`] = String(group.port);

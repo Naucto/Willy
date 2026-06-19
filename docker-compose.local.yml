@@ -13,6 +13,11 @@ services:
       - ./routing/local/tls.yml:/etc/traefik/dynamic/tls.local.yml:ro
       - ./routing/certs:/certs:ro
 
+  willy-server:
+    # Local dev keeps the Swagger UI (api/docs) enabled; prod defaults to production (docs off).
+    environment:
+      NODE_ENV: development
+
   postgres:
     # Bind to localhost on a non-default port to avoid clashing with a host Postgres.
     ports:

@@ -13,18 +13,26 @@ const CONSOLE_PATH = /^\/api\/console\/([^/]+)$/;
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
+  // Trust the single Traefik hop so req.ip reflects the real client (X-Forwarded-For) — required
+  // for per-client rate limiting; clients can't reach the backend except through Traefik.
+  app.getHttpAdapter().getInstance().set("trust proxy", 1);
+
   // Health probes stay un-prefixed so the container healthcheck can hit /health directly.
   app.setGlobalPrefix("api", { exclude: ["health", "health/ready"] });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle("Willy API")
-    .setVersion("0.0.0")
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup("api/docs", app, SwaggerModule.createDocument(app, swaggerConfig));
+  // The OpenAPI UI/spec describes the whole API surface and is unauthenticated — keep it out of
+  // production. Still available in dev for client generation and exploration.
+  if (process.env.NODE_ENV !== "production") {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle("Willy API")
+      .setVersion("0.0.0")
+      .addBearerAuth()
+      .build();
+    SwaggerModule.setup("api/docs", app, SwaggerModule.createDocument(app, swaggerConfig));
+  }
 
   attachConsoleWebsocket(app);
 

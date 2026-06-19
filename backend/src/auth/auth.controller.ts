@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Ip, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from "@nestjs/swagger";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { AuthService } from "./auth.service";
@@ -11,6 +12,7 @@ import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 import { AuthUser } from "./jwt-payload.interface";
 
 @ApiTags("auth")
+@UseGuards(ThrottlerGuard)
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -18,6 +20,8 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
+  // Brute-force guard: 10 attempts per 5 min per client IP.
+  @Throttle({ default: { limit: 10, ttl: 300_000 } })
   @Public()
   @HttpCode(200)
   @ApiBody({ type: LoginDto })
@@ -31,6 +35,7 @@ export class AuthController {
   }
 
   // Auth is the refresh token presented as a bearer (verified by JwtRefreshGuard).
+  @Throttle({ default: { limit: 30, ttl: 300_000 } })
   @Public()
   @UseGuards(JwtRefreshGuard)
   @ApiBearerAuth()

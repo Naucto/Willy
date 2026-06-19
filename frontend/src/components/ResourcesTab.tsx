@@ -22,7 +22,6 @@ import {
 } from "../api/hooks";
 import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { describeError } from "../errors";
-import { DeploymentUtilization } from "./ResourceUtilization";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 import { SettingRow } from "./SettingRow";
 
@@ -105,12 +104,7 @@ export function ResourcesTab({
       <DeploymentResources deployment={deployment} />
     );
 
-  return (
-    <Stack spacing={3}>
-      <DeploymentUtilization deploymentId={deployment.id} />
-      {form}
-    </Stack>
-  );
+  return <Stack spacing={3}>{form}</Stack>;
 }
 
 function ComposeServiceResources({

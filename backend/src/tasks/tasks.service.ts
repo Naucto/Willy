@@ -1,5 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { desc, eq, inArray } from "drizzle-orm";
+import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { desc, eq, inArray, notInArray } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
 import { tasks } from "../db/schema";
 
@@ -93,6 +93,26 @@ export class TasksService {
       .update(tasks)
       .set({ status: "FAILED", errorMessage: "Interrupted by restart", finishedAt: new Date() })
       .where(inArray(tasks.status, [...ACTIVE_STATUSES]));
+  }
+
+  // Clearing only removes finished rows — a running task can't be dismissed (it would leave the
+  // underlying operation orphaned with no visible trace).
+  async clear(id: string): Promise<void> {
+    const [row] = await this.db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+
+    if (!row) {
+      throw new NotFoundException(`Task ${id} not found`);
+    }
+
+    if ((ACTIVE_STATUSES as readonly string[]).includes(row.status)) {
+      throw new ConflictException("Cannot clear a task that is still running");
+    }
+
+    await this.db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  async clearFinished(): Promise<void> {
+    await this.db.delete(tasks).where(notInArray(tasks.status, [...ACTIVE_STATUSES]));
   }
 
   list(scope: "active" | "recent"): Promise<Task[]> {

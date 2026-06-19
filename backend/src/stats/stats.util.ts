@@ -43,3 +43,22 @@ export function memUsage(mem: MemSnapshot): {
     swapBytes: mem.stats?.swap ?? 0,
   };
 }
+
+// Time windows the history endpoints accept, smallest (sparklines) to largest (full charts).
+export enum StatsWindow {
+  FifteenMinutes = "15m",
+  OneHour = "1h",
+  SixHours = "6h",
+  TwentyFourHours = "24h",
+}
+
+const WINDOW_MS: Record<StatsWindow, number> = {
+  [StatsWindow.FifteenMinutes]: 15 * 60 * 1000,
+  [StatsWindow.OneHour]: 60 * 60 * 1000,
+  [StatsWindow.SixHours]: 6 * 60 * 60 * 1000,
+  [StatsWindow.TwentyFourHours]: 24 * 60 * 60 * 1000,
+};
+
+export function windowToMs(window: StatsWindow): number {
+  return WINDOW_MS[window];
+}

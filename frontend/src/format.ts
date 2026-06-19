@@ -13,6 +13,17 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
+// "ADMIN" → "Admin", "USER" → "User" — present roles in prose rather than SCREAMING_CASE.
+export function humanizeRole(role: string): string {
+  return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+}
+
+export function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+
+  return `${Math.round(value * 10) / 10}%`;
+}
+
 export function formatRelativeTime(unixSeconds: number): string {
   const seconds = Math.floor(Date.now() / 1000) - unixSeconds;
 

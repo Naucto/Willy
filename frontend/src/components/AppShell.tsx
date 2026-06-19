@@ -6,6 +6,7 @@ import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import HistoryIcon from "@mui/icons-material/History";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import InsightsIcon from "@mui/icons-material/Insights";
 import LanguageIcon from "@mui/icons-material/Language";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import MemoryIcon from "@mui/icons-material/Memory";
@@ -14,6 +15,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ShowChartIcon from "@mui/icons-material/ShowChart";
 import StorageIcon from "@mui/icons-material/Storage";
 import TerminalIcon from "@mui/icons-material/Terminal";
 import TuneIcon from "@mui/icons-material/Tune";
@@ -25,6 +27,7 @@ import {
   Button,
   Divider,
   Drawer,
+  Fade,
   IconButton,
   List,
   ListItemButton,
@@ -39,7 +42,9 @@ import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useDeployment, useDeploymentContainers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
 import { deploymentSections } from "../deploymentSections";
+import { humanizeRole } from "../format";
 import { ActivityMenu } from "./ActivityMenu";
+import { SlideFade } from "./SlideFade";
 
 const DRAWER_WIDTH = 220;
 const COLLAPSED_WIDTH = 64;
@@ -53,6 +58,7 @@ interface NavItem {
 
 const GLOBAL_NAV: NavItem[] = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
+  { label: "Monitoring", to: "/monitoring", icon: <InsightsIcon />, adminOnly: true },
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
   { label: "Backups", to: "/backups", icon: <BackupIcon /> },
   { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
@@ -74,6 +80,7 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   networking: <HubOutlinedIcon />,
   domains: <LanguageIcon />,
   resources: <MemoryIcon />,
+  monitoring: <ShowChartIcon />,
   health: <HealthAndSafetyIcon />,
   webhook: <WebhookIcon />,
   settings: <SettingsIcon />,
@@ -172,13 +179,13 @@ export function AppShell() {
 
           <Box sx={{ flexGrow: 1 }} />
 
+          <ActivityMenu />
+
           {user && (
-            <Typography variant="body2" sx={{ color: "text.secondary", mr: 2 }}>
-              {user.email} · {user.role}
+            <Typography variant="body2" sx={{ color: "text.secondary", mx: 2 }}>
+              {user.email} · {humanizeRole(user.role)}
             </Typography>
           )}
-
-          <ActivityMenu />
 
           <Button color="inherit" onClick={() => void logout()}>
             Sign out
@@ -212,42 +219,48 @@ export function AppShell() {
         }}
       >
         <Toolbar />
-        <List>
-          {detail ? (
-            <>
-              {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
-              <Divider sx={{ my: 1 }} />
-              {deploymentSections(deployment?.type ?? "WEB")
-                .filter((section) => hasContainers || !CONTAINER_SCOPED.has(section.key))
-                .map((section) => {
-                  const container = new URLSearchParams(location.search).get("container");
-                  const query =
-                    container && CONTAINER_SCOPED.has(section.key)
-                      ? `?container=${encodeURIComponent(container)}`
-                      : "";
+        {/* Drill animation: the sub-sidebar enters from the right, the global nav from the left. */}
+        <SlideFade key={detail ? `d-${detail.id}` : "global"} direction={detail ? "right" : "left"}>
+          <List>
+            {detail ? (
+              <>
+                {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
+                <Divider sx={{ my: 1 }} />
+                {deploymentSections(deployment?.type ?? "WEB")
+                  .filter((section) => hasContainers || !CONTAINER_SCOPED.has(section.key))
+                  .map((section) => {
+                    const container = new URLSearchParams(location.search).get("container");
+                    const query =
+                      container && CONTAINER_SCOPED.has(section.key)
+                        ? `?container=${encodeURIComponent(container)}`
+                        : "";
 
-                  return item(
-                    section.key,
-                    `/deployments/${detail.id}/${section.key}${query}`,
-                    section.label,
-                    SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
-                    detail.section === section.key,
-                  );
-                })}
-            </>
-          ) : (
-            GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>
-              item(nav.to, nav.to, nav.label, nav.icon, location.pathname.startsWith(nav.to)),
-            )
-          )}
-        </List>
+                    return item(
+                      section.key,
+                      `/deployments/${detail.id}/${section.key}${query}`,
+                      section.label,
+                      SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
+                      detail.section === section.key,
+                    );
+                  })}
+              </>
+            ) : (
+              GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>
+                item(nav.to, nav.to, nav.label, nav.icon, location.pathname.startsWith(nav.to)),
+              )
+            )}
+          </List>
+        </SlideFade>
       </Drawer>
 
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0 }}>
         <Toolbar />
-        <Box sx={{ p: 4 }}>
-          <Outlet />
-        </Box>
+        {/* Fade the page content in on each navigation (keyed on the route). */}
+        <Fade in appear key={location.pathname}>
+          <Box sx={{ p: 4 }}>
+            <Outlet />
+          </Box>
+        </Fade>
       </Box>
     </Box>
   );

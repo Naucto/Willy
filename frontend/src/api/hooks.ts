@@ -12,6 +12,7 @@ import type {
   ResourceLimits,
   Role,
   SetEnvVarInput,
+  StatsWindow,
   UpdateAppSettings,
   UpdateDeploymentInput,
   UpdateDnsRecordInput,
@@ -845,11 +846,56 @@ export function useSystemStats() {
   });
 }
 
+// Sampled host history for the monitoring graphs (and the overview sparklines). The sampler records
+// every ~15s, so poll at the same cadence.
+export function useSystemStatsHistory(window: StatsWindow, enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "stats", "history", window],
+    queryFn: async () =>
+      unwrap(await api.GET("/admin/stats/history", { params: { query: { window } } })),
+    enabled,
+    refetchInterval: 15000,
+  });
+}
+
+export function useDeploymentStatsHistory(id: string, window: StatsWindow, enabled = true) {
+  return useQuery({
+    queryKey: ["deployments", id, "stats", "history", window],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/deployments/{id}/stats/history", {
+          params: { path: { id }, query: { window } },
+        }),
+      ),
+    enabled: enabled && Boolean(id),
+    refetchInterval: 15000,
+  });
+}
+
 export function useTasks(scope: "active" | "recent" = "recent") {
   return useQuery({
     queryKey: ["tasks", scope],
     queryFn: async () => unwrap(await api.GET("/tasks", { params: { query: { scope } } })),
     refetchInterval: 3000,
+  });
+}
+
+export function useClearTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/tasks/{id}", { params: { path: { id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+}
+
+export function useClearTasks() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => unwrap(await api.DELETE("/tasks")),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
 }
 

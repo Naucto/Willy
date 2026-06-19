@@ -14,6 +14,8 @@ networks:
 
 volumes:
   postgres-data:
+  # AOF-persisted metrics history, so utilization graphs survive a control-plane restart.
+  redis-data:
   # Pinned name (no compose prefix) so backup helper containers can bind it by a stable name.
   willy_backups:
     name: willy_backups
@@ -51,8 +53,9 @@ services:
       traefik.docker.network: willy_edge
       traefik.http.routers.dashboard.rule: Host(`traefik.${BASE_DOMAIN}`)
       traefik.http.routers.dashboard.entrypoints: websecure
+      # No certresolver: traefik.<base> is a one-label subdomain served by the *.${BASE_DOMAIN}
+      # wildcard obtained on the willy-web router below.
       traefik.http.routers.dashboard.tls: "true"
-      traefik.http.routers.dashboard.tls.certresolver: ovh
       traefik.http.routers.dashboard.service: api@internal
       traefik.http.routers.dashboard.middlewares: dashboard-auth@file
 
@@ -99,6 +102,24 @@ services:
     networks:
       - willy_internal
 
+  # Time-series store for resource-utilization history (the monitoring graphs). Private to the
+  # control plane; AOF on so history isn't lost on restart.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - willy_internal
+    labels:
+      willy.internal: "true"
+
   willy-server:
     build:
       context: .
@@ -110,11 +131,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       docker-socket-proxy:
         condition: service_started
     environment:
       PORT: 3000
+      # production by default (disables the Swagger UI); the local override flips it to development.
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       WILLY_MASTER_KEY: ${WILLY_MASTER_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
@@ -155,8 +181,9 @@ services:
       traefik.docker.network: willy_edge
       traefik.http.routers.willy-api.rule: Host(`${PANEL_HOST}`) && PathPrefix(`/api`)
       traefik.http.routers.willy-api.entrypoints: websecure
+      # Served by the panel's base/wildcard cert (same host as willy-web) — no own resolver.
       traefik.http.routers.willy-api.tls: "true"
-      traefik.http.routers.willy-api.tls.certresolver: ovh
+      traefik.http.routers.willy-api.middlewares: panel-sec-headers@file
       traefik.http.services.willy-api.loadbalancer.server.port: "3000"
 
   willy-web:
@@ -177,4 +204,9 @@ services:
       traefik.http.routers.willy-web.entrypoints: websecure
       traefik.http.routers.willy-web.tls: "true"
       traefik.http.routers.willy-web.tls.certresolver: ovh
+      # Obtain one wildcard for the whole base zone so subdomain deployments reuse it instead of
+      # each triggering its own DNS-01 issuance (avoids Let's Encrypt rate limits).
+      traefik.http.routers.willy-web.tls.domains[0].main: ${BASE_DOMAIN}
+      traefik.http.routers.willy-web.tls.domains[0].sans: "*.${BASE_DOMAIN}"
+      traefik.http.routers.willy-web.middlewares: panel-sec-headers@file
       traefik.http.services.willy-web.loadbalancer.server.port: "80"

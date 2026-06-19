@@ -2,7 +2,15 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerService } from "../docker/docker.service";
-import type { DeploymentStatsDto, SystemStatsDto } from "./dto/stats.dto";
+import type {
+  DeploymentStatsDto,
+  DeploymentStatsHistoryDto,
+  DeploymentStatsSampleDto,
+  HostStatsHistoryDto,
+  SystemStatsDto,
+} from "./dto/stats.dto";
+import { deploymentKey, hostKey, MetricsStoreService, type Sample } from "./metrics-store.service";
+import { type StatsWindow, windowToMs } from "./stats.util";
 
 @Injectable()
 export class StatsService {
@@ -10,7 +18,28 @@ export class StatsService {
     private readonly docker: DockerService,
     private readonly containers: ContainersService,
     private readonly deployments: DeploymentsService,
+    private readonly store: MetricsStoreService,
   ) {}
+
+  async systemHistory(window: StatsWindow): Promise<HostStatsHistoryDto> {
+    const since = Date.now() - windowToMs(window);
+    const samples = await this.store.range<SystemStatsDto>(hostKey(), since);
+
+    return { samples: samples.map(withTimestamp) };
+  }
+
+  async deploymentHistory(
+    deploymentId: string,
+    window: StatsWindow,
+  ): Promise<DeploymentStatsHistoryDto> {
+    const since = Date.now() - windowToMs(window);
+    const samples = await this.store.range<Omit<DeploymentStatsSampleDto, "ts">>(
+      deploymentKey(deploymentId),
+      since,
+    );
+
+    return { samples: samples.map(withTimestamp) };
+  }
 
   async deploymentStats(deploymentId: string): Promise<DeploymentStatsDto> {
     const deployment = await this.deployments.findById(deploymentId);
@@ -89,4 +118,8 @@ export class StatsService {
 
 function round(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function withTimestamp<T extends object>(sample: Sample<T>): T & { ts: number } {
+  return { ts: sample.ts, ...sample.data };
 }

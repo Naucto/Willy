@@ -1,8 +1,13 @@
+import type { ConfigService } from "@nestjs/config";
 import { describe, expect, it } from "vitest";
 import { LabelGeneratorService, OWNER_LABEL, groupRoutes } from "./label-generator.service";
 
+// LabelGeneratorService reads BASE_DOMAIN to decide which routers ride the wildcard cert.
+const make = (baseDomain = "willy.naucto.net") =>
+  new LabelGeneratorService({ get: () => baseDomain } as unknown as ConfigService);
+
 describe("LabelGeneratorService", () => {
-  const service = new LabelGeneratorService();
+  const service = make();
 
   it("groups domains that share a (service, port) into one router with an OR rule", () => {
     const labels = service.forWebRoutes({
@@ -43,6 +48,44 @@ describe("LabelGeneratorService", () => {
     expect(labels["traefik.http.services.stack-backend-4000.loadbalancer.server.port"]).toBe(
       "4000",
     );
+  });
+
+  it("omits the certresolver for base-domain subdomains (served by the wildcard)", () => {
+    const labels = make("willy.naucto.net").forWebRoutes({
+      deploymentId: "dep-1",
+      routerPrefix: "blog",
+      network: "willy_edge",
+      priority: 1000,
+      groups: [{ service: null, port: 8080, hosts: ["blog.willy.naucto.net"] }],
+    });
+
+    expect(labels["traefik.http.routers.blog-app-8080.tls"]).toBe("true");
+    expect(labels["traefik.http.routers.blog-app-8080.tls.certresolver"]).toBeUndefined();
+  });
+
+  it("keeps per-domain ovh issuance for custom external domains", () => {
+    const labels = make("willy.naucto.net").forWebRoutes({
+      deploymentId: "dep-1",
+      routerPrefix: "shop",
+      network: "willy_edge",
+      priority: 1000,
+      groups: [{ service: null, port: 80, hosts: ["shop.acme.com"] }],
+    });
+
+    expect(labels["traefik.http.routers.shop-app-80.tls.certresolver"]).toBe("ovh");
+  });
+
+  it("treats deeper labels under the base domain as not wildcard-covered", () => {
+    const labels = make("willy.naucto.net").forWebRoutes({
+      deploymentId: "dep-1",
+      routerPrefix: "deep",
+      network: "willy_edge",
+      priority: 1000,
+      groups: [{ service: null, port: 80, hosts: ["a.b.willy.naucto.net"] }],
+    });
+
+    // *.willy.naucto.net covers one label only, so a two-label host needs its own cert.
+    expect(labels["traefik.http.routers.deep-app-80.tls.certresolver"]).toBe("ovh");
   });
 
   it("emits only the owner label for non-web deployments", () => {

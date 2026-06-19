@@ -231,6 +231,8 @@ POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql://willy:${pg_pass}@postgres:5432/willy
 
+REDIS_URL=redis://redis:6379
+
 DOCKER_PROXY_HOST=docker-socket-proxy
 DOCKER_PROXY_PORT=2375
 

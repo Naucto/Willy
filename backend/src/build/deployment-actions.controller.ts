@@ -175,9 +175,20 @@ export class DeploymentActionsController {
   @Roles("ADMIN")
   @ApiOkResponse({ type: OkResponseDto })
   @Delete("deployments/:id")
-  async remove(@Param("id") id: string): Promise<{ ok: true }> {
+  async remove(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
     await this.orchestrator.teardown(id);
     await this.deployments.remove(id);
+    await this.audit.record({
+      actorId: user.userId,
+      action: "DEPLOYMENT_DELETE",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+    });
 
     return { ok: true };
   }

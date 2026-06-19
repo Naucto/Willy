@@ -10,6 +10,7 @@ import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { DnsPage } from "./pages/DnsPage";
 import { ImagesPage } from "./pages/ImagesPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MonitoringPage } from "./pages/MonitoringPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { UsersPage } from "./pages/UsersPage";
 
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
           { path: "/deployments/new", element: <CreateDeploymentPage /> },
           { path: "/deployments/:id", element: <DeploymentDetailPage /> },
           { path: "/deployments/:id/:section", element: <DeploymentDetailPage /> },
+          { path: "/monitoring", element: <MonitoringPage /> },
           { path: "/dns", element: <DnsPage /> },
           { path: "/backups", element: <BackupsPage /> },
           { path: "/users", element: <UsersPage /> },

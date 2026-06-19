@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Prepare local development: generate a .env with dev defaults + secrets, and a TLS cert
-# for *.localhost (mkcert -> browser-trusted; falls back to self-signed). Idempotent.
+# for willy.localhost + *.willy.localhost (mkcert -> browser-trusted; falls back to
+# self-signed). Idempotent.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${0}")/.." && pwd)"
@@ -41,6 +42,8 @@ POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql://willy:${postgres_password}@postgres:5432/willy
 
+REDIS_URL=redis://redis:6379
+
 DOCKER_PROXY_HOST=docker-socket-proxy
 DOCKER_PROXY_PORT=2375
 
@@ -61,7 +64,20 @@ fi
 
 mkdir -p routing/certs
 
+# Each WEB deployment is served at <name>.willy.localhost, so the cert must carry the
+# *.willy.localhost wildcard (a bare *.localhost only matches a single label). Regenerate an
+# older cert that predates this so existing checkouts pick it up.
+needs_cert=0
+
 if [ ! -f routing/certs/local-cert.pem ]; then
+  needs_cert=1
+elif ! openssl x509 -in routing/certs/local-cert.pem -noout -text 2>/dev/null \
+  | grep -qF "*.willy.localhost"; then
+  echo "Local TLS cert is missing *.willy.localhost — regenerating."
+  needs_cert=1
+fi
+
+if [ "${needs_cert}" -eq 1 ]; then
   if command -v mkcert >/dev/null 2>&1; then
     echo "Generating a browser-trusted cert with mkcert..."
 
@@ -72,7 +88,7 @@ if [ ! -f routing/certs/local-cert.pem ]; then
     fi
 
     mkcert -cert-file routing/certs/local-cert.pem -key-file routing/certs/local-key.pem \
-      "willy.localhost" "*.localhost" "localhost" 127.0.0.1 ::1
+      "willy.localhost" "*.willy.localhost" "localhost" "*.localhost" 127.0.0.1 ::1
   else
     echo "mkcert not found — generating a self-signed cert (the browser will warn)."
     echo "Install mkcert for a trusted cert: https://github.com/FiloSottile/mkcert"
@@ -80,7 +96,7 @@ if [ ! -f routing/certs/local-cert.pem ]; then
     openssl req -x509 -newkey rsa:2048 -nodes -days 825 \
       -keyout routing/certs/local-key.pem -out routing/certs/local-cert.pem \
       -subj "/CN=willy.localhost" \
-      -addext "subjectAltName=DNS:willy.localhost,DNS:*.localhost,DNS:localhost,IP:127.0.0.1"
+      -addext "subjectAltName=DNS:willy.localhost,DNS:*.willy.localhost,DNS:localhost,DNS:*.localhost,IP:127.0.0.1,IP:::1"
   fi
 else
   echo "Local TLS cert already present — leaving it untouched."

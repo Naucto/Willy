@@ -41,8 +41,10 @@ import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
+import { MonitoringTab } from "../components/MonitoringTab";
 import { NetworkingTab } from "../components/NetworkingTab";
 import { ResourcesTab } from "../components/ResourcesTab";
+import { DeploymentUtilization } from "../components/ResourceUtilization";
 import { SelectOption } from "../components/SelectOption";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
@@ -206,6 +208,7 @@ export function DeploymentDetailPage() {
       {active === "networking" && <NetworkingTab deploymentId={id} />}
       {active === "domains" && <DomainsManager deployment={deployment} />}
       {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
+      {active === "monitoring" && <MonitoringTab deployment={deployment} />}
       {active === "health" && <HealthTab deployment={deployment} container={selected} />}
       {active === "webhook" && <WebhookTab deployment={deployment} />}
       {active === "settings" && <SettingsTab deployment={deployment} />}
@@ -224,6 +227,8 @@ function OverviewTab({
 
   return (
     <Stack spacing={3}>
+      <DeploymentUtilization deploymentId={deploymentId} />
+
       <Card variant="outlined">
         <CardContent>
           <DetailRow

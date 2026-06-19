@@ -8,6 +8,7 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 // since ConfigModule.forRoot() validates at module-evaluation time. Preview mode
 // never executes providers, so these values are only here to satisfy the schema.
 process.env.DATABASE_URL ??= "postgres://placeholder";
+process.env.REDIS_URL ??= "redis://placeholder";
 process.env.WILLY_MASTER_KEY ??= "0".repeat(64);
 process.env.JWT_SECRET ??= "0".repeat(32);
 process.env.JWT_REFRESH_SECRET ??= "0".repeat(32);

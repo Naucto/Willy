@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { AdminModule } from "./admin/admin.module";
 import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
@@ -21,6 +22,7 @@ import { LogsModule } from "./logs/logs.module";
 import { MaintenanceModule } from "./maintenance/maintenance.module";
 import { OvhModule } from "./ovh/ovh.module";
 import { ReconcileModule } from "./reconcile/reconcile.module";
+import { RedisModule } from "./redis/redis.module";
 import { StatsModule } from "./stats/stats.module";
 import { SystemModule } from "./system/system.module";
 import { TasksModule } from "./tasks/tasks.module";
@@ -32,7 +34,10 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
+    // Baseline rate limit; auth endpoints tighten it further (see AuthController).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     DbModule,
+    RedisModule,
     CryptoModule,
     DockerModule,
     LogStorageModule,

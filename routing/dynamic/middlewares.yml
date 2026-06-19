@@ -2,14 +2,34 @@
 # created from container labels (compose-expanded), not here.
 http:
   middlewares:
+    # Applied to deployed apps. Deliberately no CSP/frame-deny here — those are app-specific and a
+    # blanket policy would break tenant apps.
     sec-headers:
       headers:
         stsSeconds: 31536000
         stsIncludeSubdomains: true
         stsPreload: true
         contentTypeNosniff: true
-        browserXssFilter: true
         referrerPolicy: "strict-origin-when-cross-origin"
+    # Hardened headers for Willy's OWN control panel (willy-web/willy-api): adds clickjacking
+    # protection and a strict CSP. The SPA is fully self-hosted; emotion needs inline styles.
+    panel-sec-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        contentSecurityPolicy: >-
+          default-src 'self';
+          img-src 'self' data:;
+          style-src 'self' 'unsafe-inline';
+          font-src 'self' data:;
+          connect-src 'self';
+          frame-ancestors 'none';
+          base-uri 'self';
+          object-src 'none'
     rate-limit:
       rateLimit:
         average: 100

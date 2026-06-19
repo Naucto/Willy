@@ -6,6 +6,10 @@ export class EnvironmentVariables {
   @IsString()
   DATABASE_URL!: string;
 
+  // Time-series metrics store (see MetricsStoreService), e.g. redis://redis:6379.
+  @IsString()
+  REDIS_URL!: string;
+
   // 32 bytes encoded as hex (64 chars) — validated precisely in CryptoService.
   @IsString()
   @MinLength(32)

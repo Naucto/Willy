@@ -1,4 +1,4 @@
-import type { components } from "./schema";
+import type { components, paths } from "./schema";
 
 // Convenience aliases over the generated OpenAPI schema — the single source of truth.
 export type Deployment = components["schemas"]["DeploymentDto"];
@@ -45,6 +45,13 @@ export type AppSettings = components["schemas"]["AppSettingsDto"];
 export type UpdateAppSettings = components["schemas"]["UpdateAppSettingsDto"];
 export type DeploymentStats = components["schemas"]["DeploymentStatsDto"];
 export type SystemStats = components["schemas"]["SystemStatsDto"];
+export type HostStatsHistory = components["schemas"]["HostStatsHistoryDto"];
+export type HostStatsSample = components["schemas"]["HostStatsSampleDto"];
+export type DeploymentStatsHistory = components["schemas"]["DeploymentStatsHistoryDto"];
+export type DeploymentStatsSample = components["schemas"]["DeploymentStatsSampleDto"];
+export type StatsWindow = NonNullable<
+  NonNullable<paths["/admin/stats/history"]["get"]["parameters"]["query"]>["window"]
+>;
 export type Task = components["schemas"]["TaskDto"];
 export type AuditLog = components["schemas"]["AuditLogDto"];
 export type DeploymentRef = components["schemas"]["DeploymentRefDto"];

@@ -78,3 +78,44 @@ export class SystemStatsDto {
   @ApiProperty({ type: () => DiskUsageDto })
   disk!: DiskUsageDto;
 }
+
+// One recorded host snapshot. Same fields as the live SystemStatsDto plus the sample timestamp.
+export class HostStatsSampleDto extends SystemStatsDto {
+  @ApiProperty({ type: Number, description: "Sample time (epoch ms)." })
+  ts!: number;
+}
+
+export class HostStatsHistoryDto {
+  @ApiProperty({ type: () => [HostStatsSampleDto] })
+  samples!: HostStatsSampleDto[];
+}
+
+// One recorded per-deployment snapshot. The plotted scalars only — the live endpoint still carries
+// the per-container/volume breakdown, which isn't useful as a time series.
+export class DeploymentStatsSampleDto {
+  @ApiProperty({ type: Number, description: "Sample time (epoch ms)." })
+  ts!: number;
+
+  @ApiProperty({ type: Number })
+  cpuPercent!: number;
+
+  @ApiProperty({ type: Number, nullable: true, description: "Configured CPU limit in cores." })
+  cpuCores!: number | null;
+
+  @ApiProperty({ type: Number })
+  memUsageBytes!: number;
+
+  @ApiProperty({ type: Number, nullable: true, description: "Configured memory limit in bytes." })
+  memLimitBytes!: number | null;
+
+  @ApiProperty({ type: Number })
+  swapBytes!: number;
+
+  @ApiProperty({ type: Number, description: "Named volumes + container writable layers." })
+  storageBytes!: number;
+}
+
+export class DeploymentStatsHistoryDto {
+  @ApiProperty({ type: () => [DeploymentStatsSampleDto] })
+  samples!: DeploymentStatsSampleDto[];
+}

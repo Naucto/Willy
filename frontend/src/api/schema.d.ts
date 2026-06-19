@@ -932,6 +932,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/stats/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["StatsController_deploymentHistory"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/admin/stats": {
     parameters: {
       query?: never;
@@ -940,6 +956,22 @@ export interface paths {
       cookie?: never;
     };
     get: operations["StatsController_systemStats"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/stats/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["StatsController_systemHistory"];
     put?: never;
     post?: never;
     delete?: never;
@@ -958,7 +990,23 @@ export interface paths {
     get: operations["TasksController_list"];
     put?: never;
     post?: never;
-    delete?: never;
+    delete: operations["TasksController_clearAll"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/tasks/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["TasksController_clear"];
     options?: never;
     head?: never;
     patch?: never;
@@ -1563,6 +1611,22 @@ export interface components {
       volumes: components["schemas"]["VolumeUsageDto"][];
       containers: components["schemas"]["ContainerStatDto"][];
     };
+    DeploymentStatsSampleDto: {
+      /** @description Sample time (epoch ms). */
+      ts: number;
+      cpuPercent: number;
+      /** @description Configured CPU limit in cores. */
+      cpuCores: number | null;
+      memUsageBytes: number;
+      /** @description Configured memory limit in bytes. */
+      memLimitBytes: number | null;
+      swapBytes: number;
+      /** @description Named volumes + container writable layers. */
+      storageBytes: number;
+    };
+    DeploymentStatsHistoryDto: {
+      samples: components["schemas"]["DeploymentStatsSampleDto"][];
+    };
     DiskUsageDto: {
       imagesBytes: number;
       containersBytes: number;
@@ -1579,6 +1643,22 @@ export interface components {
       /** @description Sum of memory used across all running containers. */
       memUsageBytes: number;
       disk: components["schemas"]["DiskUsageDto"];
+    };
+    HostStatsSampleDto: {
+      /** @description Host logical CPU count. */
+      cpus: number;
+      /** @description Host total memory in bytes. */
+      memTotalBytes: number;
+      /** @description Sum of CPU% across all running containers. */
+      cpuPercent: number;
+      /** @description Sum of memory used across all running containers. */
+      memUsageBytes: number;
+      disk: components["schemas"]["DiskUsageDto"];
+      /** @description Sample time (epoch ms). */
+      ts: number;
+    };
+    HostStatsHistoryDto: {
+      samples: components["schemas"]["HostStatsSampleDto"][];
     };
     TaskDto: {
       id: string;
@@ -3264,6 +3344,29 @@ export interface operations {
       };
     };
   };
+  StatsController_deploymentHistory: {
+    parameters: {
+      query?: {
+        window?: "15m" | "1h" | "6h" | "24h";
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeploymentStatsHistoryDto"];
+        };
+      };
+    };
+  };
   StatsController_systemStats: {
     parameters: {
       query?: never;
@@ -3279,6 +3382,27 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["SystemStatsDto"];
+        };
+      };
+    };
+  };
+  StatsController_systemHistory: {
+    parameters: {
+      query?: {
+        window?: "15m" | "1h" | "6h" | "24h";
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HostStatsHistoryDto"];
         };
       };
     };
@@ -3301,6 +3425,42 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["TaskDto"][];
         };
+      };
+    };
+  };
+  TasksController_clearAll: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  TasksController_clear: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
