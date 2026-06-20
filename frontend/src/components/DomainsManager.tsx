@@ -1,7 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
 import EditIcon from "@mui/icons-material/EditOutlined";
-import LanIcon from "@mui/icons-material/LanOutlined";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import {
@@ -13,27 +12,26 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Link,
   MenuItem,
   Stack,
   TextField,
-  Tooltip,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { DataGrid, GridActionsCellItem, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
+  useAddBinding,
   useAddDomain,
-  useAddPortBinding,
   useAppSettings,
   useDeploymentContainers,
   useDeploymentDomains,
   useMakeDomainPrimary,
-  usePortBindings,
+  useRemoveBinding,
   useRemoveDomain,
-  useRemovePortBinding,
   useSuggestBindingPort,
   useUpdateDomainTarget,
 } from "../api/hooks";
@@ -50,9 +48,60 @@ interface ServiceOption {
   label: string;
 }
 
-// Live multi-domain editor. Each domain can be pinned to a specific container/service (compose
-// only) and a specific port; blank falls back to the deployment default. Adding and editing a route
-// both go through one modal; changes apply on the next deploy/restart.
+// One row of the route grid: a domain's 443 web route, or one of its hard-bound host ports. Both
+// kinds can coexist on a single domain, so the grid flattens domains + their bindings into rows.
+interface RouteRow {
+  id: string;
+  domain: DeploymentDomain;
+  kind: "web" | "port";
+  fqdn: string;
+  isPrimary: boolean;
+  targetService: string | null;
+  targetPort: number | null;
+  hostPort: number | null;
+  bindingId: string | null;
+}
+
+function toRows(domains: DeploymentDomain[]): RouteRow[] {
+  return domains.flatMap((domain) => {
+    const rows: RouteRow[] = [];
+
+    if (domain.webRoute) {
+      rows.push({
+        id: `${domain.id}:web`,
+        domain,
+        kind: "web",
+        fqdn: domain.fqdn,
+        isPrimary: domain.isPrimary,
+        targetService: domain.targetService,
+        targetPort: domain.targetPort,
+        hostPort: null,
+        bindingId: null,
+      });
+    }
+
+    for (const binding of domain.bindings) {
+      rows.push({
+        id: binding.id,
+        domain,
+        kind: "port",
+        fqdn: domain.fqdn,
+        isPrimary: false,
+        targetService: binding.targetService,
+        targetPort: binding.targetPort,
+        hostPort: binding.hostPort,
+        bindingId: binding.id,
+      });
+    }
+
+    return rows;
+  });
+}
+
+// Live multi-route editor. Each domain can serve a regular 443 web route and/or one or more hard-bound
+// host ports (each on its own Traefik entrypoint with TLS); a route can be pinned to a specific
+// container/service (compose only) and port. Adding and editing both go through one modal; changes
+// apply on the next deploy/restart.
 export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
   const canOperate = useCan("operate");
@@ -61,18 +110,20 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const { data: settings } = useAppSettings();
   const makePrimary = useMakeDomainPrimary(deployment.id);
   const removeDomain = useRemoveDomain(deployment.id);
+  const removeBinding = useRemoveBinding(deployment.id);
+  const updateTarget = useUpdateDomainTarget(deployment.id);
 
   const portBinding = settings?.portBinding;
   const bindingsEnabled = portBinding?.enabled ?? false;
 
   const isCompose = deployment.buildStrategy === "COMPOSE";
   const defaultService = deployment.strategyConfig.composeWebService ?? "";
-  // Port binding lives entirely here now: the fallback for a domain without an explicit port is the
-  // first container's first exposed port (matching how the backend resolves it), else 80.
+  // The fallback for a route without an explicit port is the first container's first exposed port
+  // (matching how the backend resolves it), else 80.
   const defaultPort = (containers ?? [])[0]?.exposedPorts[0] ?? 80;
 
-  // Service options come from the running containers (plus whatever domains already reference and
-  // the configured default), so the service is always picked from a list rather than typed.
+  // Service options come from the running containers (plus whatever domains already reference and the
+  // configured default), so the service is always picked from a list rather than typed.
   const serviceNames = Array.from(
     new Set(
       [
@@ -90,7 +141,6 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const [dialog, setDialog] = useState<
     { mode: "add" } | { mode: "edit"; domain: DeploymentDomain }
   >();
-  const [bindingsFor, setBindingsFor] = useState<DeploymentDomain | null>(null);
 
   const run = async (action: Promise<unknown>, ok: string) => {
     try {
@@ -101,17 +151,60 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     }
   };
 
-  const columns: GridColDef<DeploymentDomain>[] = [
+  // Removing a web route off a domain that still fronts host ports keeps the domain (now port-only);
+  // removing its last entry drops the whole domain (and its managed DNS).
+  const removeRow = (row: RouteRow) => {
+    if (row.kind === "web") {
+      if (row.domain.bindings.length > 0) {
+        return run(
+          updateTarget.mutateAsync({
+            domainId: row.domain.id,
+            body: { webRoute: false, targetService: null, targetPort: null },
+          }),
+          "Web route removed",
+        );
+      }
+
+      return run(removeDomain.mutateAsync(row.domain.id), "Domain removed");
+    }
+
+    if (!row.domain.webRoute && row.domain.bindings.length <= 1) {
+      return run(removeDomain.mutateAsync(row.domain.id), "Domain removed");
+    }
+
+    return run(
+      removeBinding.mutateAsync({ domainId: row.domain.id, bindingId: row.bindingId ?? "" }),
+      "Port unbound",
+    );
+  };
+
+  const columns: GridColDef<RouteRow>[] = [
     {
       field: "fqdn",
       headerName: "Domain",
       flex: 1,
       minWidth: 200,
-      renderCell: ({ row }) => (
-        <Link href={`https://${row.fqdn}`} target="_blank" rel="noopener noreferrer">
-          {row.fqdn}
-        </Link>
-      ),
+      renderCell: ({ row }) => {
+        const href =
+          row.kind === "port" ? `https://${row.fqdn}:${row.hostPort}` : `https://${row.fqdn}`;
+
+        return (
+          <Link href={href} target="_blank" rel="noopener noreferrer">
+            {row.fqdn}
+          </Link>
+        );
+      },
+    },
+    {
+      field: "kind",
+      headerName: "Type",
+      width: 130,
+      renderCell: ({ row }) =>
+        row.kind === "port" ? (
+          <Chip size="small" label={`Port :${row.hostPort}`} />
+        ) : (
+          <Chip size="small" variant="outlined" label="Web (443)" />
+        ),
     },
     ...(isCompose
       ? ([
@@ -122,12 +215,12 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
             valueGetter: (value) =>
               value || `default${defaultService ? ` (${defaultService})` : ""}`,
           },
-        ] satisfies GridColDef<DeploymentDomain>[])
+        ] satisfies GridColDef<RouteRow>[])
       : []),
     {
       field: "targetPort",
-      headerName: "Port",
-      width: 110,
+      headerName: "Target port",
+      width: 120,
       renderCell: ({ value }) => (
         <Box component="span" sx={{ color: value ? "inherit" : "text.disabled" }}>
           {value ?? defaultPort}
@@ -137,41 +230,43 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     {
       field: "actions",
       type: "actions",
-      width: bindingsEnabled ? 160 : 120,
-      getActions: ({ row }) => [
-        <GridActionsCellItem
-          key="edit"
-          icon={<EditIcon />}
-          label="Edit route"
-          disabled={!canOperate}
-          onClick={() => setDialog({ mode: "edit", domain: row })}
-        />,
-        ...(bindingsEnabled
+      width: 120,
+      getActions: ({ row }) =>
+        row.kind === "web"
           ? [
               <GridActionsCellItem
-                key="bindings"
-                icon={<LanIcon />}
-                label="Host ports"
+                key="edit"
+                icon={<EditIcon />}
+                label="Edit route"
                 disabled={!canOperate}
-                onClick={() => setBindingsFor(row)}
+                onClick={() => setDialog({ mode: "edit", domain: row.domain })}
+              />,
+              <GridActionsCellItem
+                key="primary"
+                icon={row.isPrimary ? <StarIcon color="warning" /> : <StarBorderIcon />}
+                label={row.isPrimary ? "Primary" : "Make primary"}
+                disabled={row.isPrimary || makePrimary.isPending || !canOperate}
+                onClick={() =>
+                  void run(makePrimary.mutateAsync(row.domain.id), "Primary domain updated")
+                }
+              />,
+              <GridActionsCellItem
+                key="delete"
+                icon={<DeleteIcon />}
+                label="Remove"
+                disabled={!canOperate}
+                onClick={() => void removeRow(row)}
               />,
             ]
-          : []),
-        <GridActionsCellItem
-          key="primary"
-          icon={row.isPrimary ? <StarIcon color="warning" /> : <StarBorderIcon />}
-          label={row.isPrimary ? "Primary" : "Make primary"}
-          disabled={row.isPrimary || makePrimary.isPending || !canOperate}
-          onClick={() => void run(makePrimary.mutateAsync(row.id), "Primary domain updated")}
-        />,
-        <GridActionsCellItem
-          key="delete"
-          icon={<DeleteIcon />}
-          label="Remove"
-          disabled={!canOperate}
-          onClick={() => void run(removeDomain.mutateAsync(row.id), "Domain removed")}
-        />,
-      ],
+          : [
+              <GridActionsCellItem
+                key="delete"
+                icon={<DeleteIcon />}
+                label="Remove"
+                disabled={!canOperate}
+                onClick={() => void removeRow(row)}
+              />,
+            ],
     },
   ];
 
@@ -185,56 +280,45 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
             startIcon={<AddIcon />}
             onClick={() => setDialog({ mode: "add" })}
           >
-            Add domain
+            Add route
           </Button>
         </Gated>
       </Box>
 
       <Box sx={{ width: "100%" }}>
         <DataGrid
-          rows={domains ?? []}
+          rows={toRows(domains ?? [])}
           columns={columns}
           getRowId={(row) => row.id}
           density="compact"
           autoHeight
           hideFooter
           disableRowSelectionOnClick
-          localeText={{ noRowsLabel: "No domains yet — add one above." }}
+          localeText={{ noRowsLabel: "No routes yet — add one above." }}
           sx={{ border: 0 }}
         />
       </Box>
 
       {isCompose && (
         <Box sx={{ fontSize: 12, color: "text.secondary" }}>
-          Service/port pin a domain to one compose service and port (e.g.{" "}
+          Service/port pin a route to one compose service and port (e.g.{" "}
           <code>api.example.com → backend:4000</code>). Default routes to the web service.
         </Box>
       )}
 
       {dialog && (
-        <DomainDialog
+        <RouteDialog
           deploymentId={deployment.id}
+          domains={domains ?? []}
+          bindingsEnabled={bindingsEnabled}
           isCompose={isCompose}
           defaultService={defaultService}
           defaultPort={defaultPort}
           serviceOptions={serviceOptions}
           containers={containers ?? []}
-          existing={dialog.mode === "edit" ? dialog.domain : null}
+          range={portBinding ? { start: portBinding.start, end: portBinding.end } : null}
+          editing={dialog.mode === "edit" ? dialog.domain : null}
           onClose={() => setDialog(undefined)}
-        />
-      )}
-
-      {bindingsFor && portBinding && (
-        <PortBindingsDialog
-          deploymentId={deployment.id}
-          domain={bindingsFor}
-          isCompose={isCompose}
-          defaultService={defaultService}
-          defaultPort={defaultPort}
-          serviceOptions={serviceOptions}
-          containers={containers ?? []}
-          range={{ start: portBinding.start, end: portBinding.end }}
-          onClose={() => setBindingsFor(null)}
         />
       )}
     </Stack>
@@ -259,41 +343,66 @@ function exposedPortsFor(
   return match?.exposedPorts ?? [];
 }
 
-function DomainDialog({
+type RouteKind = "domain" | "port";
+
+// One dialog for every route operation: add a dedicated domain (443) OR a hard port bind, attaching to
+// a brand-new FQDN or an existing domain — and editing an existing domain's web-route target. A hard
+// port bind on a new FQDN creates a port-only domain (no 443); both kinds then coexist on that domain.
+function RouteDialog({
   deploymentId,
+  domains,
+  bindingsEnabled,
   isCompose,
   defaultService,
   defaultPort,
   serviceOptions,
   containers,
-  existing,
+  range,
+  editing,
   onClose,
 }: {
   deploymentId: string;
+  domains: DeploymentDomain[];
+  bindingsEnabled: boolean;
   isCompose: boolean;
   defaultService: string;
   defaultPort: number;
   serviceOptions: ServiceOption[];
   containers: Container[];
-  existing: DeploymentDomain | null;
+  range: { start: number; end: number } | null;
+  editing: DeploymentDomain | null;
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const canOperate = useCan("operate");
   const addDomain = useAddDomain(deploymentId);
   const updateTarget = useUpdateDomainTarget(deploymentId);
-  const editing = existing !== null;
+  const addBinding = useAddBinding(deploymentId);
 
-  const [fqdn, setFqdn] = useState(existing?.fqdn ?? "");
-  const [service, setService] = useState(existing?.targetService ?? "");
-  const [port, setPort] = useState(existing?.targetPort ? String(existing.targetPort) : "");
+  const [kind, setKind] = useState<RouteKind>("domain");
+  const [fqdn, setFqdn] = useState(editing?.fqdn ?? "");
+  const [service, setService] = useState(editing?.targetService ?? "");
+  const [port, setPort] = useState(editing?.targetPort ? String(editing.targetPort) : "");
+  const [hostPort, setHostPort] = useState("");
+
+  const existingDomain = domains.find((d) => d.fqdn === fqdn.trim());
+  // Suggestions are global, so any owned domain anchors the lookup; prefer the matched one.
+  const anchorDomainId = existingDomain?.id ?? domains[0]?.id ?? "";
+  const { data: suggested } = useSuggestBindingPort(
+    deploymentId,
+    anchorDomainId,
+    kind === "port" && !editing && anchorDomainId !== "",
+  );
+  const hostPortValue = hostPort || (suggested ? String(suggested.hostPort) : "");
 
   const exposed = exposedPortsFor(containers, isCompose, service, defaultService);
   const fqdnInvalid = fqdn.trim().length > 0 && !isValidFqdn(fqdn);
-  const pending = addDomain.isPending || updateTarget.isPending;
+  const pending = addDomain.isPending || updateTarget.isPending || addBinding.isPending;
 
   const submit = async () => {
-    if (!editing && !isValidFqdn(fqdn)) {
+    const fq = fqdn.trim();
+
+    if (!editing && !isValidFqdn(fq)) {
       enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
 
       return;
@@ -303,15 +412,37 @@ function DomainDialog({
     const targetPort = port.trim() ? Number(port) : null;
 
     try {
-      if (editing) {
-        await updateTarget.mutateAsync({
-          domainId: existing.id,
-          body: { targetService, targetPort },
-        });
-        enqueueSnackbar("Route updated", { variant: "success" });
+      if (kind === "domain") {
+        if (editing || existingDomain) {
+          const domainId = (editing ?? existingDomain)?.id ?? "";
+          await updateTarget.mutateAsync({
+            domainId,
+            body: { webRoute: true, targetService, targetPort },
+          });
+        } else {
+          await addDomain.mutateAsync({ fqdn: fq, webRoute: true, targetService, targetPort });
+        }
+
+        enqueueSnackbar(editing ? "Route updated" : "Domain added", { variant: "success" });
       } else {
-        await addDomain.mutateAsync({ fqdn: fqdn.trim(), targetService, targetPort });
-        enqueueSnackbar("Domain added", { variant: "success" });
+        const value = Number.parseInt(hostPortValue, 10);
+
+        if (!range || !Number.isInteger(value) || value < range.start || value > range.end) {
+          enqueueSnackbar(`Host port must be within ${range?.start}–${range?.end}`, {
+            variant: "warning",
+          });
+
+          return;
+        }
+
+        // A bind needs a domain to anchor to; a brand-new FQDN becomes a port-only domain.
+        const domainId =
+          existingDomain?.id ?? (await addDomain.mutateAsync({ fqdn: fq, webRoute: false })).id;
+        await addBinding.mutateAsync({
+          domainId,
+          body: { hostPort: value, targetService, targetPort },
+        });
+        enqueueSnackbar("Port bound", { variant: "success" });
       }
 
       onClose();
@@ -320,15 +451,33 @@ function DomainDialog({
     }
   };
 
+  const title = editing ? `Edit ${editing.fqdn}` : "Add route";
+  const submitLabel = editing ? "Save" : kind === "port" ? "Bind port" : "Add domain";
+  const submitDisabled = pending || (!editing && !isValidFqdn(fqdn));
+
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{editing ? `Edit ${existing.fqdn}` : "Add domain"}</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
+          {!editing && bindingsEnabled && (
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              size="small"
+              color="primary"
+              value={kind}
+              onChange={(_, next: RouteKind | null) => next && setKind(next)}
+            >
+              <ToggleButton value="domain">Dedicated domain</ToggleButton>
+              <ToggleButton value="port">Hard port bind</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+
           {editing ? (
             <TextField
               label="Domain"
-              value={existing.fqdn}
+              value={editing.fqdn}
               slotProps={{ input: { readOnly: true } }}
             />
           ) : (
@@ -339,7 +488,40 @@ function DomainDialog({
                   Enter a valid domain, e.g. app.example.com
                 </Typography>
               )}
+              {domains.length > 0 && (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mt: 1, ml: 1.75 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
+                    Attach to:
+                  </Typography>
+                  {domains.map((d) => (
+                    <Chip
+                      key={d.id}
+                      size="small"
+                      label={d.fqdn}
+                      variant={existingDomain?.id === d.id ? "filled" : "outlined"}
+                      color={existingDomain?.id === d.id ? "primary" : "default"}
+                      onClick={() => setFqdn(d.fqdn)}
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
+          )}
+
+          {kind === "port" && !editing && (
+            <TextField
+              label="Host port"
+              type="number"
+              value={hostPortValue}
+              slotProps={{ htmlInput: range ? { min: range.start, max: range.end } : {} }}
+              onChange={(event) => setHostPort(event.target.value)}
+              helperText={
+                range
+                  ? `Dedicated TLS host port, allocatable range ${range.start}–${range.end}.`
+                  : undefined
+              }
+              sx={{ width: 200 }}
+            />
           )}
 
           {isCompose && (
@@ -381,7 +563,7 @@ function DomainDialog({
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Port"
+                label={kind === "port" ? "Internal port" : "Port"}
                 type="number"
                 placeholder={String(defaultPort)}
                 helperText={
@@ -392,214 +574,20 @@ function DomainDialog({
               />
             )}
           />
+
+          {kind === "port" && !editing && (
+            <Typography variant="caption" color="text.secondary">
+              Serves the domain over TLS on its own host port, additive to any 443 routing. A new
+              domain bound this way is created port-only (no 443 route).
+            </Typography>
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            disabled={pending || (!editing && !isValidFqdn(fqdn))}
-            onClick={() => void submit()}
-          >
-            {editing ? "Save" : "Add domain"}
-          </Button>
-        </Gated>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-// Manages the host ports hard-bound to a single domain: many ports can front one domain (each routed
-// to its own service/internal port, served on its own Traefik entrypoint with TLS), additive to the
-// domain's normal 443 routing. Changes apply on the next deploy/restart.
-function PortBindingsDialog({
-  deploymentId,
-  domain,
-  isCompose,
-  defaultService,
-  defaultPort,
-  serviceOptions,
-  containers,
-  range,
-  onClose,
-}: {
-  deploymentId: string;
-  domain: DeploymentDomain;
-  isCompose: boolean;
-  defaultService: string;
-  defaultPort: number;
-  serviceOptions: ServiceOption[];
-  containers: Container[];
-  range: { start: number; end: number };
-  onClose: () => void;
-}) {
-  const { enqueueSnackbar } = useSnackbar();
-  const canOperate = useCan("operate");
-  const { data: bindings } = usePortBindings(deploymentId, domain.id);
-  const addBinding = useAddPortBinding(deploymentId, domain.id);
-  const removeBinding = useRemovePortBinding(deploymentId, domain.id);
-  const { data: suggested } = useSuggestBindingPort(deploymentId, domain.id, true);
-
-  const [hostPort, setHostPort] = useState("");
-  const [service, setService] = useState("");
-  const [port, setPort] = useState("");
-
-  const exposed = exposedPortsFor(containers, isCompose, service, defaultService);
-  // Prefill the host port with the next free one once known, unless the user already typed something.
-  const hostPortValue = hostPort || (suggested ? String(suggested.hostPort) : "");
-
-  const run = async (action: Promise<unknown>, ok: string) => {
-    try {
-      await action;
-      enqueueSnackbar(ok, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
-
-  const submit = async () => {
-    const value = Number.parseInt(hostPortValue, 10);
-
-    if (!Number.isInteger(value) || value < range.start || value > range.end) {
-      enqueueSnackbar(`Host port must be within ${range.start}–${range.end}`, {
-        variant: "warning",
-      });
-
-      return;
-    }
-
-    await run(
-      addBinding.mutateAsync({
-        hostPort: value,
-        targetService: isCompose && service ? service : null,
-        targetPort: port.trim() ? Number(port) : null,
-      }),
-      "Port bound",
-    );
-    setHostPort("");
-    setService("");
-    setPort("");
-  };
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Host ports — {domain.fqdn}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2.5} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Each bound port serves <code>{domain.fqdn}</code> over TLS on a dedicated host port
-            (allocatable range {range.start}–{range.end}), in addition to its normal 443 routing.
-          </Typography>
-
-          <Stack spacing={1}>
-            {(bindings ?? []).length === 0 && (
-              <Typography variant="body2" color="text.disabled">
-                No host ports bound yet.
-              </Typography>
-            )}
-
-            {(bindings ?? []).map((binding) => (
-              <Box
-                key={binding.id}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 1,
-                  px: 1.5,
-                  py: 0.75,
-                }}
-              >
-                <Chip size="small" label={`:${binding.hostPort}`} />
-                <Link
-                  href={`https://${domain.fqdn}:${binding.hostPort}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{ flexGrow: 1, fontSize: 13 }}
-                >
-                  {domain.fqdn}:{binding.hostPort}
-                </Link>
-                <Typography variant="caption" color="text.secondary">
-                  → {isCompose ? `${binding.targetService || defaultService || "default"}:` : ""}
-                  {binding.targetPort ?? defaultPort}
-                </Typography>
-                <Tooltip title="Remove binding">
-                  <span>
-                    <IconButton
-                      size="small"
-                      disabled={!canOperate || removeBinding.isPending}
-                      onClick={() =>
-                        void run(removeBinding.mutateAsync(binding.id), "Port unbound")
-                      }
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </Box>
-            ))}
-          </Stack>
-
-          <Stack spacing={1.5} sx={{ borderTop: 1, borderColor: "divider", pt: 2 }}>
-            <Typography variant="subtitle2">Bind a port</Typography>
-
-            <Stack direction="row" spacing={1.5}>
-              <TextField
-                label="Host port"
-                type="number"
-                size="small"
-                value={hostPortValue}
-                slotProps={{ htmlInput: { min: range.start, max: range.end } }}
-                onChange={(event) => setHostPort(event.target.value)}
-                sx={{ width: 140 }}
-              />
-
-              {isCompose && (
-                <TextField
-                  select
-                  label="Service"
-                  size="small"
-                  value={service}
-                  onChange={(event) => setService(event.target.value)}
-                  sx={{ flexGrow: 1 }}
-                >
-                  {serviceOptions.map((option) => (
-                    <MenuItem key={option.value || "default"} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
-
-              <Autocomplete
-                freeSolo
-                options={exposed.map((p) => String(p))}
-                value={port}
-                onChange={(_, next) => setPort(next ?? "")}
-                onInputChange={(_, next) => setPort(next)}
-                sx={{ width: 140 }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Internal port"
-                    type="number"
-                    size="small"
-                    placeholder={String(defaultPort)}
-                  />
-                )}
-              />
-            </Stack>
-          </Stack>
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Close</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" disabled={addBinding.isPending} onClick={() => void submit()}>
-            Bind port
+          <Button variant="contained" disabled={submitDisabled} onClick={() => void submit()}>
+            {submitLabel}
           </Button>
         </Gated>
       </DialogActions>

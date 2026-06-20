@@ -18,7 +18,6 @@ import type {
   UpdateDnsRecordInput,
   UpdateDomainTargetInput,
   UpdateEnvVarMetaInput,
-  UpdatePortBindingInput,
   UpdateUserInput,
 } from "./types";
 
@@ -532,20 +531,9 @@ export function useRemoveDomain(id: string) {
   });
 }
 
-export function usePortBindings(id: string, domainId: string) {
-  return useQuery({
-    queryKey: ["deployments", id, "domains", domainId, "bindings"],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/deployments/{id}/domains/{domainId}/bindings", {
-          params: { path: { id, domainId } },
-        }),
-      ),
-  });
-}
-
-// Lowest free host port in the active sub-range. Fetched lazily (e.g. when opening the add form);
-// kept fresh-on-demand rather than cached long, since allocation state moves under it.
+// Lowest free host port in the active sub-range. The suggestion is global (a host port binds at most
+// once machine-wide), so any owned domain works as the lookup anchor; fetched lazily and kept
+// fresh-on-demand rather than cached long, since allocation state moves under it.
 export function useSuggestBindingPort(id: string, domainId: string, enabled: boolean) {
   return useQuery({
     queryKey: ["deployments", id, "domains", domainId, "bindings", "suggest"],
@@ -561,57 +549,34 @@ export function useSuggestBindingPort(id: string, domainId: string, enabled: boo
   });
 }
 
-function invalidateBindings(
-  queryClient: ReturnType<typeof useQueryClient>,
-  id: string,
-  domainId: string,
-): void {
-  void queryClient.invalidateQueries({
-    queryKey: ["deployments", id, "domains", domainId, "bindings"],
-  });
-}
-
-export function useAddPortBinding(id: string, domainId: string) {
+// Binds embed in the domains list now, so binding mutations just refresh that query. domainId travels
+// in the variables (not the hook) so the unified add flow can bind to a domain it creates on the fly.
+export function useAddBinding(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (body: AddPortBindingInput) =>
+    mutationFn: async (input: { domainId: string; body: AddPortBindingInput }) =>
       unwrap(
         await api.POST("/deployments/{id}/domains/{domainId}/bindings", {
-          params: { path: { id, domainId } },
-          body,
-        }),
-      ),
-    onSuccess: () => invalidateBindings(queryClient, id, domainId),
-  });
-}
-
-export function useUpdatePortBinding(id: string, domainId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: { bindingId: string; body: UpdatePortBindingInput }) =>
-      unwrap(
-        await api.PATCH("/deployments/{id}/domains/{domainId}/bindings/{bindingId}", {
-          params: { path: { id, domainId, bindingId: input.bindingId } },
+          params: { path: { id, domainId: input.domainId } },
           body: input.body,
         }),
       ),
-    onSuccess: () => invalidateBindings(queryClient, id, domainId),
+    onSuccess: () => invalidateDomains(queryClient, id),
   });
 }
 
-export function useRemovePortBinding(id: string, domainId: string) {
+export function useRemoveBinding(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (bindingId: string) =>
+    mutationFn: async (input: { domainId: string; bindingId: string }) =>
       unwrap(
         await api.DELETE("/deployments/{id}/domains/{domainId}/bindings/{bindingId}", {
-          params: { path: { id, domainId, bindingId } },
+          params: { path: { id, domainId: input.domainId, bindingId: input.bindingId } },
         }),
       ),
-    onSuccess: () => invalidateBindings(queryClient, id, domainId),
+    onSuccess: () => invalidateDomains(queryClient, id),
   });
 }
 
