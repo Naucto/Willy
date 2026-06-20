@@ -17,6 +17,13 @@ const API_BASE = "/api";
 // Single-flight refresh: concurrent 401s share one refresh round-trip.
 let refreshInFlight: Promise<boolean> | null = null;
 
+// A failed /auth/refresh only ends the session when the refresh token itself is rejected. A
+// rate-limit (429), server error (5xx), or network blip is transient — we keep the session and let
+// the next request retry, so fast navigation can't spuriously log the user out.
+export function refreshFailureIsTerminal(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
 async function refreshTokens(): Promise<boolean> {
   const refreshToken = tokens.getRefresh();
 
@@ -24,21 +31,29 @@ async function refreshTokens(): Promise<boolean> {
     return false;
   }
 
-  const response = await fetch(`${API_BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${refreshToken}` },
-  });
+  let response: Response;
 
-  if (!response.ok) {
-    tokens.clear();
-
+  try {
+    response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${refreshToken}` },
+    });
+  } catch {
     return false;
   }
 
-  const session = (await response.json()) as { accessToken: string; refreshToken: string };
-  tokens.set(session.accessToken, session.refreshToken);
+  if (response.ok) {
+    const session = (await response.json()) as { accessToken: string; refreshToken: string };
+    tokens.set(session.accessToken, session.refreshToken);
 
-  return true;
+    return true;
+  }
+
+  if (refreshFailureIsTerminal(response.status)) {
+    tokens.clear();
+  }
+
+  return false;
 }
 
 // Dispatched when the session can't be refreshed; the auth layer redirects to /login.
@@ -68,7 +83,11 @@ async function authFetch(input: Request): Promise<Response> {
   });
 
   if (!(await refreshInFlight)) {
-    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    // Only force a logout when the refresh genuinely invalidated the session (tokens were cleared);
+    // a transient 429/5xx leaves the refresh token in place so the user stays signed in.
+    if (!tokens.getRefresh()) {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
 
     return response;
   }

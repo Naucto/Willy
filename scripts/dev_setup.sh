@@ -102,11 +102,4 @@ else
   echo "Local TLS cert already present — leaving it untouched."
 fi
 
-mkdir -p routing/auth
-
-if [ ! -f routing/auth/dashboard.htpasswd ]; then
-  echo "Generating Traefik dashboard credentials (admin / admin)..."
-  printf 'admin:%s\n' "$(openssl passwd -apr1 admin)" > routing/auth/dashboard.htpasswd
-fi
-
 echo "Local dev environment ready. Run 'make dev'."

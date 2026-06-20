@@ -88,6 +88,9 @@ export interface SanitizedCompose {
   services: string[];
   // Declared `healthcheck` blocks, keyed by service name (only services that declare one).
   healthchecks: Record<string, unknown>;
+  // Each service's `image:` (null for build-only services), used to default the routed port to the
+  // image's first EXPOSE when no web port is configured.
+  images: Record<string, string | null>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -109,6 +112,7 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
   const rawServices = asRecord(doc.services);
   const services: string[] = [];
   const healthchecks: Record<string, unknown> = {};
+  const images: Record<string, string | null> = {};
   const sanitized: Record<string, unknown> = {};
 
   for (const [name, value] of Object.entries(rawServices)) {
@@ -122,15 +126,17 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
         healthchecks[name] = service.healthcheck;
       }
 
+      images[name] = typeof service.image === "string" ? service.image : null;
       sanitized[name] = service;
     } else {
+      images[name] = null;
       sanitized[name] = value;
     }
   }
 
   doc.services = sanitized;
 
-  return { yaml: toYaml(doc), services, healthchecks };
+  return { yaml: toYaml(doc), services, healthchecks, images };
 }
 
 // Runs docker-compose stacks for COMPOSE deployments. Builds go through the same socket-proxy
@@ -180,8 +186,9 @@ export class ComposeService {
     // still set (back-compat with deployments created before the anchor was dissolved), otherwise
     // the first declared service.
     const defaultService = config.composeWebService || sanitized.services[0] || null;
+    const defaultServiceImage = defaultService ? (sanitized.images[defaultService] ?? null) : null;
 
-    await this.writeOverride(deployment, dir, defaultService);
+    await this.writeOverride(deployment, dir, defaultService, defaultServiceImage);
     await this.runCompose(
       ["-p", project, ...files, "up", "-d", "--build", "--remove-orphans"],
       dir,
@@ -231,6 +238,7 @@ export class ComposeService {
     deployment: Deployment,
     dir: string,
     defaultService: string | null,
+    defaultServiceImage: string | null,
   ): Promise<void> {
     const services: Record<string, Record<string, unknown>> = {};
     const networks: Record<string, unknown> = {};
@@ -242,7 +250,13 @@ export class ComposeService {
         throw new ComposeError("WEB compose deployment requires a domain");
       }
 
-      const defaultPort = deployment.webServicePort ?? 80;
+      // No configured port → fall back to the default service image's first EXPOSE (best-effort; the
+      // image may not be pulled yet, in which case this is empty), then 80. Mirrors the single-
+      // container path and the frontend's "first exposed port" hint.
+      const exposed = defaultServiceImage
+        ? await this.docker.imageExposedPorts(defaultServiceImage)
+        : [];
+      const defaultPort = deployment.webServicePort ?? exposed[0] ?? 80;
       const priority = PRIORITY_BASE - Date.now();
       const groups = groupRoutes(routes, { defaultService, defaultPort });
 

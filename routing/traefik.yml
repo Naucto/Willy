@@ -9,9 +9,7 @@ log:
 
 accessLog: {}
 
-api:
-  dashboard: true
-  insecure: false
+# The dashboard/API is intentionally disabled — unused, and leaving it off removes attack surface.
 
 entryPoints:
   web:

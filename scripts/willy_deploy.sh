@@ -275,22 +275,6 @@ configure_traefik() {
   sed -i "s|caServer: \".*\"|caServer: \"${ca}\"|" "${f}"
 }
 
-generate_dashboard_auth() {
-  mkdir -p "${WILLY_DIR}/routing/auth"
-
-  if [ ! -f "${WILLY_DIR}/routing/auth/dashboard.htpasswd" ]; then
-    pass="$(env_get WILLY_ADMIN_PASSWORD)"
-    if [ -z "${pass}" ]; then
-      pass="$(gen_secret 12)"
-    fi
-
-    printf 'admin:%s\n' "$(openssl passwd -apr1 "${pass}")" > "${WILLY_DIR}/routing/auth/dashboard.htpasswd"
-    log "Traefik dashboard user 'admin' created (password = WILLY_ADMIN_PASSWORD)"
-  fi
-
-  chown -R "${WILLY_USER}:${WILLY_USER}" "${WILLY_DIR}/routing/auth"
-}
-
 prepare_acme() {
   mkdir -p "${WILLY_DIR}/routing/letsencrypt"
   touch "${WILLY_DIR}/routing/letsencrypt/acme.json"
@@ -382,7 +366,6 @@ cmd_provision() {
   clone_or_update_repo
   write_env
   configure_traefik
-  generate_dashboard_auth
   prepare_acme
   compose_up
   wait_health

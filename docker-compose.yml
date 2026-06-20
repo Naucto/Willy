@@ -41,23 +41,14 @@ services:
     volumes:
       - ./routing/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./routing/dynamic:/etc/traefik/dynamic:ro
-      - ./routing/auth:/etc/traefik/auth:ro
       # Host bind (not a named volume) so the provisioner can create it 600, poll it, and back it up.
       - ./routing/letsencrypt:/letsencrypt
     networks:
       - willy_edge
       - willy_internal
     labels:
+      # No dashboard router — the Traefik API/dashboard is disabled (see routing/traefik.yml).
       willy.internal: "true"
-      traefik.enable: "true"
-      traefik.docker.network: willy_edge
-      traefik.http.routers.dashboard.rule: Host(`traefik.${BASE_DOMAIN}`)
-      traefik.http.routers.dashboard.entrypoints: websecure
-      # No certresolver: traefik.<base> is a one-label subdomain served by the *.${BASE_DOMAIN}
-      # wildcard obtained on the willy-web router below.
-      traefik.http.routers.dashboard.tls: "true"
-      traefik.http.routers.dashboard.service: api@internal
-      traefik.http.routers.dashboard.middlewares: dashboard-auth@file
 
   # Least-privilege gateway to the Docker Engine. Traefik and willy-server talk to Docker
   # through this, never the raw socket. Only the API surface Willy needs is enabled.

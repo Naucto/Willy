@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Ip, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
+import { SkipThrottle, Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { AuthService } from "./auth.service";
@@ -34,8 +34,9 @@ export class AuthController {
     return session;
   }
 
-  // Auth is the refresh token presented as a bearer (verified by JwtRefreshGuard).
-  @Throttle({ default: { limit: 30, ttl: 300_000 } })
+  // Already authenticated (a valid refresh token is presented + verified by JwtRefreshGuard), so it's
+  // not a brute-force target — don't IP-throttle it, or fast navigation can spuriously 429 → logout.
+  @SkipThrottle()
   @Public()
   @UseGuards(JwtRefreshGuard)
   @ApiBearerAuth()
@@ -46,6 +47,7 @@ export class AuthController {
     return this.auth.refresh(user.userId, token);
   }
 
+  @SkipThrottle()
   @ApiBearerAuth()
   @HttpCode(200)
   @ApiOkResponse({ type: OkResponseDto })
@@ -56,6 +58,7 @@ export class AuthController {
     return { ok: true };
   }
 
+  @SkipThrottle()
   @ApiBearerAuth()
   @ApiOkResponse({ type: AuthUserDto })
   @Get("me")

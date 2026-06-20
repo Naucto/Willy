@@ -1,3 +1,4 @@
+import { Socket } from "node:net";
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { WillyError } from "../common/errors";
 import { ContainersService } from "../containers/containers.service";
@@ -38,6 +39,28 @@ const WEB_HEALTH_TIMEOUT_MS = 90_000;
 const WORKER_HEALTH_GRACE_MS = 6_000;
 const HEALTH_INTERVAL_MS = 2_000;
 const KEEP_IMAGES = 3;
+
+// After the stack is healthy, how long to keep trying to actually reach the app on its routed port
+// before declaring the deployment unreachable (a port misconfiguration that would otherwise 502).
+const REACHABILITY_TIMEOUT_MS = 15_000;
+
+// Best-effort TCP connect with a per-attempt timeout — true if the port accepts a connection.
+function tcpConnect(host: string, port: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new Socket();
+
+    const finish = (ok: boolean): void => {
+      socket.destroy();
+      resolve(ok);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(port, host);
+  });
+}
 
 const RESTART_MAP: Record<Deployment["restartPolicy"], RestartPolicyName> = {
   NO: "no",
@@ -458,6 +481,17 @@ export class BuildOrchestrator {
         throw new HealthCheckError("compose stack did not become healthy");
       }
 
+      // Healthy containers can still 502 if the app listens on a different port than Traefik routes
+      // to. Probe the routed port so a port mismatch fails loudly instead of silently 502-ing.
+      const unreachable = await this.firstUnreachableRoute(deployment);
+
+      if (unreachable) {
+        this.buildLog.append(releaseId, unreachable);
+        await this.compose.stopAll(deployment);
+
+        throw new HealthCheckError(unreachable);
+      }
+
       await this.releases.setStatus(releaseId, "LIVE", { composeProject: project });
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
@@ -502,6 +536,57 @@ export class BuildOrchestrator {
     }
 
     return false;
+  }
+
+  // Verify each routed domain actually reaches its container on the port Traefik forwards to. Returns
+  // a human-readable reason for the first unreachable route, or null when everything is reachable (or
+  // can't be safely determined). Conservative: only probes a route when its target container is
+  // unambiguous, so it never fails a healthy deploy on missing information.
+  private async firstUnreachableRoute(deployment: Deployment): Promise<string | null> {
+    const [containers, routes] = await Promise.all([
+      this.containers.listForDeployment(deployment),
+      this.deployments.domainRoutes(deployment.id),
+    ]);
+
+    for (const route of routes) {
+      const container = route.targetService
+        ? containers.find((c) => c.service === route.targetService)
+        : containers.length === 1
+          ? containers[0]
+          : undefined;
+
+      const ip = container?.networks.find((n) => n.name === EDGE_NETWORK)?.ip;
+
+      if (!container || !ip) {
+        continue;
+      }
+
+      const port = route.targetPort ?? deployment.webServicePort ?? container.exposedPorts[0] ?? 80;
+      const deadline = Date.now() + REACHABILITY_TIMEOUT_MS;
+      let reachable = false;
+
+      while (Date.now() < deadline) {
+        if (await tcpConnect(ip, port, HEALTH_INTERVAL_MS)) {
+          reachable = true;
+          break;
+        }
+
+        await delay(HEALTH_INTERVAL_MS);
+      }
+
+      if (!reachable) {
+        const exposed = container.exposedPorts.length
+          ? ` (the container exposes ${container.exposedPorts.join(", ")})`
+          : "";
+
+        return (
+          `${route.fqdn} is routed to port ${port} but the app isn't accepting connections there${exposed}. ` +
+          "Set the domain's port (Domains tab) to the port your app actually listens on."
+        );
+      }
+    }
+
+    return null;
   }
 
   private async allContainersHealthy(

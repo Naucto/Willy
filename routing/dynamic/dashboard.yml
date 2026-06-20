@@ -1,8 +1,0 @@
-# Basic-auth middleware for the Traefik dashboard. The dashboard router itself is defined
-# via labels on the traefik service (it needs the env-configured base domain). Credentials
-# live in a generated htpasswd file (mounted, gitignored), not in this committed config.
-http:
-  middlewares:
-    dashboard-auth:
-      basicAuth:
-        usersFile: /etc/traefik/auth/dashboard.htpasswd

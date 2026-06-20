@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, unwrap } from "./client";
+import { ApiError, refreshFailureIsTerminal, unwrap } from "./client";
 
 function result<T>(init: { data?: T; error?: unknown; status: number }) {
   const value: { data?: T; error?: unknown; response: Response } = {
@@ -44,5 +44,19 @@ describe("unwrap", () => {
     } catch (error) {
       expect((error as ApiError).message).toBe("a, b");
     }
+  });
+});
+
+describe("refreshFailureIsTerminal", () => {
+  it("ends the session only when the refresh token is rejected", () => {
+    expect(refreshFailureIsTerminal(401)).toBe(true);
+    expect(refreshFailureIsTerminal(403)).toBe(true);
+  });
+
+  it("treats rate-limit / server / network failures as transient (stay signed in)", () => {
+    expect(refreshFailureIsTerminal(429)).toBe(false);
+    expect(refreshFailureIsTerminal(500)).toBe(false);
+    expect(refreshFailureIsTerminal(502)).toBe(false);
+    expect(refreshFailureIsTerminal(0)).toBe(false);
   });
 });
