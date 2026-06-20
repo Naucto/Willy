@@ -91,6 +91,9 @@ export interface SanitizedCompose {
   // Each service's `image:` (null for build-only services), used to default the routed port to the
   // image's first EXPOSE when no web port is configured.
   images: Record<string, string | null>;
+  // Services whose published `ports:` were stripped (declaration order), so the caller can tell the
+  // user in the build log why their host mapping no longer applies.
+  strippedPorts: string[];
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -102,8 +105,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 // Rewrites a user's compose file so two deployments from the same source don't collide. A hardcoded
 // `container_name` overrides Docker's project prefix (and an override file can't *delete* a key), so
 // two stacks would fight over one fixed name ("name already in use"); we strip it from every service
-// and let Docker derive `willy_<name>-<service>-N`. The obsolete top-level `version` is dropped too
-// (compose v2 ignores it and only warns). Pure (yaml string → result) so it can be unit-tested.
+// and let Docker derive `willy_<name>-<service>-N`. Published `ports:` are stripped too: Willy routes
+// by domain over the edge network (never host ports), so a host mapping is useless here and two stacks
+// publishing the same host port would clash on bind ("port is already allocated"). The obsolete
+// top-level `version` is dropped as well (compose v2 ignores it and only warns). Pure (yaml string →
+// result) so it can be unit-tested.
 export function sanitizeComposeYaml(raw: string): SanitizedCompose {
   const doc = asRecord(parseYaml(raw));
 
@@ -113,6 +119,7 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
   const services: string[] = [];
   const healthchecks: Record<string, unknown> = {};
   const images: Record<string, string | null> = {};
+  const strippedPorts: string[] = [];
   const sanitized: Record<string, unknown> = {};
 
   for (const [name, value] of Object.entries(rawServices)) {
@@ -121,6 +128,11 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const service = { ...(value as Record<string, unknown>) };
       delete service.container_name;
+
+      if (service.ports !== undefined) {
+        delete service.ports;
+        strippedPorts.push(name);
+      }
 
       if (service.healthcheck !== undefined) {
         healthchecks[name] = service.healthcheck;
@@ -136,7 +148,7 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
 
   doc.services = sanitized;
 
-  return { yaml: toYaml(doc), services, healthchecks, images };
+  return { yaml: toYaml(doc), services, healthchecks, images, strippedPorts };
 }
 
 // Runs docker-compose stacks for COMPOSE deployments. Builds go through the same socket-proxy
@@ -179,6 +191,12 @@ export class ComposeService {
 
     if (sanitized.services.length === 0) {
       throw new ComposeError("compose file declares no services");
+    }
+
+    for (const name of sanitized.strippedPorts) {
+      onLog(
+        `[willy] removed published host ports from service "${name}" — apps are reached by domain, not host ports.`,
+      );
     }
 
     const files = ["-f", composeFile, "-f", OVERRIDE_FILE];
