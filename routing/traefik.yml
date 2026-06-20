@@ -22,6 +22,9 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
+  # Per-port entrypoints for hard-bound domains (HTTPS/WSS only — no http->https redirect).
+  # willy:port-bind-entrypoints (generated from WILLY_PORT_BIND_RANGE by scripts/willy_deploy.sh) — do not edit by hand
+  # /willy:port-bind-entrypoints
 
 providers:
   docker:

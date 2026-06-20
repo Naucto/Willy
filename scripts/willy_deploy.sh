@@ -251,6 +251,73 @@ EOF
   mv "${tmp}" "${WILLY_DIR}/.env"
 }
 
+# Replace the body between a "${open}" .. "${close}" marker pair in "${file}" with "${block}"
+# (a literal string whose "\n" sequences awk expands to newlines). Idempotent: re-running replaces
+# the prior body rather than appending. Markers are matched as fixed substrings.
+replace_marker_block() {
+  file="${1}"
+  open="${2}"
+  close="${3}"
+  block="${4}"
+
+  if [ ! -f "${file}" ]; then
+    return 0
+  fi
+
+  tmp="$(mktemp)"
+
+  # `open`/`close` are gawk reserved words, so the awk vars use distinct names.
+  awk -v startm="${open}" -v endm="${close}" -v block="${block}" '
+    index($0, startm) { print; printf "%s", block; skip = 1; next }
+    index($0, endm) { skip = 0; print; next }
+    skip { next }
+    { print }
+  ' "${file}" > "${tmp}"
+
+  # Write back through the existing file so its owner/permissions are preserved (this runs as root,
+  # but the stack files are owned by WILLY_USER and read by `as_willy docker compose`).
+  cat "${tmp}" > "${file}"
+  rm -f "${tmp}"
+}
+
+# Provision the host-port-binding capacity from WILLY_PORT_BIND_RANGE (START-END): publish the whole
+# range on the Traefik container and declare one Traefik entrypoint per port. Empty/unset clears both
+# (feature off). Re-applied every run after the git reset, so it always matches the env.
+configure_port_bindings() {
+  range="$(env_get WILLY_PORT_BIND_RANGE)"
+
+  entrypoints=""
+  publish=""
+
+  if [ -n "${range}" ]; then
+    if ! printf '%s' "${range}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+      die "WILLY_PORT_BIND_RANGE must be START-END (e.g. 20000-20099), got '${range}'"
+    fi
+
+    start="${range%-*}"
+    end="${range#*-}"
+
+    if [ "${start}" -gt "${end}" ]; then
+      die "WILLY_PORT_BIND_RANGE start must be <= end (got '${range}')"
+    fi
+
+    p="${start}"
+    while [ "${p}" -le "${end}" ]; do
+      entrypoints="${entrypoints}  port-${p}:\n    address: \":${p}\"\n"
+      p=$((p + 1))
+    done
+
+    publish="      - \"${start}-${end}:${start}-${end}\"\n"
+
+    ufw allow "${start}:${end}/tcp" >/dev/null 2>&1 || true
+  fi
+
+  replace_marker_block "${WILLY_DIR}/routing/traefik.yml" \
+    "willy:port-bind-entrypoints (generated" "/willy:port-bind-entrypoints" "${entrypoints}"
+  replace_marker_block "${WILLY_DIR}/docker-compose.yml" \
+    "willy:port-bind-publish (generated" "/willy:port-bind-publish" "${publish}"
+}
+
 configure_traefik() {
   # Traefik does not expand env vars in its static file, so rewrite email + caServer here.
   # Re-applied every run (after git reset) to stay correct. Prod flip tracked by a marker.
@@ -273,6 +340,8 @@ configure_traefik() {
   f="${WILLY_DIR}/routing/traefik.yml"
   sed -i "s|email: \".*\"|email: \"${email}\"|" "${f}"
   sed -i "s|caServer: \".*\"|caServer: \"${ca}\"|" "${f}"
+
+  configure_port_bindings
 }
 
 prepare_acme() {

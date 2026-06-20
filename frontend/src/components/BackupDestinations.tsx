@@ -23,7 +23,10 @@ import {
   useTestDestination,
 } from "../api/hooks";
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { Gated } from "./Gated";
+import { PasswordField } from "./PasswordField";
 
 const DEST_OPTIONS = [
   {
@@ -40,6 +43,7 @@ type DestType = (typeof DEST_OPTIONS)[number]["value"];
 
 export function BackupDestinations() {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const { data: destinations, isLoading } = useBackupDestinations();
   const deleteDestination = useDeleteDestination();
   const [adding, setAdding] = useState(false);
@@ -70,9 +74,11 @@ export function BackupDestinations() {
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Gated>
       ),
     },
   ];
@@ -83,14 +89,16 @@ export function BackupDestinations() {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Offsite destinations
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={() => setAdding(true)}
-        >
-          New destination
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setAdding(true)}
+          >
+            New destination
+          </Button>
+        </Gated>
       </Box>
 
       <Box sx={{ height: 280 }}>
@@ -113,6 +121,7 @@ export function BackupDestinations() {
 
 function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const create = useCreateDestination();
   const test = useTestDestination();
   const [type, setType] = useState<DestType>("S3");
@@ -157,14 +166,20 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
     }
   };
 
-  const field = (key: string, label: string, password = false) => (
-    <TextField
-      label={label}
-      type={password ? "password" : "text"}
-      value={fields[key] ?? ""}
-      onChange={(event) => set(key, event.target.value)}
-    />
-  );
+  const field = (key: string, label: string, password = false) =>
+    password ? (
+      <PasswordField
+        label={label}
+        value={fields[key] ?? ""}
+        onChange={(event) => set(key, event.target.value)}
+      />
+    ) : (
+      <TextField
+        label={label}
+        value={fields[key] ?? ""}
+        onChange={(event) => set(key, event.target.value)}
+      />
+    );
 
   const ready =
     Boolean(fields.name) &&
@@ -245,16 +260,20 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button disabled={test.isPending || !ready} onClick={() => void onTest()}>
-          {test.isPending ? "Testing…" : "Test connection"}
-        </Button>
-        <Button
-          variant="contained"
-          disabled={create.isPending || !ready}
-          onClick={() => void onCreate()}
-        >
-          Create
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button disabled={test.isPending || !ready} onClick={() => void onTest()}>
+            {test.isPending ? "Testing…" : "Test connection"}
+          </Button>
+        </Gated>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            variant="contained"
+            disabled={create.isPending || !ready}
+            onClick={() => void onCreate()}
+          >
+            Create
+          </Button>
+        </Gated>
       </DialogActions>
     </Dialog>
   );

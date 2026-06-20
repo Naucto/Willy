@@ -25,10 +25,13 @@ import {
   useSetScheduleEnabled,
 } from "../api/hooks";
 import type { BackupSchedule } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { Gated } from "./Gated";
 
 export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const { data: schedules, isLoading } = useBackupSchedules(deploymentId);
   const setEnabled = useSetScheduleEnabled();
   const deleteSchedule = useDeleteSchedule();
@@ -66,11 +69,13 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
       headerName: "Enabled",
       width: 100,
       renderCell: (params) => (
-        <Switch
-          size="small"
-          checked={params.row.enabled}
-          onChange={(event) => void onToggle(params.row.id, event.target.checked)}
-        />
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Switch
+            size="small"
+            checked={params.row.enabled}
+            onChange={(event) => void onToggle(params.row.id, event.target.checked)}
+          />
+        </Gated>
       ),
     },
     {
@@ -81,9 +86,11 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
-          <DeleteIcon fontSize="small" />
-        </IconButton>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Gated>
       ),
     },
   ];
@@ -94,14 +101,16 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Schedules
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={() => setAdding(true)}
-        >
-          New schedule
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setAdding(true)}
+          >
+            New schedule
+          </Button>
+        </Gated>
       </Box>
 
       <Box sx={{ height: 320 }}>
@@ -137,6 +146,7 @@ function NewScheduleDialog({
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const createSchedule = useCreateSchedule();
 
   const [containerId, setContainerId] = useState("");
@@ -219,13 +229,15 @@ function NewScheduleDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={createSchedule.isPending || !volume || !cron.trim()}
-          onClick={() => void onCreate()}
-        >
-          Create
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            variant="contained"
+            disabled={createSchedule.isPending || !volume || !cron.trim()}
+            onClick={() => void onCreate()}
+          >
+            Create
+          </Button>
+        </Gated>
       </DialogActions>
     </Dialog>
   );

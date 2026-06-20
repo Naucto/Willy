@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatPercent, humanizeRole } from "./format";
+import { displayName, formatBytes, formatPercent, humanizeRole, humanizeType } from ".";
 
 describe("formatBytes", () => {
   it("scales into the largest fitting unit", () => {
@@ -31,9 +31,24 @@ describe("formatPercent", () => {
   });
 });
 
-describe("humanizeRole", () => {
-  it("title-cases the SCREAMING_CASE role", () => {
+describe("humanizeRole / humanizeType", () => {
+  it("title-cases SCREAMING_CASE values", () => {
     expect(humanizeRole("ADMIN")).toBe("Admin");
     expect(humanizeRole("USER")).toBe("User");
+    expect(humanizeType("WEB")).toBe("Web");
+    expect(humanizeType("CRON")).toBe("Cron");
+    expect(humanizeType("WORKER")).toBe("Worker");
+  });
+});
+
+describe("displayName", () => {
+  it("prefers the name when set", () => {
+    expect(displayName({ name: "Ada Lovelace", email: "ada@example.com" })).toBe("Ada Lovelace");
+  });
+
+  it("falls back to the email when the name is missing or blank", () => {
+    expect(displayName({ name: null, email: "ada@example.com" })).toBe("ada@example.com");
+    expect(displayName({ name: "   ", email: "ada@example.com" })).toBe("ada@example.com");
+    expect(displayName({ email: "ada@example.com" })).toBe("ada@example.com");
   });
 });

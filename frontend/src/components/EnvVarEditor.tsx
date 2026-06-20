@@ -23,8 +23,11 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useDeleteEnvVar, useEnvVars, useSetEnvVar, useUpdateEnvVarMeta } from "../api/hooks";
 import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
 import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
+import { Gated } from "./Gated";
+import { PasswordField } from "./PasswordField";
 
 const SCOPE_OPTIONS: { value: EnvScope; label: string; description: string }[] = [
   {
@@ -54,6 +57,7 @@ export function EnvVarEditor({
   service?: string;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const deploymentId = deployment.id;
 
   const { data, isLoading, error } = useEnvVars(deploymentId, service);
@@ -100,14 +104,18 @@ export function EnvVarEditor({
       renderCell: (params) => (
         <Box>
           <Tooltip title="Edit">
-            <IconButton size="small" onClick={() => setEditing(params.row)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
+            <Gated can={canOperate} reason={ROLE_REASON.operate}>
+              <IconButton size="small" onClick={() => setEditing(params.row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Gated>
           </Tooltip>
           <Tooltip title="Delete">
-            <IconButton size="small" onClick={() => void remove(params.row.key)}>
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            <Gated can={canOperate} reason={ROLE_REASON.operate}>
+              <IconButton size="small" onClick={() => void remove(params.row.key)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Gated>
           </Tooltip>
         </Box>
       ),
@@ -120,9 +128,11 @@ export function EnvVarEditor({
 
       <Box sx={{ display: "flex" }}>
         <Box sx={{ flexGrow: 1 }} />
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-          Add variable
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+            Add variable
+          </Button>
+        </Gated>
       </Box>
 
       <Box sx={{ height: 420 }}>
@@ -174,6 +184,7 @@ function EnvVarDialog({
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const setEnvVar = useSetEnvVar(deploymentId, service);
   const updateMeta = useUpdateEnvVarMeta(deploymentId, service);
 
@@ -227,13 +238,21 @@ function EnvVarDialog({
             disabled={editing}
             onChange={(event) => setKey(event.target.value)}
           />
-          <TextField
-            label="Value"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            type={isSecret ? "password" : "text"}
-            helperText={valueHelper}
-          />
+          {isSecret ? (
+            <PasswordField
+              label="Value"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              helperText={valueHelper}
+            />
+          ) : (
+            <TextField
+              label="Value"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              helperText={valueHelper}
+            />
+          )}
           <TextField
             select
             label="Scope"
@@ -267,13 +286,15 @@ function EnvVarDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button
-          variant="contained"
-          onClick={() => void save()}
-          disabled={setEnvVar.isPending || updateMeta.isPending || blocked}
-        >
-          Save
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            variant="contained"
+            onClick={() => void save()}
+            disabled={setEnvVar.isPending || updateMeta.isPending || blocked}
+          >
+            Save
+          </Button>
+        </Gated>
       </DialogActions>
     </Dialog>
   );

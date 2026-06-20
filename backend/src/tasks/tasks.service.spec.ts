@@ -9,6 +9,7 @@ const finished: Task = {
   status: "SUCCESS",
   title: "Deploy",
   deploymentId: null,
+  backupId: null,
   actorId: null,
   progress: 100,
   errorMessage: null,
@@ -61,5 +62,42 @@ describe("TasksService.clearFinished", () => {
     await service.clearFinished();
 
     expect(deleteWhere).toHaveBeenCalledOnce();
+  });
+});
+
+// Captures the predicate handed to .where() so we can tell a deployment-scoped query from a global one.
+function listDb(rows: Task[]) {
+  let captured: unknown;
+  const afterOrder = Object.assign(Promise.resolve(rows), { limit: () => Promise.resolve(rows) });
+  const db = {
+    select: () => ({
+      from: () => ({
+        where: (arg: unknown) => {
+          captured = arg;
+
+          return { orderBy: () => afterOrder };
+        },
+      }),
+    }),
+  } as unknown as Database;
+
+  return { service: new TasksService(db), captured: () => captured };
+}
+
+describe("TasksService.list", () => {
+  it("applies no predicate when unscoped", async () => {
+    const { service, captured } = listDb([finished]);
+
+    await service.list({ scope: "recent" });
+
+    expect(captured()).toBeUndefined();
+  });
+
+  it("filters by deployment when given", async () => {
+    const { service, captured } = listDb([finished]);
+
+    await service.list({ scope: "recent", deploymentId: "d1" });
+
+    expect(captured()).toBeDefined();
   });
 });

@@ -17,6 +17,16 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
     // "Deployment" (key kept as "settings" so routes/icons/switch stay put) sits right below
     // Overview — it governs the core build/run config and is the first thing to set up.
     { key: "settings", label: "Deployment" },
+    { key: "env", label: "Environment" },
+    { key: "resources", label: "Resources" },
+    { key: "networking", label: "Networking" },
+    ...(isWeb ? [{ key: "domains", label: "Domains" }] : []),
+    { key: "webhook", label: "Webhook" },
+    { key: "health", label: "Health" },
+    { key: "volumes", label: "Volumes" },
+    { key: "backups", label: "Backups" },
+    { key: "monitoring", label: "Monitoring" },
+    // Logs/console sit last. CRON shows "Runs" instead of the live Runtime-logs/Console sections.
     { key: "build", label: "Build logs" },
     ...(isCron
       ? [{ key: "runs", label: "Runs" }]
@@ -24,14 +34,5 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
           { key: "runtime", label: "Runtime logs" },
           { key: "console", label: "Console" },
         ]),
-    { key: "env", label: "Environment" },
-    { key: "volumes", label: "Volumes" },
-    { key: "backups", label: "Backups" },
-    { key: "networking", label: "Networking" },
-    ...(isWeb ? [{ key: "domains", label: "Domains" }] : []),
-    { key: "resources", label: "Resources" },
-    { key: "monitoring", label: "Monitoring" },
-    { key: "health", label: "Health" },
-    { key: "webhook", label: "Webhook" },
   ];
 }

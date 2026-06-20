@@ -22,12 +22,15 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment, useHostResources } from "../api/hooks";
 import type { CreateDeploymentInput, DeploymentType } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { DomainPicker } from "../components/DomainPicker";
+import { Gated } from "../components/Gated";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "../components/resourceScale";
 import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "../components/source/SourceFields";
 import type { SourceValue } from "../components/source/sourceTypes";
 import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
+import { humanizeType } from "../format";
 
 interface WizardState {
   name: string;
@@ -205,6 +208,7 @@ export function CreateDeploymentPage() {
   const { enqueueSnackbar } = useSnackbar();
   const createDeployment = useCreateDeployment();
   const { data: host } = useHostResources();
+  const canOperate = useCan("operate");
   const [step, setStep] = useState(0);
   const [state, setState] = useState<WizardState>(INITIAL);
 
@@ -272,13 +276,15 @@ export function CreateDeploymentPage() {
           {stepIndex === 0 ? "Cancel" : "Back"}
         </Button>
         {isLast ? (
-          <Button
-            variant="contained"
-            disabled={createDeployment.isPending || Boolean(error)}
-            onClick={() => void onCreate()}
-          >
-            Create
-          </Button>
+          <Gated can={canOperate} reason={ROLE_REASON.operate}>
+            <Button
+              variant="contained"
+              disabled={createDeployment.isPending || Boolean(error)}
+              onClick={() => void onCreate()}
+            >
+              Create
+            </Button>
+          </Gated>
         ) : (
           <Button
             variant="contained"
@@ -434,7 +440,7 @@ function DomainStep({
           {isCompose && (
             <TextField
               label="Service"
-              placeholder="web"
+              placeholder="first declared service"
               value={state.domainService}
               helperText="Compose service this domain routes to, on its internal port (below) — not a published host port. Blank uses the first declared service."
               onChange={(event) => patch({ domainService: event.target.value })}
@@ -444,6 +450,7 @@ function DomainStep({
           <TextField
             label="Port"
             type="number"
+            placeholder="first exposed port"
             value={state.domainPort}
             helperText="Port the domain routes to. Blank uses the image's first exposed port."
             onChange={(event) => patch({ domainPort: event.target.value })}
@@ -495,7 +502,7 @@ function ReviewStep({ state }: { state: WizardState }) {
   const { source } = state;
   const rows: [string, string][] = [
     ["Name", state.name || "—"],
-    ["Type", state.type],
+    ["Type", humanizeType(state.type)],
     ["Source", sourceDescription(source.buildStrategy)],
   ];
 
@@ -511,6 +518,10 @@ function ReviewStep({ state }: { state: WizardState }) {
     rows.push(["Domain", domain || "added later"]);
 
     if (domain) {
+      if (source.buildStrategy === "COMPOSE") {
+        rows.push(["Service", state.domainService.trim() || "first declared service"]);
+      }
+
       rows.push(["Port", state.domainPort.trim() || "first exposed port"]);
     }
   }

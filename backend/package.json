@@ -33,6 +33,7 @@
     "dockerode": "^5.0.0",
     "drizzle-orm": "^0.45.0",
     "ioredis": "^5.11.1",
+    "otpauth": "^9.5.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.0",
     "pg": "^8.21.0",

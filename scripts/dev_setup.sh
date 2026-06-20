@@ -102,4 +102,59 @@ else
   echo "Local TLS cert already present — leaving it untouched."
 fi
 
+# Mirror the production provisioner's host-port-binding capacity for `make dev`: publish the range
+# on Traefik and declare one entrypoint per port, from WILLY_PORT_BIND_RANGE in .env. Unset = off
+# (markers stay empty, no diff). Lets the hard-bound-domain feature be exercised locally over
+# *.willy.localhost (the mkcert wildcard covers every entrypoint).
+replace_marker_block() {
+  file="${1}"
+  open="${2}"
+  close="${3}"
+  block="${4}"
+
+  [ -f "${file}" ] || return 0
+
+  tmp="$(mktemp)"
+
+  # `open`/`close` are gawk reserved words, so the awk vars use distinct names.
+  awk -v startm="${open}" -v endm="${close}" -v block="${block}" '
+    index($0, startm) { print; printf "%s", block; skip = 1; next }
+    index($0, endm) { skip = 0; print; next }
+    skip { next }
+    { print }
+  ' "${file}" > "${tmp}"
+
+  # Write back through the existing file to preserve its owner/permissions.
+  cat "${tmp}" > "${file}"
+  rm -f "${tmp}"
+}
+
+range="$(sed -n 's/^WILLY_PORT_BIND_RANGE=//p' .env | head -1)"
+entrypoints=""
+publish=""
+
+if [ -n "${range}" ]; then
+  if ! printf '%s' "${range}" | grep -Eq '^[0-9]+-[0-9]+$'; then
+    echo "WILLY_PORT_BIND_RANGE must be START-END (e.g. 20000-20099), got '${range}'" >&2
+    exit 1
+  fi
+
+  start="${range%-*}"
+  end="${range#*-}"
+
+  p="${start}"
+  while [ "${p}" -le "${end}" ]; do
+    entrypoints="${entrypoints}  port-${p}:\n    address: \":${p}\"\n"
+    p=$((p + 1))
+  done
+
+  publish="      - \"${start}-${end}:${start}-${end}\"\n"
+  echo "Provisioning host-port-binding range ${range} for local dev."
+fi
+
+replace_marker_block routing/traefik.local.yml \
+  "willy:port-bind-entrypoints (generated" "/willy:port-bind-entrypoints" "${entrypoints}"
+replace_marker_block docker-compose.yml \
+  "willy:port-bind-publish (generated" "/willy:port-bind-publish" "${publish}"
+
 echo "Local dev environment ready. Run 'make dev'."

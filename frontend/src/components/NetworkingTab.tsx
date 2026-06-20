@@ -32,11 +32,26 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
       sortable: false,
       renderCell: (params) =>
         params.row.networks.length > 0 ? (
-          <Box sx={{ display: "flex", flexDirection: "column" }}>
+          <Stack spacing={0.25}>
             {params.row.networks.map((net) => (
-              <Box key={net.name}>{net.ip ? `${net.name} (${net.ip})` : net.name}</Box>
+              <Box key={net.name}>
+                {net.name}
+                {net.ip && (
+                  <Box
+                    component="span"
+                    sx={{
+                      ml: 0.75,
+                      color: "text.secondary",
+                      fontFamily: "monospace",
+                      fontSize: 12,
+                    }}
+                  >
+                    {net.ip}
+                  </Box>
+                )}
+              </Box>
             ))}
-          </Box>
+          </Stack>
         ) : (
           "—"
         ),
@@ -82,7 +97,12 @@ export function NetworkingTab({ deploymentId }: { deploymentId: string }) {
           localeText={{
             noRowsLabel: "No running containers — networking appears once they're up.",
           }}
-          sx={{ border: 0, "& .MuiDataGrid-cell": { display: "flex", alignItems: "center" } }}
+          sx={{
+            border: 0,
+            // Top-align so a container on multiple networks reads as a neat list instead of pushing
+            // the row's other cells off-center.
+            "& .MuiDataGrid-cell": { display: "flex", alignItems: "flex-start", py: 1 },
+          }}
         />
       </Box>
 

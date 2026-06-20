@@ -30,6 +30,9 @@ export function StatCard({
       sx={{
         p: 2,
         height: "100%",
+        // Floor the height so the card is the same size while loading (spinner) and once loaded
+        // (value + detail + sparkline) — no layout jump when data arrives.
+        minHeight: 210,
         display: "flex",
         flexDirection: "column",
         ...(to && {
@@ -64,7 +67,7 @@ export function StatCard({
             {data.length > 1 ? (
               <SparkLineChart
                 data={data}
-                height={48}
+                height={80}
                 area
                 showHighlight
                 curve="monotoneX"
@@ -72,7 +75,7 @@ export function StatCard({
               />
             ) : (
               // Keep the card height stable before any history has accumulated.
-              <Box sx={{ height: 48 }} />
+              <Box sx={{ height: 80 }} />
             )}
           </Box>
         </>

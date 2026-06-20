@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -18,13 +19,25 @@ import {
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
+import { SettingsService } from "../admin/settings.service";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { OkResponseDto } from "../common/dto/ok.dto";
 import { DomainProvisioningService } from "../domains/domain-provisioning.service";
-import { type Domain, type DeploymentView, DeploymentsService } from "./deployments.service";
+import {
+  type Domain,
+  type DeploymentView,
+  DeploymentsService,
+  type PortBinding,
+} from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
 import { AddDomainDto, DomainDto, UpdateDomainTargetDto } from "./dto/domain.dto";
+import {
+  AddPortBindingDto,
+  PortBindingDto,
+  SuggestPortDto,
+  UpdatePortBindingDto,
+} from "./dto/port-binding.dto";
 import { ResourceLimitsDto } from "./dto/resource-limits.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
 
@@ -38,6 +51,16 @@ function domainToDto(row: Domain): DomainDto {
   };
 }
 
+function bindingToDto(row: PortBinding): PortBindingDto {
+  return {
+    id: row.id,
+    domainId: row.domainId,
+    hostPort: row.hostPort,
+    targetService: row.targetService,
+    targetPort: row.targetPort,
+  };
+}
+
 @ApiTags("deployments")
 @ApiBearerAuth()
 @Controller("deployments")
@@ -45,6 +68,7 @@ export class DeploymentsController {
   constructor(
     private readonly deployments: DeploymentsService,
     private readonly domainProvisioning: DomainProvisioningService,
+    private readonly settings: SettingsService,
   ) {}
 
   @Roles("ADMIN", "OPERATOR")
@@ -170,6 +194,98 @@ export class DeploymentsController {
   }
 
   @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiOkResponse({ type: [PortBindingDto] })
+  @Get(":id/domains/:domainId/bindings")
+  async portBindings(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+  ): Promise<PortBindingDto[]> {
+    await this.requireDomain(id, domainId);
+
+    return (await this.deployments.listPortBindings(domainId)).map(bindingToDto);
+  }
+
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiOkResponse({ type: SuggestPortDto })
+  @Get(":id/domains/:domainId/bindings/suggest")
+  async suggestPortBinding(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+  ): Promise<SuggestPortDto> {
+    await this.requireDomain(id, domainId);
+    const range = await this.activeRange();
+
+    return { hostPort: await this.deployments.suggestFreePort(range) };
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiBody({ type: AddPortBindingDto })
+  @ApiCreatedResponse({ type: PortBindingDto })
+  @Post(":id/domains/:domainId/bindings")
+  async addPortBinding(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+    @Body() dto: AddPortBindingDto,
+  ): Promise<PortBindingDto> {
+    await this.requireDomain(id, domainId);
+    await this.assertHostPortInRange(dto.hostPort);
+
+    return bindingToDto(
+      await this.deployments.addPortBinding(domainId, {
+        hostPort: dto.hostPort,
+        targetService: dto.targetService?.trim() || null,
+        targetPort: dto.targetPort ?? null,
+      }),
+    );
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiParam({ name: "bindingId", type: String })
+  @ApiBody({ type: UpdatePortBindingDto })
+  @ApiOkResponse({ type: PortBindingDto })
+  @Patch(":id/domains/:domainId/bindings/:bindingId")
+  async updatePortBinding(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+    @Param("bindingId", ParseUUIDPipe) bindingId: string,
+    @Body() dto: UpdatePortBindingDto,
+  ): Promise<PortBindingDto> {
+    await this.requireDomain(id, domainId);
+    await this.assertHostPortInRange(dto.hostPort);
+
+    return bindingToDto(
+      await this.deployments.updatePortBinding(domainId, bindingId, {
+        hostPort: dto.hostPort,
+        targetService: dto.targetService?.trim() || null,
+        targetPort: dto.targetPort ?? null,
+      }),
+    );
+  }
+
+  @Roles("ADMIN", "OPERATOR")
+  @ApiParam({ name: "id", type: String })
+  @ApiParam({ name: "domainId", type: String })
+  @ApiParam({ name: "bindingId", type: String })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Delete(":id/domains/:domainId/bindings/:bindingId")
+  async removePortBinding(
+    @Param("id") id: string,
+    @Param("domainId", ParseUUIDPipe) domainId: string,
+    @Param("bindingId", ParseUUIDPipe) bindingId: string,
+  ): Promise<{ ok: true }> {
+    await this.requireDomain(id, domainId);
+    await this.deployments.removePortBinding(domainId, bindingId);
+
+    return { ok: true };
+  }
+
+  @ApiParam({ name: "id", type: String })
   @ApiParam({ name: "service", type: String })
   @ApiOkResponse({ type: ResourceLimitsDto })
   @Get(":id/services/:service/resources")
@@ -196,6 +312,35 @@ export class DeploymentsController {
     const updated = await this.deployments.updateServiceResources(id, service, dto);
 
     return updated.serviceResources?.[service] ?? {};
+  }
+
+  private async requireDomain(deploymentId: string, domainId: string): Promise<Domain> {
+    const domain = await this.deployments.findDomain(deploymentId, domainId);
+
+    if (!domain) {
+      throw new NotFoundException("domain not found for this deployment");
+    }
+
+    return domain;
+  }
+
+  // The active allocatable sub-range, after confirming the feature is provisioned + enabled.
+  private async activeRange(): Promise<{ start: number; end: number }> {
+    const settings = await this.settings.getAll();
+
+    if (!settings.portBinding.enabled) {
+      throw new BadRequestException("host-port binding is disabled in settings");
+    }
+
+    return { start: settings.portBinding.start, end: settings.portBinding.end };
+  }
+
+  private async assertHostPortInRange(hostPort: number): Promise<void> {
+    const { start, end } = await this.activeRange();
+
+    if (hostPort < start || hostPort > end) {
+      throw new BadRequestException(`host port must be within the active range ${start}-${end}`);
+    }
   }
 
   private async requireForApi(id: string): Promise<DeploymentView> {

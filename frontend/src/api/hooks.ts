@@ -3,6 +3,7 @@ import { api, unwrap } from "./client";
 import { tokens } from "./tokens";
 import type {
   AddDomainInput,
+  AddPortBindingInput,
   CreateBackupDestinationInput,
   CreateBackupInput,
   CreateBackupScheduleInput,
@@ -10,7 +11,6 @@ import type {
   CreateDnsRecordInput,
   CreateUserInput,
   ResourceLimits,
-  Role,
   SetEnvVarInput,
   StatsWindow,
   UpdateAppSettings,
@@ -18,6 +18,8 @@ import type {
   UpdateDnsRecordInput,
   UpdateDomainTargetInput,
   UpdateEnvVarMetaInput,
+  UpdatePortBindingInput,
+  UpdateUserInput,
 } from "./types";
 
 export const queryKeys = {
@@ -325,6 +327,14 @@ export function useUsers() {
   });
 }
 
+export function useUser(id: string) {
+  return useQuery({
+    queryKey: ["users", id],
+    queryFn: async () => unwrap(await api.GET("/users/{id}", { params: { path: { id } } })),
+    enabled: id.length > 0,
+  });
+}
+
 export function useCreateUser() {
   const queryClient = useQueryClient();
 
@@ -334,22 +344,22 @@ export function useCreateUser() {
   });
 }
 
-export function useSetUserRole() {
+export function useUpdateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { id: string; role: Role }) =>
-      unwrap(
-        await api.PATCH("/users/{id}/role", {
-          params: { path: { id: input.id } },
-          body: { role: input.role },
-        }),
-      ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+    mutationFn: async ({ id, ...body }: { id: string } & UpdateUserInput) =>
+      unwrap(await api.PATCH("/users/{id}", { params: { path: { id } }, body })),
+    onSuccess: (_data, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+      void queryClient.invalidateQueries({ queryKey: ["users", id] });
+    },
   });
 }
 
 export function useSetUserPassword() {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (input: { id: string; password: string }) =>
       unwrap(
@@ -358,6 +368,7 @@ export function useSetUserPassword() {
           body: { password: input.password },
         }),
       ),
+    onSuccess: (_data, { id }) => queryClient.invalidateQueries({ queryKey: ["users", id] }),
   });
 }
 
@@ -368,6 +379,51 @@ export function useDeleteUser() {
     mutationFn: async (id: string) =>
       unwrap(await api.DELETE("/users/{id}", { params: { path: { id } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
+  });
+}
+
+// Self-service 2FA enrolment: ask the server for a fresh secret + QR (nothing is persisted yet).
+export function useStartTwoFactor(id: string) {
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.POST("/users/{id}/2fa/setup", { params: { path: { id } } })),
+  });
+}
+
+function invalidateUser(queryClient: ReturnType<typeof useQueryClient>, id: string) {
+  void queryClient.invalidateQueries({ queryKey: ["users"] });
+  void queryClient.invalidateQueries({ queryKey: ["users", id] });
+}
+
+export function useConfirmTwoFactor(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: { setupToken: string; code: string }) =>
+      unwrap(await api.POST("/users/{id}/2fa/confirm", { params: { path: { id } }, body })),
+    onSuccess: () => invalidateUser(queryClient, id),
+  });
+}
+
+// Disable (self) or reset (admin recovery).
+export function useDisableTwoFactor(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.DELETE("/users/{id}/2fa", { params: { path: { id } } })),
+    onSuccess: () => invalidateUser(queryClient, id),
+  });
+}
+
+// Admin: require 2FA on a user (they configure it at next login).
+export function useRequireTwoFactor(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () =>
+      unwrap(await api.POST("/users/{id}/2fa/require", { params: { path: { id } } })),
+    onSuccess: () => invalidateUser(queryClient, id),
   });
 }
 
@@ -473,6 +529,89 @@ export function useRemoveDomain(id: string) {
         }),
       ),
     onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function usePortBindings(id: string, domainId: string) {
+  return useQuery({
+    queryKey: ["deployments", id, "domains", domainId, "bindings"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/deployments/{id}/domains/{domainId}/bindings", {
+          params: { path: { id, domainId } },
+        }),
+      ),
+  });
+}
+
+// Lowest free host port in the active sub-range. Fetched lazily (e.g. when opening the add form);
+// kept fresh-on-demand rather than cached long, since allocation state moves under it.
+export function useSuggestBindingPort(id: string, domainId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["deployments", id, "domains", domainId, "bindings", "suggest"],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/deployments/{id}/domains/{domainId}/bindings/suggest", {
+          params: { path: { id, domainId } },
+        }),
+      ),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+function invalidateBindings(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: string,
+  domainId: string,
+): void {
+  void queryClient.invalidateQueries({
+    queryKey: ["deployments", id, "domains", domainId, "bindings"],
+  });
+}
+
+export function useAddPortBinding(id: string, domainId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (body: AddPortBindingInput) =>
+      unwrap(
+        await api.POST("/deployments/{id}/domains/{domainId}/bindings", {
+          params: { path: { id, domainId } },
+          body,
+        }),
+      ),
+    onSuccess: () => invalidateBindings(queryClient, id, domainId),
+  });
+}
+
+export function useUpdatePortBinding(id: string, domainId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { bindingId: string; body: UpdatePortBindingInput }) =>
+      unwrap(
+        await api.PATCH("/deployments/{id}/domains/{domainId}/bindings/{bindingId}", {
+          params: { path: { id, domainId, bindingId: input.bindingId } },
+          body: input.body,
+        }),
+      ),
+    onSuccess: () => invalidateBindings(queryClient, id, domainId),
+  });
+}
+
+export function useRemovePortBinding(id: string, domainId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (bindingId: string) =>
+      unwrap(
+        await api.DELETE("/deployments/{id}/domains/{domainId}/bindings/{bindingId}", {
+          params: { path: { id, domainId, bindingId } },
+        }),
+      ),
+    onSuccess: () => invalidateBindings(queryClient, id, domainId),
   });
 }
 
@@ -876,6 +1015,17 @@ export function useTasks(scope: "active" | "recent" = "recent") {
   return useQuery({
     queryKey: ["tasks", scope],
     queryFn: async () => unwrap(await api.GET("/tasks", { params: { query: { scope } } })),
+    refetchInterval: 3000,
+  });
+}
+
+// Recent tasks scoped to one deployment — drives the per-row activity in the Backups tab.
+export function useDeploymentTasks(deploymentId: string) {
+  return useQuery({
+    queryKey: ["tasks", "deployment", deploymentId],
+    queryFn: async () =>
+      unwrap(await api.GET("/tasks", { params: { query: { scope: "recent", deploymentId } } })),
+    enabled: deploymentId.length > 0,
     refetchInterval: 3000,
   });
 }

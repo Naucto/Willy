@@ -1,148 +1,39 @@
 import AddIcon from "@mui/icons-material/Add";
-import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import KeyIcon from "@mui/icons-material/Key";
 import {
+  Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
-  MenuItem,
+  Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
 import { useState } from "react";
-import {
-  useCreateUser,
-  useDeleteUser,
-  useSetUserPassword,
-  useSetUserRole,
-  useUsers,
-} from "../api/hooks";
+import { useNavigate } from "react-router-dom";
+import { useCreateUser, useUsers } from "../api/hooks";
 import type { CreateUserInput, PanelUser, Role } from "../api/types";
-import { useAuth } from "../auth/AuthContext";
+import { PasswordField } from "../components/PasswordField";
+import { RoleSelect } from "../components/RoleSelect";
 import { describeError } from "../errors";
-
-const ROLE_OPTIONS: { value: Role; label: string; description: string }[] = [
-  {
-    value: "ADMIN",
-    label: "Admin",
-    description: "Full access — manage users, all deployments, and panel settings.",
-  },
-  {
-    value: "OPERATOR",
-    label: "Operator",
-    description: "Deploy and configure resources; cannot manage users.",
-  },
-  {
-    value: "VIEWER",
-    label: "Viewer",
-    description: "Read-only access — cannot trigger deploys or change configuration.",
-  },
-];
+import { humanizeRole } from "../format";
+import { generatePassword } from "../password";
 
 export function UsersPage() {
-  const { enqueueSnackbar } = useSnackbar();
-  const { user: me } = useAuth();
-  const { data: users, isLoading } = useUsers();
-  const setRole = useSetUserRole();
-  const deleteUser = useDeleteUser();
+  const navigate = useNavigate();
+  const { data: users, isLoading, error } = useUsers();
 
   const [adding, setAdding] = useState(false);
-  const [passwordFor, setPasswordFor] = useState<PanelUser | null>(null);
-
-  const onRole = async (id: string, role: Role) => {
-    try {
-      await setRole.mutateAsync({ id, role });
-      enqueueSnackbar("Role updated", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
-
-  const onDelete = async (id: string) => {
-    try {
-      await deleteUser.mutateAsync(id);
-      enqueueSnackbar("User deleted", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
-
-  const columns: GridColDef<PanelUser>[] = [
-    { field: "email", headerName: "Email", flex: 1, minWidth: 220 },
-    {
-      field: "role",
-      headerName: "Role",
-      width: 160,
-      renderCell: (params) => (
-        <TextField
-          select
-          size="small"
-          variant="standard"
-          value={params.row.role}
-          disabled={params.row.id === me?.userId}
-          onChange={(event) => void onRole(params.row.id, event.target.value as Role)}
-          slotProps={{
-            select: {
-              renderValue: (v) => ROLE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
-            },
-          }}
-        >
-          {ROLE_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              <Stack spacing={0.25}>
-                <Typography variant="body2">{opt.label}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {opt.description}
-                </Typography>
-              </Stack>
-            </MenuItem>
-          ))}
-        </TextField>
-      ),
-    },
-    {
-      field: "createdAt",
-      headerName: "Created",
-      width: 190,
-      valueFormatter: (value) => new Date(value as string).toLocaleString(),
-    },
-    {
-      field: "actions",
-      headerName: "",
-      width: 100,
-      sortable: false,
-      filterable: false,
-      align: "right",
-      renderCell: (params) => (
-        <Box>
-          <Tooltip title="Reset password">
-            <IconButton size="small" onClick={() => setPasswordFor(params.row)}>
-              <KeyIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={params.row.id === me?.userId ? "You can't delete yourself" : "Delete"}>
-            <span>
-              <IconButton
-                size="small"
-                disabled={params.row.id === me?.userId}
-                onClick={() => void onDelete(params.row.id)}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Box>
-      ),
-    },
-  ];
 
   return (
     <Stack spacing={3}>
@@ -155,23 +46,53 @@ export function UsersPage() {
         </Button>
       </Box>
 
-      <Box sx={{ height: 540 }}>
-        <DataGrid
-          rows={users ?? []}
-          columns={columns}
-          loading={isLoading}
-          getRowId={(row) => row.id}
-          density="compact"
-          disableRowSelectionOnClick
-          pageSizeOptions={[25, 50, 100]}
-          initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
-          sx={{ border: 0 }}
-        />
-      </Box>
+      {isLoading && (
+        <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {error && <Alert severity="error">{describeError(error)}</Alert>}
+
+      {users && users.length > 0 && (
+        <Paper variant="outlined">
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Created</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {users.map((user) => (
+                <UserRow key={user.id} user={user} onOpen={() => navigate(`/users/${user.id}`)} />
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
 
       <NewUserDialog open={adding} onClose={() => setAdding(false)} />
-      <SetPasswordDialog user={passwordFor} onClose={() => setPasswordFor(null)} />
     </Stack>
+  );
+}
+
+function UserRow({ user, onOpen }: { user: PanelUser; onOpen: () => void }) {
+  return (
+    <TableRow hover sx={{ cursor: "pointer" }} onClick={onOpen}>
+      <TableCell sx={{ fontWeight: 600 }}>
+        {user.name ?? (
+          <Box component="span" sx={{ color: "text.disabled" }}>
+            —
+          </Box>
+        )}
+      </TableCell>
+      <TableCell>{user.email}</TableCell>
+      <TableCell>{humanizeRole(user.role)}</TableCell>
+      <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
+    </TableRow>
   );
 }
 
@@ -197,40 +118,25 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
+            label="Name"
+            helperText="Optional — shown instead of the email across the panel."
+            value={form.name ?? ""}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+          <TextField
             label="Email"
             type="email"
             value={form.email}
             onChange={(event) => setForm({ ...form, email: event.target.value })}
           />
-          <TextField
+          <PasswordField
             label="Password"
-            type="password"
             helperText="At least 8 characters."
             value={form.password}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
+            onGenerate={() => setForm({ ...form, password: generatePassword() })}
           />
-          <TextField
-            select
-            label="Role"
-            value={form.role}
-            onChange={(event) => setForm({ ...form, role: event.target.value as Role })}
-            slotProps={{
-              select: {
-                renderValue: (v) => ROLE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
-              },
-            }}
-          >
-            {ROLE_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                <Stack spacing={0.25}>
-                  <Typography variant="body2">{opt.label}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {opt.description}
-                  </Typography>
-                </Stack>
-              </MenuItem>
-            ))}
-          </TextField>
+          <RoleSelect value={form.role} onChange={(role: Role) => setForm({ ...form, role })} />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -241,54 +147,6 @@ function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }
           onClick={() => void onCreate()}
         >
           Create
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
-function SetPasswordDialog({ user, onClose }: { user: PanelUser | null; onClose: () => void }) {
-  const { enqueueSnackbar } = useSnackbar();
-  const setPassword = useSetUserPassword();
-  const [password, setPasswordValue] = useState("");
-
-  const onSubmit = async () => {
-    if (!user) {
-      return;
-    }
-
-    try {
-      await setPassword.mutateAsync({ id: user.id, password });
-      enqueueSnackbar("Password updated", { variant: "success" });
-      setPasswordValue("");
-      onClose();
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
-
-  return (
-    <Dialog open={user !== null} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Reset password · {user?.email}</DialogTitle>
-      <DialogContent>
-        <TextField
-          label="New password"
-          type="password"
-          fullWidth
-          sx={{ mt: 1 }}
-          helperText="At least 8 characters. Signs the user out everywhere."
-          value={password}
-          onChange={(event) => setPasswordValue(event.target.value)}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={setPassword.isPending || password.length < 8}
-          onClick={() => void onSubmit()}
-        >
-          Update
         </Button>
       </DialogActions>
     </Dialog>

@@ -116,6 +116,7 @@ export class BackupsService {
       kind: "BACKUP",
       title: `Back up ${input.target}`,
       deploymentId: input.deploymentId ?? null,
+      backupId: row.id,
       actorId: input.actorId ?? null,
     });
 
@@ -169,6 +170,7 @@ export class BackupsService {
       kind: "OFFSITE_PUSH",
       title: `Push ${target} offsite`,
       deploymentId: backup.deploymentId,
+      backupId,
       actorId: actorId ?? null,
     });
 
@@ -210,6 +212,7 @@ export class BackupsService {
       kind: "RESTORE",
       title: `Restore ${target}`,
       deploymentId: row.deploymentId,
+      backupId: row.id,
       actorId: actorId ?? null,
     });
 
@@ -268,6 +271,8 @@ export class BackupsService {
         .update(backups)
         .set({ status: "FAILED", errorMessage: describeError(error), finishedAt: new Date() })
         .where(eq(backups.id, id));
+      // Rethrow so the tracking task is marked FAILED too, not silently SUCCESS.
+      throw error;
     }
   }
 
@@ -282,6 +287,8 @@ export class BackupsService {
       await this.db.update(backups).set({ offsiteUrl: url }).where(eq(backups.id, id));
     } catch (error) {
       this.logger.warn(`offsite push ${id} failed: ${describeError(error)}`);
+      // Rethrow so the tracking task reflects the failure instead of a false SUCCESS.
+      throw error;
     }
   }
 
@@ -331,7 +338,9 @@ export class BackupsService {
         throw new BackupError(`volume op exited ${result.exitCode}: ${result.logs.slice(0, 300)}`);
       }
     } catch (error) {
+      // Surface the failure to the tracking task; containers are still restarted below.
       this.logger.warn(`volume op on ${volume} failed: ${describeError(error)}`);
+      throw error;
     } finally {
       for (const id of ids) {
         await this.docker.startContainer(id).catch(() => undefined);

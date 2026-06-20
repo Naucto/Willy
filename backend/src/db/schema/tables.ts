@@ -40,8 +40,12 @@ const updatedAt = timestamp("updated_at", { withTimezone: true }).notNull().defa
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
+  name: text("name"),
   passwordHash: text("password_hash").notNull(),
   role: roleEnum("role").notNull().default("VIEWER"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  // JSON-serialized SealedSecret (crypto.service) once confirmed; null while off/pending.
+  twoFactorSecret: text("two_factor_secret"),
   refreshTokenHash: text("refresh_token_hash"),
   createdAt,
   updatedAt,
@@ -127,6 +131,28 @@ export const domains = pgTable(
     updatedAt,
   },
   (t) => [index("domains_deployment_idx").on(t.deploymentId)],
+);
+
+// A dedicated host port bound to a domain, served on its own Traefik entrypoint (port-<hostPort>)
+// with the domain's Host() rule + TLS — additive to the domain's normal 443 routing. A domain can
+// own several (e.g. one shared domain fronting many servers, each on its own port). hostPort is
+// globally UNIQUE: a host port binds at most once across the machine. targetService/targetPort
+// mirror domains' routing target (null service = the deployment's default container; null port =
+// its webServicePort).
+export const portBindings = pgTable(
+  "port_bindings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    domainId: uuid("domain_id")
+      .notNull()
+      .references(() => domains.id, { onDelete: "cascade" }),
+    hostPort: integer("host_port").notNull().unique(),
+    targetService: text("target_service"),
+    targetPort: integer("target_port"),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [index("port_bindings_domain_idx").on(t.domainId)],
 );
 
 export const dnsRecords = pgTable(
@@ -323,6 +349,8 @@ export const tasks = pgTable(
     status: taskStatusEnum("status").notNull().default("PENDING"),
     title: text("title").notNull(),
     deploymentId: uuid("deployment_id").references(() => deployments.id, { onDelete: "set null" }),
+    // Links a task to the backup row it operates on, so the Backups tab can show its progress inline.
+    backupId: uuid("backup_id").references(() => backups.id, { onDelete: "set null" }),
     actorId: uuid("actor_id"),
     progress: integer("progress"),
     errorMessage: text("error_message"),

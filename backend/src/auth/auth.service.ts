@@ -5,11 +5,30 @@ import * as argon2 from "argon2";
 import { parseDurationSeconds } from "../common/duration";
 import { User, UsersService } from "../users/users.service";
 import { JwtPayload } from "./jwt-payload.interface";
+import { type Capability, capabilitiesForRole } from "./permissions";
+import { TwoFactorService } from "./two-factor.service";
 
 export interface SessionResult {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email: string; role: User["role"] };
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    role: User["role"];
+    permissions: Capability[];
+  };
+}
+
+export type LoginOutcome =
+  | { status: "authenticated"; session: SessionResult }
+  | { status: "totp_required"; challengeToken: string }
+  | { status: "totp_setup_required"; challengeToken: string };
+
+export interface TotpSetupResult {
+  secret: string;
+  otpauthUri: string;
+  setupToken: string;
 }
 
 @Injectable()
@@ -18,17 +37,78 @@ export class AuthService {
     private readonly users: UsersService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   hashPassword(password: string): Promise<string> {
     return argon2.hash(password, { type: argon2.argon2id });
   }
 
-  async login(email: string, password: string): Promise<SessionResult> {
+  async login(email: string, password: string): Promise<LoginOutcome> {
     const user = await this.users.findByEmail(email);
 
     if (!user || !(await argon2.verify(user.passwordHash, password))) {
       throw new UnauthorizedException("invalid credentials");
+    }
+
+    if (!user.twoFactorEnabled) {
+      return { status: "authenticated", session: await this.issueSession(user) };
+    }
+
+    if (user.twoFactorSecret) {
+      return {
+        status: "totp_required",
+        challengeToken: await this.twoFactor.mintChallengeToken(user.id, "verify"),
+      };
+    }
+
+    // 2FA required but never configured (admin enforced it) — force setup before issuing a session.
+    return {
+      status: "totp_setup_required",
+      challengeToken: await this.twoFactor.mintChallengeToken(user.id, "setup"),
+    };
+  }
+
+  // Second login step when 2FA is active: verify the TOTP code against the stored secret.
+  async verifyTotpLogin(challengeToken: string, code: string): Promise<SessionResult> {
+    const userId = await this.twoFactor.verifyChallengeToken(challengeToken, "verify");
+    const user = await this.users.findById(userId);
+    const secret = user ? this.twoFactor.decryptSecret(user) : null;
+
+    if (!user || !secret || !this.twoFactor.verifyCode(secret, code)) {
+      throw new UnauthorizedException("invalid 2FA code");
+    }
+
+    return this.issueSession(user);
+  }
+
+  // Forced-setup step at login: hand back a fresh secret + QR (no persistence yet).
+  async startTotpSetup(challengeToken: string): Promise<TotpSetupResult> {
+    const userId = await this.twoFactor.verifyChallengeToken(challengeToken, "setup");
+    const user = await this.users.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException("invalid 2FA challenge");
+    }
+
+    const { secret, otpauthUri } = this.twoFactor.generateSecret(user.email);
+
+    return { secret, otpauthUri, setupToken: await this.twoFactor.mintSetupToken(user.id, secret) };
+  }
+
+  // Forced-setup confirm at login: validate the code, persist the secret, then issue a session.
+  async confirmTotpSetup(setupToken: string, code: string): Promise<SessionResult> {
+    const { userId, secret } = await this.twoFactor.verifySetupToken(setupToken);
+
+    if (!this.twoFactor.verifyCode(secret, code)) {
+      throw new UnauthorizedException("invalid 2FA code");
+    }
+
+    await this.twoFactor.enable(userId, secret);
+    const user = await this.users.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException("user not found");
     }
 
     return this.issueSession(user);
@@ -71,7 +151,13 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: { id: user.id, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        permissions: capabilitiesForRole(user.role),
+      },
     };
   }
 }

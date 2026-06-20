@@ -112,7 +112,10 @@ export function Console({
       <Box
         ref={mountRef}
         sx={{
-          height: 460,
+          // Fill the viewport (minus the AppBar + page/header padding); the FitAddon re-fits on
+          // window resize, so xterm tracks this height.
+          height: "calc(100vh - 240px)",
+          minHeight: 360,
           bgcolor: "#0b0e13",
           border: 1,
           borderColor: "divider",

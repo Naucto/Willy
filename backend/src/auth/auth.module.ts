@@ -10,13 +10,16 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
+import { TwoFactorController } from "./two-factor.controller";
+import { TwoFactorService } from "./two-factor.service";
 
 @Module({
   imports: [UsersModule, PassportModule, JwtModule.register({})],
-  controllers: [AuthController],
+  controllers: [AuthController, TwoFactorController],
   providers: [
     AuthService,
     AdminSeedService,
+    TwoFactorService,
     JwtStrategy,
     JwtRefreshStrategy,
     // Global auth: every route requires a valid access token unless marked @Public,

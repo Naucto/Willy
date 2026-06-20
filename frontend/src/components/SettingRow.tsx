@@ -17,7 +17,8 @@ export function SettingRow({
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "200px 1fr" },
+        // Wider label column on roomy screens; stacks on phones (xs).
+        gridTemplateColumns: { xs: "1fr", sm: "260px 1fr", md: "320px 1fr" },
         gap: { xs: 1, sm: 4 },
         py: 2.5,
       }}

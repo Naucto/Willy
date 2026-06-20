@@ -49,7 +49,9 @@ export function LogViewer({ path }: LogViewerProps) {
           await streamSse(
             path,
             (line) => {
-              if (line === LOG_STREAM_EOF) {
+              // A stray non-printable byte can precede the sentinel on the wire; strip anything
+              // outside printable ASCII before matching so the marker never shows as a log line.
+              if (line.replace(/[^\x20-\x7e]/g, "").trim() === LOG_STREAM_EOF) {
                 endedCleanly = true;
 
                 return;
@@ -140,7 +142,9 @@ export function LogViewer({ path }: LogViewerProps) {
           borderColor: "divider",
           borderRadius: 1,
           p: 1.5,
-          height: 460,
+          // Fill the viewport (minus the AppBar + page/header padding) so logs aren't cramped.
+          height: "calc(100vh - 240px)",
+          minHeight: 360,
           overflowY: "auto",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",

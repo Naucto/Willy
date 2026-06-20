@@ -10,10 +10,19 @@ export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
   @ApiQuery({ name: "scope", required: false, enum: ["active", "recent"] })
+  @ApiQuery({ name: "deploymentId", required: false, type: String })
   @ApiOkResponse({ type: [TaskDto] })
   @Get()
-  async list(@Query("scope") scope?: "active" | "recent"): Promise<TaskDto[]> {
-    return (await this.tasks.list(scope === "active" ? "active" : "recent")).map(toTaskDto);
+  async list(
+    @Query("scope") scope?: "active" | "recent",
+    @Query("deploymentId") deploymentId?: string,
+  ): Promise<TaskDto[]> {
+    const rows = await this.tasks.list({
+      scope: scope === "active" ? "active" : "recent",
+      ...(deploymentId ? { deploymentId } : {}),
+    });
+
+    return rows.map(toTaskDto);
   }
 
   // Clears every finished task. Running tasks are left untouched.

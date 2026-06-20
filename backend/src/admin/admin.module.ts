@@ -8,5 +8,6 @@ import { SettingsService } from "./settings.service";
   imports: [DockerModule],
   controllers: [AdminController],
   providers: [AdminService, SettingsService],
+  exports: [SettingsService],
 })
 export class AdminModule {}

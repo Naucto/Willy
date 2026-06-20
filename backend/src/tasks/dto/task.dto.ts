@@ -27,6 +27,13 @@ export class TaskDto {
   @ApiProperty({ type: String, nullable: true })
   deploymentId!: string | null;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: "Backup this task operates on, if any.",
+  })
+  backupId!: string | null;
+
   @ApiProperty({ type: Number, nullable: true, description: "0–100, or null when indeterminate." })
   progress!: number | null;
 
@@ -47,6 +54,7 @@ export function toTaskDto(row: Task): TaskDto {
     status: row.status,
     title: row.title,
     deploymentId: row.deploymentId,
+    backupId: row.backupId,
     progress: row.progress,
     errorMessage: row.errorMessage,
     createdAt: row.createdAt.toISOString(),

@@ -1,5 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { desc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
 import { tasks } from "../db/schema";
 
@@ -10,10 +10,16 @@ export interface CreateTaskInput {
   kind: TaskKind;
   title: string;
   deploymentId?: string | null;
+  backupId?: string | null;
   actorId?: string | null;
   // Omit (or null) for operations that can't report determinate progress — the UI shows an
   // indeterminate bar.
   progress?: number | null;
+}
+
+export interface ListTasksOptions {
+  scope: "active" | "recent";
+  deploymentId?: string;
 }
 
 const ACTIVE_STATUSES = ["PENDING", "RUNNING"] as const;
@@ -29,6 +35,7 @@ export class TasksService {
         kind: input.kind,
         title: input.title,
         deploymentId: input.deploymentId ?? null,
+        backupId: input.backupId ?? null,
         actorId: input.actorId ?? null,
         progress: input.progress ?? null,
       })
@@ -115,15 +122,17 @@ export class TasksService {
     await this.db.delete(tasks).where(notInArray(tasks.status, [...ACTIVE_STATUSES]));
   }
 
-  list(scope: "active" | "recent"): Promise<Task[]> {
+  list({ scope, deploymentId }: ListTasksOptions): Promise<Task[]> {
+    const scoped = deploymentId ? eq(tasks.deploymentId, deploymentId) : undefined;
+
     if (scope === "active") {
       return this.db
         .select()
         .from(tasks)
-        .where(inArray(tasks.status, [...ACTIVE_STATUSES]))
+        .where(and(inArray(tasks.status, [...ACTIVE_STATUSES]), scoped))
         .orderBy(desc(tasks.createdAt));
     }
 
-    return this.db.select().from(tasks).orderBy(desc(tasks.createdAt)).limit(50);
+    return this.db.select().from(tasks).where(scoped).orderBy(desc(tasks.createdAt)).limit(50);
   }
 }

@@ -3,6 +3,7 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useDiscoverBranches } from "../../api/hooks";
 import { describeError } from "../../errors";
+import { PasswordField } from "../PasswordField";
 import type { SourceFieldsProps } from "./sourceTypes";
 
 // Shared git repository fields (URL, branch picker, optional token) reused by the Dockerfile and
@@ -60,9 +61,8 @@ export function GitRepoFields({ value, onChange, showToken }: SourceFieldsProps)
       {/* Token sits above the ref so it's present before branch discovery runs (discovery uses it
           for private remotes). */}
       {showToken && (
-        <TextField
+        <PasswordField
           label="Git token (private repos)"
-          type="password"
           value={value.gitToken}
           onChange={(event) => onChange({ gitToken: event.target.value })}
         />

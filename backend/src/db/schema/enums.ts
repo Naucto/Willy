@@ -92,6 +92,10 @@ export const auditActionEnum = pgEnum("audit_action", [
   "USER_PASSWORD_RESET",
   "USER_DELETE",
   "WEBHOOK_ROTATE",
+  "USER_UPDATE",
+  "TWOFA_REQUIRE",
+  "TWOFA_ENABLE",
+  "TWOFA_DISABLE",
 ]);
 
 // Long-running administrative operations surfaced in the top-bar activity tracker.

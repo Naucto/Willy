@@ -4,8 +4,9 @@ name: willy
 # Willy must never redeploy its own control plane.
 
 networks:
-  # Shared edge network: Traefik + every WEB deployment join it. Routing is by Host rule,
-  # never host ports, so apps never collide. Created here, referenced as external elsewhere.
+  # Shared edge network: Traefik + every WEB deployment join it. Routing is by Host rule, so apps
+  # never collide (the optional per-domain hard-bound host ports are the one explicit exception).
+  # Created here, referenced as external elsewhere.
   willy_edge:
     name: willy_edge
   # Private network for control-plane internals (db, socket proxy) — not exposed.
@@ -32,6 +33,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # willy:port-bind-publish (generated from WILLY_PORT_BIND_RANGE by scripts/willy_deploy.sh) — do not edit by hand
+      - "10000-10999:10000-10999"
+      # /willy:port-bind-publish
     environment:
       OVH_ENDPOINT: ${OVH_ENDPOINT:-}
       OVH_APPLICATION_KEY: ${OVH_APPLICATION_KEY:-}
@@ -150,6 +154,9 @@ services:
       BACKUPS_VOLUME: willy_backups
       BACKUPS_NETWORK: ${BACKUPS_NETWORK:-willy_internal}
       LOGS_DIR: /var/lib/willy/logs
+      # Provisioned host-port capacity for hard-bound domain ports. Must match the range Traefik
+      # publishes + declares entrypoints for (see traefik service + routing/traefik.yml).
+      WILLY_PORT_BIND_RANGE: ${WILLY_PORT_BIND_RANGE:-}
     volumes:
       - willy_backups:/var/lib/willy/backups
       - willy_logs:/var/lib/willy/logs

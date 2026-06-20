@@ -26,6 +26,7 @@ import {
 } from "react";
 import { useDeploy, useRemoveDeployment, useRestart, useStart, useStop } from "../api/hooks";
 import type { Deployment } from "../api/types";
+import { type Capability, ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -44,6 +45,7 @@ interface Action {
   spinning: boolean;
   run: () => void;
   destructive?: boolean;
+  capability: Capability;
 }
 
 export function DeployActions({ deployment, variant = "full", onDeleted }: DeployActionsProps) {
@@ -57,6 +59,8 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
   const stop = useStop(deployment.id);
   const start = useStart(deployment.id);
   const remove = useRemoveDeployment(deployment.id);
+  const canOperate = useCan("operate");
+  const canAdmin = useCan("admin");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
@@ -137,6 +141,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       icon: <RocketLaunchIcon fontSize="small" />,
       spinning: pendingKey === "deploy",
       run: () => void trigger("deploy", () => deploy.mutateAsync(), "Deploy queued")(),
+      capability: "operate",
     },
   ];
 
@@ -148,6 +153,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       icon: <RestartAltIcon fontSize="small" />,
       spinning: pendingKey === "restart",
       run: () => void trigger("restart", () => restart.mutateAsync(), "Restarting")(),
+      capability: "operate",
     });
     actions.push({
       key: "stop",
@@ -156,6 +162,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       icon: <StopIcon fontSize="small" />,
       spinning: pendingKey === "stop",
       run: () => void trigger("stop", () => stop.mutateAsync(), "Stopping")(),
+      capability: "operate",
     });
   } else if (hasRelease) {
     actions.push({
@@ -165,6 +172,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       icon: <PlayArrowIcon fontSize="small" />,
       spinning: pendingKey === "start",
       run: () => void trigger("start", () => start.mutateAsync(), "Starting")(),
+      capability: "operate",
     });
   }
 
@@ -176,10 +184,19 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
     spinning: remove.isPending,
     run: () => setConfirmDelete(true),
     destructive: true,
+    capability: "admin",
   });
 
+  const allowed = (action: Action): boolean =>
+    action.capability === "admin" ? canAdmin : canOperate;
+
   const isDisabled = (action: Action): boolean =>
-    action.destructive ? remove.isPending : lifecycleBusy;
+    !allowed(action) || (action.destructive ? remove.isPending : lifecycleBusy);
+
+  // Explain a permission block where a reason already shows (full + compact buttons); the kebab
+  // menu just disables the item.
+  const reasonFor = (action: Action, base: string): string =>
+    allowed(action) ? base : ROLE_REASON[action.capability];
 
   const confirmDialog = (
     <ConfirmDialog
@@ -261,7 +278,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       >
         {actions.map((action) =>
           compact ? (
-            <Tooltip key={action.key} title={action.label}>
+            <Tooltip key={action.key} title={reasonFor(action, action.label)}>
               <span>
                 <IconButton
                   color={action.destructive ? "error" : "primary"}
@@ -273,7 +290,7 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
               </span>
             </Tooltip>
           ) : (
-            <Tooltip key={action.key} title={action.tip}>
+            <Tooltip key={action.key} title={reasonFor(action, action.tip)}>
               <span>
                 <Button
                   variant={action.key === "deploy" ? "contained" : "outlined"}

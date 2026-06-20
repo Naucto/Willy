@@ -8,6 +8,7 @@ const base: Task = {
   status: "RUNNING",
   title: "Deploy",
   deploymentId: "d1",
+  backupId: null,
   actorId: "u1",
   progress: 50,
   errorMessage: null,

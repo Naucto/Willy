@@ -20,20 +20,20 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/users/{id}/role": {
+  "/users/{id}": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    get: operations["UsersController_get"];
     put?: never;
     post?: never;
-    delete?: never;
+    delete: operations["UsersController_remove"];
     options?: never;
     head?: never;
-    patch: operations["UsersController_setRole"];
+    patch: operations["UsersController_update"];
     trace?: never;
   };
   "/users/{id}/password": {
@@ -52,22 +52,6 @@ export interface paths {
     patch: operations["UsersController_setPassword"];
     trace?: never;
   };
-  "/users/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: operations["UsersController_remove"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/auth/login": {
     parameters: {
       query?: never;
@@ -78,6 +62,54 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["AuthController_login"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/2fa/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_totpLogin"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/2fa/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_totpSetup"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/2fa/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AuthController_totpConfirm"];
     delete?: never;
     options?: never;
     head?: never;
@@ -127,6 +159,70 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/{id}/2fa/setup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TwoFactorController_setup"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/{id}/2fa/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TwoFactorController_confirm"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/{id}/2fa/require": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["TwoFactorController_require"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/{id}/2fa": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["TwoFactorController_disable"];
     options?: never;
     head?: never;
     patch?: never;
@@ -210,6 +306,54 @@ export interface paths {
     options?: never;
     head?: never;
     patch: operations["DeploymentsController_makeDomainPrimary"];
+    trace?: never;
+  };
+  "/deployments/{id}/domains/{domainId}/bindings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentsController_portBindings"];
+    put?: never;
+    post: operations["DeploymentsController_addPortBinding"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/domains/{domainId}/bindings/suggest": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DeploymentsController_suggestPortBinding"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/domains/{domainId}/bindings/{bindingId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["DeploymentsController_removePortBinding"];
+    options?: never;
+    head?: never;
+    patch: operations["DeploymentsController_updatePortBinding"];
     trace?: never;
   };
   "/deployments/{id}/services/{service}/resources": {
@@ -349,6 +493,102 @@ export interface paths {
     };
     get: operations["SystemController_publicIp"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/images": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getImages"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/images/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["AdminController_deleteImage"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/images/prune": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AdminController_pruneImages"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/containers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getContainers"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/containers/prune": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["AdminController_pruneContainers"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["AdminController_getSettings"];
+    put: operations["AdminController_updateSettings"];
     post?: never;
     delete?: never;
     options?: never;
@@ -820,102 +1060,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/admin/images": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AdminController_getImages"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/images/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: operations["AdminController_deleteImage"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/images/prune": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations["AdminController_pruneImages"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/containers": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AdminController_getContainers"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/containers/prune": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations["AdminController_pruneContainers"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/admin/settings": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations["AdminController_getSettings"];
-    put: operations["AdminController_updateSettings"];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/deployments/{id}/stats": {
     parameters: {
       query?: never;
@@ -1036,21 +1180,30 @@ export interface components {
       /** Format: uuid */
       id: string;
       email: string;
+      name: string | null;
       /** @enum {string} */
       role: "ADMIN" | "OPERATOR" | "VIEWER";
+      /** @description Whether 2FA is required for this user. */
+      twoFactorEnabled: boolean;
+      /** @description Whether a TOTP secret has been confirmed. */
+      twoFactorConfigured: boolean;
       /** Format: date-time */
       createdAt: string;
     };
     CreateUserDto: {
       /** Format: email */
       email: string;
+      name?: string;
       password: string;
       /** @enum {string} */
       role: "ADMIN" | "OPERATOR" | "VIEWER";
     };
-    UpdateUserRoleDto: {
+    UpdateUserDto: {
+      /** Format: email */
+      email?: string;
+      name?: string;
       /** @enum {string} */
-      role: "ADMIN" | "OPERATOR" | "VIEWER";
+      role?: "ADMIN" | "OPERATOR" | "VIEWER";
     };
     SetPasswordDto: {
       password: string;
@@ -1069,21 +1222,52 @@ export interface components {
       id: string;
       /** Format: email */
       email: string;
+      name: string | null;
       /** @enum {string} */
       role: "ADMIN" | "OPERATOR" | "VIEWER";
+      /** @description UI capabilities for this role. */
+      permissions: ("operate" | "admin")[];
     };
     SessionDto: {
       accessToken: string;
       refreshToken: string;
       user: components["schemas"]["SessionUserDto"];
     };
+    LoginResultDto: {
+      /** @enum {string} */
+      status: "authenticated" | "totp_required" | "totp_setup_required";
+      session?: components["schemas"]["SessionDto"];
+      challengeToken?: string;
+    };
+    TotpLoginDto: {
+      challengeToken: string;
+      code: string;
+    };
+    TotpSetupStartDto: {
+      challengeToken: string;
+    };
+    TotpSetupResponseDto: {
+      /** @description Base32 secret to enter manually. */
+      secret: string;
+      /** @description otpauth:// URI to render as a QR code. */
+      otpauthUri: string;
+      /** @description Opaque token to pass back when confirming the code. */
+      setupToken: string;
+    };
+    TotpConfirmDto: {
+      setupToken: string;
+      code: string;
+    };
     AuthUserDto: {
       /** Format: uuid */
       userId: string;
       /** Format: email */
       email: string;
+      name: string | null;
       /** @enum {string} */
       role: "ADMIN" | "OPERATOR" | "VIEWER";
+      /** @description UI capabilities for this role. */
+      permissions: ("operate" | "admin")[];
     };
     CreateDeploymentDto: {
       /** @example my-app */
@@ -1249,6 +1433,38 @@ export interface components {
       /** @example 8080 */
       targetPort?: number | null;
     };
+    PortBindingDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      domainId: string;
+      /** @description Dedicated host port this domain is bound to. */
+      hostPort: number;
+      /** @description Compose service this binding routes to; null = the deployment's default container. */
+      targetService: string | null;
+      /** @description Internal port this binding routes to; null = the deployment's web service port. */
+      targetPort: number | null;
+    };
+    SuggestPortDto: {
+      /** @description Lowest free host port in the active sub-range. */
+      hostPort: number;
+    };
+    AddPortBindingDto: {
+      /** @example 20001 */
+      hostPort: number;
+      /** @example rtc-1 */
+      targetService?: string | null;
+      /** @example 5001 */
+      targetPort?: number | null;
+    };
+    UpdatePortBindingDto: {
+      /** @example 20001 */
+      hostPort: number;
+      /** @example rtc-1 */
+      targetService?: string | null;
+      /** @example 5001 */
+      targetPort?: number | null;
+    };
     ResourceLimitsDto: {
       /** @example 512 */
       memoryLimitMb?: number | null;
@@ -1323,6 +1539,75 @@ export interface components {
     };
     PublicIpDto: {
       ip: string | null;
+    };
+    DeploymentRefDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+    };
+    AdminImageDto: {
+      /** @description Full Docker image ID (sha256:…). */
+      id: string;
+      repoTags: string[];
+      /** @description Actual on-disk size of the image in bytes. */
+      size: number;
+      /** @description Virtual size including shared layers, in bytes. */
+      virtualSize: number;
+      /** @description Unix timestamp when the image was created. */
+      created: number;
+      deployments: components["schemas"]["DeploymentRefDto"][];
+      /** @description Number of containers based on this image. */
+      activeContainersCount: number;
+      /** @description Built by Willy or run by a managed deployment. */
+      managed: boolean;
+    };
+    PruneResultDto: {
+      /** @description Bytes reclaimed by the prune operation. */
+      spaceReclaimedBytes: number;
+      /** @description Number of images or containers removed. */
+      itemsRemoved: number;
+    };
+    AdminContainerDto: {
+      id: string;
+      name: string;
+      /** @description Image tag or ID the container was started from. */
+      image: string;
+      /** @description Docker state: running, exited, created, paused, … */
+      state: string;
+      /** @description Human-readable status, e.g. "Up 2 hours". */
+      status: string;
+      /** @description Unix timestamp when the container was created. */
+      created: number;
+      deployment?: components["schemas"]["DeploymentRefDto"] | null;
+      /** @description Belongs to a Willy-managed deployment. */
+      managed: boolean;
+    };
+    PortBindingSettingsDto: {
+      enabled: boolean;
+      /** @description Lowest allocatable host port. */
+      start: number;
+      /** @description Highest allocatable host port. */
+      end: number;
+    };
+    PortBindingCapacityDto: {
+      start: number;
+      end: number;
+    };
+    AppSettingsDto: {
+      /** @description Show all host containers/images on the Images/Containers pages, not only Willy-managed ones. */
+      showAllResources: boolean;
+      portBinding: components["schemas"]["PortBindingSettingsDto"];
+      /** @description Provisioned host-port capacity; null when WILLY_PORT_BIND_RANGE is unset. */
+      portBindingCapacity: components["schemas"]["PortBindingCapacityDto"] | null;
+    };
+    UpdatePortBindingSettingsDto: {
+      enabled?: boolean;
+      start?: number;
+      end?: number;
+    };
+    UpdateAppSettingsDto: {
+      showAllResources?: boolean;
+      portBinding?: components["schemas"]["UpdatePortBindingSettingsDto"];
     };
     MaskedEnvVarDto: {
       key: string;
@@ -1537,55 +1822,6 @@ export interface components {
       /** @description Stale per-deployment image tags that were removed. */
       removedImageTags: string[];
     };
-    DeploymentRefDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-    };
-    AdminImageDto: {
-      /** @description Full Docker image ID (sha256:…). */
-      id: string;
-      repoTags: string[];
-      /** @description Actual on-disk size of the image in bytes. */
-      size: number;
-      /** @description Virtual size including shared layers, in bytes. */
-      virtualSize: number;
-      /** @description Unix timestamp when the image was created. */
-      created: number;
-      deployments: components["schemas"]["DeploymentRefDto"][];
-      /** @description Number of containers based on this image. */
-      activeContainersCount: number;
-      /** @description Built by Willy or run by a managed deployment. */
-      managed: boolean;
-    };
-    PruneResultDto: {
-      /** @description Bytes reclaimed by the prune operation. */
-      spaceReclaimedBytes: number;
-      /** @description Number of images or containers removed. */
-      itemsRemoved: number;
-    };
-    AdminContainerDto: {
-      id: string;
-      name: string;
-      /** @description Image tag or ID the container was started from. */
-      image: string;
-      /** @description Docker state: running, exited, created, paused, … */
-      state: string;
-      /** @description Human-readable status, e.g. "Up 2 hours". */
-      status: string;
-      /** @description Unix timestamp when the container was created. */
-      created: number;
-      deployment?: components["schemas"]["DeploymentRefDto"] | null;
-      /** @description Belongs to a Willy-managed deployment. */
-      managed: boolean;
-    };
-    AppSettingsDto: {
-      /** @description Show all host containers/images on the Images/Containers pages, not only Willy-managed ones. */
-      showAllResources: boolean;
-    };
-    UpdateAppSettingsDto: {
-      showAllResources?: boolean;
-    };
     VolumeUsageDto: {
       name: string;
       bytes: number;
@@ -1675,6 +1911,8 @@ export interface components {
       status: "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
       title: string;
       deploymentId: string | null;
+      /** @description Backup this task operates on, if any. */
+      backupId: string | null;
       /** @description 0–100, or null when indeterminate. */
       progress: number | null;
       errorMessage: string | null;
@@ -1746,7 +1984,49 @@ export interface operations {
       };
     };
   };
-  UsersController_setRole: {
+  UsersController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["UserDto"];
+        };
+      };
+    };
+  };
+  UsersController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  UsersController_update: {
     parameters: {
       query?: never;
       header?: never;
@@ -1757,7 +2037,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["UpdateUserRoleDto"];
+        "application/json": components["schemas"]["UpdateUserDto"];
       };
     };
     responses: {
@@ -1796,27 +2076,6 @@ export interface operations {
       };
     };
   };
-  UsersController_remove: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["OkResponseDto"];
-        };
-      };
-    };
-  };
   AuthController_login: {
     parameters: {
       query?: never;
@@ -1827,6 +2086,75 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["LoginDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoginResultDto"];
+        };
+      };
+    };
+  };
+  AuthController_totpLogin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TotpLoginDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SessionDto"];
+        };
+      };
+    };
+  };
+  AuthController_totpSetup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TotpSetupStartDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TotpSetupResponseDto"];
+        };
+      };
+    };
+  };
+  AuthController_totpConfirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TotpConfirmDto"];
       };
     };
     responses: {
@@ -1893,6 +2221,94 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AuthUserDto"];
+        };
+      };
+    };
+  };
+  TwoFactorController_setup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TotpSetupResponseDto"];
+        };
+      };
+    };
+  };
+  TwoFactorController_confirm: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TotpConfirmDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  TwoFactorController_require: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  TwoFactorController_disable: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
         };
       };
     };
@@ -2118,6 +2534,126 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_portBindings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PortBindingDto"][];
+        };
+      };
+    };
+  };
+  DeploymentsController_addPortBinding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AddPortBindingDto"];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PortBindingDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_suggestPortBinding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuggestPortDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_removePortBinding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bindingId: string;
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentsController_updatePortBinding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bindingId: string;
+        domainId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdatePortBindingDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PortBindingDto"];
         };
       };
     };
@@ -2399,6 +2935,149 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PublicIpDto"];
+        };
+      };
+    };
+  };
+  AdminController_getImages: {
+    parameters: {
+      query?: {
+        all?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminImageDto"][];
+        };
+      };
+    };
+  };
+  AdminController_deleteImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Image ID or tag. */
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Image removed. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminController_pruneImages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PruneResultDto"];
+        };
+      };
+    };
+  };
+  AdminController_getContainers: {
+    parameters: {
+      query?: {
+        all?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminContainerDto"][];
+        };
+      };
+    };
+  };
+  AdminController_pruneContainers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PruneResultDto"];
+        };
+      };
+    };
+  };
+  AdminController_getSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AppSettingsDto"];
+        };
+      };
+    };
+  };
+  AdminController_updateSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UpdateAppSettingsDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AppSettingsDto"];
         };
       };
     };
@@ -3180,149 +3859,6 @@ export interface operations {
       };
     };
   };
-  AdminController_getImages: {
-    parameters: {
-      query?: {
-        all?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["AdminImageDto"][];
-        };
-      };
-    };
-  };
-  AdminController_deleteImage: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description Image ID or tag. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Image removed. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  AdminController_pruneImages: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["PruneResultDto"];
-        };
-      };
-    };
-  };
-  AdminController_getContainers: {
-    parameters: {
-      query?: {
-        all?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["AdminContainerDto"][];
-        };
-      };
-    };
-  };
-  AdminController_pruneContainers: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["PruneResultDto"];
-        };
-      };
-    };
-  };
-  AdminController_getSettings: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["AppSettingsDto"];
-        };
-      };
-    };
-  };
-  AdminController_updateSettings: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UpdateAppSettingsDto"];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["AppSettingsDto"];
-        };
-      };
-    };
-  };
   StatsController_deploymentStats: {
     parameters: {
       query?: never;
@@ -3410,6 +3946,7 @@ export interface operations {
   TasksController_list: {
     parameters: {
       query?: {
+        deploymentId?: string;
         scope?: "active" | "recent";
       };
       header?: never;

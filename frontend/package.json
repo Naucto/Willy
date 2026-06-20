@@ -25,6 +25,7 @@
     "@xterm/xterm": "^6.0.0",
     "notistack": "^3.0.2",
     "openapi-fetch": "^0.17.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.79.0",

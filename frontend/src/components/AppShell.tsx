@@ -9,12 +9,16 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import InsightsIcon from "@mui/icons-material/Insights";
 import LanguageIcon from "@mui/icons-material/Language";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import LogoutIcon from "@mui/icons-material/Logout";
 import MemoryIcon from "@mui/icons-material/Memory";
 import MenuIcon from "@mui/icons-material/Menu";
 import PeopleIcon from "@mui/icons-material/People";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import StorageIcon from "@mui/icons-material/Storage";
 import TerminalIcon from "@mui/icons-material/Terminal";
@@ -35,14 +39,15 @@ import {
   ListItemText,
   Toolbar,
   Tooltip,
-  Typography,
 } from "@mui/material";
 import { type ReactNode, useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useDeployment, useDeploymentContainers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
+import { useCan } from "../auth/permissions";
 import { deploymentSections } from "../deploymentSections";
-import { humanizeRole } from "../format";
+import { userSections } from "../userSections";
+import { AccountMenu } from "./AccountMenu";
 import { ActivityMenu } from "./ActivityMenu";
 import { SlideFade } from "./SlideFade";
 
@@ -60,10 +65,10 @@ const GLOBAL_NAV: NavItem[] = [
   { label: "Deployments", to: "/deployments", icon: <RocketLaunchIcon /> },
   { label: "Monitoring", to: "/monitoring", icon: <InsightsIcon />, adminOnly: true },
   { label: "DNS", to: "/dns", icon: <DnsIcon /> },
-  { label: "Backups", to: "/backups", icon: <BackupIcon /> },
-  { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
   { label: "Images", to: "/images", icon: <LayersOutlinedIcon />, adminOnly: true },
   { label: "Containers", to: "/containers", icon: <ViewInArIcon />, adminOnly: true },
+  { label: "Backups", to: "/backups", icon: <BackupIcon /> },
+  { label: "Users", to: "/users", icon: <PeopleIcon />, adminOnly: true },
   { label: "Audit", to: "/audit", icon: <ReceiptLongIcon />, adminOnly: true },
   { label: "Settings", to: "/settings", icon: <SettingsIcon />, adminOnly: true },
 ];
@@ -89,6 +94,12 @@ const SECTION_ICONS: Record<string, ReactNode> = {
 // Tabs whose content depends on the selected container — keep ?container= when navigating to them.
 const CONTAINER_SCOPED = new Set(["runtime", "console", "resources", "health"]);
 
+const USER_SECTION_ICONS: Record<string, ReactNode> = {
+  general: <PersonOutlineIcon />,
+  security: <LockOutlinedIcon />,
+  twofa: <ShieldOutlinedIcon />,
+};
+
 // Recognise a deployment-detail route (/deployments/:id[/:section]); "new" and the bare list aren't.
 function matchDeployment(pathname: string): { id: string; section: string } | null {
   const match = pathname.match(/^\/deployments\/([^/]+)(?:\/([^/]+))?/);
@@ -100,12 +111,25 @@ function matchDeployment(pathname: string): { id: string; section: string } | nu
   return { id: match[1], section: match[2] ?? "overview" };
 }
 
+// Recognise a user-detail route (/users/:id[/:section]); the bare list isn't.
+function matchUser(pathname: string): { id: string; section: string } | null {
+  const match = pathname.match(/^\/users\/([^/]+)(?:\/([^/]+))?/);
+
+  if (!match?.[1]) {
+    return null;
+  }
+
+  return { id: match[1], section: match[2] ?? "general" };
+}
+
 export function AppShell() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const canAdmin = useCan("admin");
   const location = useLocation();
   const [open, setOpen] = useState(true);
 
   const detail = matchDeployment(location.pathname);
+  const userDetail = matchUser(location.pathname);
   // Only fetched on a deployment route (so we know whether to show Runs vs Runtime/Console).
   const { data: deployment } = useDeployment(detail?.id ?? "");
   // Container-scoped sections only make sense when there's a container to focus on.
@@ -180,14 +204,14 @@ export function AppShell() {
           <Box sx={{ flexGrow: 1 }} />
 
           <ActivityMenu />
+          <AccountMenu />
 
-          {user && (
-            <Typography variant="body2" sx={{ color: "text.secondary", mx: 2 }}>
-              {user.email} · {humanizeRole(user.role)}
-            </Typography>
-          )}
-
-          <Button color="inherit" onClick={() => void logout()}>
+          <Button
+            color="inherit"
+            startIcon={<LogoutIcon />}
+            sx={{ ml: 1 }}
+            onClick={() => void logout()}
+          >
             Sign out
           </Button>
         </Toolbar>
@@ -220,9 +244,29 @@ export function AppShell() {
       >
         <Toolbar />
         {/* Drill animation: the sub-sidebar enters from the right, the global nav from the left. */}
-        <SlideFade key={detail ? `d-${detail.id}` : "global"} direction={detail ? "right" : "left"}>
+        <SlideFade
+          key={userDetail ? `u-${userDetail.id}` : detail ? `d-${detail.id}` : "global"}
+          direction={userDetail || detail ? "right" : "left"}
+        >
           <List>
-            {detail ? (
+            {userDetail ? (
+              <>
+                {/* Admins came from the Users list; everyone else is on their own account page. */}
+                {canAdmin
+                  ? item("back", "/users", "Users", <ArrowBackIcon />, false)
+                  : item("back", "/deployments", "Back", <ArrowBackIcon />, false)}
+                <Divider sx={{ my: 1 }} />
+                {userSections().map((section) =>
+                  item(
+                    section.key,
+                    `/users/${userDetail.id}/${section.key}`,
+                    section.label,
+                    USER_SECTION_ICONS[section.key] ?? <InfoOutlinedIcon />,
+                    userDetail.section === section.key,
+                  ),
+                )}
+              </>
+            ) : detail ? (
               <>
                 {item("back", "/deployments", "Deployments", <ArrowBackIcon />, false)}
                 <Divider sx={{ my: 1 }} />
@@ -245,7 +289,7 @@ export function AppShell() {
                   })}
               </>
             ) : (
-              GLOBAL_NAV.filter((nav) => !nav.adminOnly || user?.role === "ADMIN").map((nav) =>
+              GLOBAL_NAV.filter((nav) => !nav.adminOnly || canAdmin).map((nav) =>
                 item(nav.to, nav.to, nav.label, nav.icon, location.pathname.startsWith(nav.to)),
               )
             )}

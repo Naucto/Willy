@@ -31,6 +31,7 @@ import {
   useRollback,
 } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { Console } from "../components/Console";
 import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelector";
 import { CopyButton } from "../components/CopyButton";
@@ -39,6 +40,7 @@ import { DeployActions } from "../components/DeployActions";
 import { DeploymentBackupsTab } from "../components/DeploymentBackupsTab";
 import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
+import { Gated } from "../components/Gated";
 import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
 import { MonitoringTab } from "../components/MonitoringTab";
@@ -51,7 +53,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
-import { formatRelativeTime } from "../format";
+import { formatRelativeTime, humanizeType } from "../format";
 
 // Tabs whose content is scoped to a single container; only these show the container selector
 // (Environment is handled separately, with an extra "Everyone" entry). Volumes/Networking show all
@@ -104,6 +106,7 @@ export function DeploymentDetailPage() {
   const { data: deployment, isLoading, error } = useDeployment(id);
   const { data: containers } = useDeploymentContainers(id);
   const transition = useDeploymentTransition(id);
+  const canOperate = useCan("operate");
 
   // The active section is driven by the URL; the left sidebar (AppShell) navigates between sections.
   const active = section ?? "overview";
@@ -169,7 +172,7 @@ export function DeploymentDetailPage() {
         </Typography>
         <StatusBadge status={transition ?? deployment.state} />
         <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
-          {deployment.type}
+          {humanizeType(deployment.type)}
         </Typography>
         {showSelector && containers && (
           <ContainerSelector
@@ -197,7 +200,10 @@ export function DeploymentDetailPage() {
         <RuntimeLogsTab deploymentId={id} deployment={deployment} container={selectedId} />
       )}
       {active === "console" &&
-        (isRunning(deployment) ? (
+        (!canOperate ? (
+          // The console runs commands inside the container — never connect it for a read-only role.
+          <Alert severity="warning">{ROLE_REASON.operate} to use the console.</Alert>
+        ) : isRunning(deployment) ? (
           <Console deploymentId={id} container={selectedId} />
         ) : (
           <Alert severity="info">Console is available while the deployment is running.</Alert>
@@ -288,6 +294,7 @@ function ReleasesGrid({
   deploymentUpdatedAt?: string;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const rollback = useRollback(deploymentId);
   const deleteRelease = useDeleteRelease(deploymentId);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -392,28 +399,34 @@ function ReleasesGrid({
     renderCell: (params) => (
       <Box>
         {params.row.imageTag && params.row.id !== activeReleaseId && (
-          <Button
-            size="small"
-            disabled={rollbackBusy}
-            startIcon={
-              pendingRollbackId === params.row.id ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : undefined
-            }
-            onClick={() => void onRollback(params.row.id)}
-          >
-            Rollback
-          </Button>
+          <Gated can={canOperate} reason={ROLE_REASON.operate}>
+            <Button
+              size="small"
+              disabled={rollbackBusy}
+              startIcon={
+                pendingRollbackId === params.row.id ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : undefined
+              }
+              onClick={() => void onRollback(params.row.id)}
+            >
+              Rollback
+            </Button>
+          </Gated>
         )}
         {params.row.id !== activeReleaseId && (
-          <Tooltip title="Delete release">
-            <IconButton
-              size="small"
-              disabled={deleteRelease.isPending}
-              onClick={() => setPendingDeleteId(params.row.id)}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+          <Tooltip title={canOperate ? "Delete release" : ROLE_REASON.operate}>
+            <span>
+              <Gated can={canOperate} reason={ROLE_REASON.operate}>
+                <IconButton
+                  size="small"
+                  disabled={deleteRelease.isPending}
+                  onClick={() => setPendingDeleteId(params.row.id)}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Gated>
+            </span>
           </Tooltip>
         )}
       </Box>

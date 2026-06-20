@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { type Capability, CAPABILITIES } from "../permissions";
 
 const ROLES = ["ADMIN", "OPERATOR", "VIEWER"] as const;
 
@@ -9,8 +10,14 @@ export class SessionUserDto {
   @ApiProperty({ type: String, format: "email" })
   email!: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  name!: string | null;
+
   @ApiProperty({ enum: ROLES })
   role!: (typeof ROLES)[number];
+
+  @ApiProperty({ enum: CAPABILITIES, isArray: true, description: "UI capabilities for this role." })
+  permissions!: Capability[];
 }
 
 export class SessionDto {
@@ -32,6 +39,12 @@ export class AuthUserDto {
   @ApiProperty({ type: String, format: "email" })
   email!: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  name!: string | null;
+
   @ApiProperty({ enum: ROLES })
   role!: (typeof ROLES)[number];
+
+  @ApiProperty({ enum: CAPABILITIES, isArray: true, description: "UI capabilities for this role." })
+  permissions!: Capability[];
 }

@@ -3,7 +3,9 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useUpdateDeployment } from "../api/hooks";
 import type { Deployment, UpdateDeploymentInput } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { Gated } from "./Gated";
 import { SettingRow } from "./SettingRow";
 import { SOURCE_OPTIONS, SourceFields } from "./source/SourceFields";
 import type { SourceValue } from "./source/sourceTypes";
@@ -38,6 +40,7 @@ function initialValues(deployment: Deployment): FormValues {
 
 export function SettingsTab({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const update = useUpdateDeployment(deployment.id);
   const [values, setValues] = useState<FormValues>(() => initialValues(deployment));
 
@@ -147,9 +150,11 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
       <Divider sx={{ mb: 2 }} />
 
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button variant="contained" disabled={update.isPending} onClick={() => void onSubmit()}>
-          Save changes
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button variant="contained" disabled={update.isPending} onClick={() => void onSubmit()}>
+            Save changes
+          </Button>
+        </Gated>
       </Box>
     </Stack>
   );

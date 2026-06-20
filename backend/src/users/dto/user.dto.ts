@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsIn, IsString, MinLength } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 const ROLES = ["ADMIN", "OPERATOR", "VIEWER"] as const;
 type Role = (typeof ROLES)[number];
@@ -12,8 +12,17 @@ export class UserDto {
   @ApiProperty({ type: String })
   email!: string;
 
+  @ApiProperty({ type: String, nullable: true })
+  name!: string | null;
+
   @ApiProperty({ enum: ROLES })
   role!: string;
+
+  @ApiProperty({ type: Boolean, description: "Whether 2FA is required for this user." })
+  twoFactorEnabled!: boolean;
+
+  @ApiProperty({ type: Boolean, description: "Whether a TOTP secret has been confirmed." })
+  twoFactorConfigured!: boolean;
 
   @ApiProperty({ type: String, format: "date-time" })
   createdAt!: string;
@@ -23,6 +32,12 @@ export class CreateUserDto {
   @ApiProperty({ type: String, format: "email" })
   @IsEmail()
   email!: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
 
   @ApiProperty({ type: String, minLength: 8 })
   @IsString()
@@ -34,10 +49,22 @@ export class CreateUserDto {
   role!: Role;
 }
 
-export class UpdateUserRoleDto {
-  @ApiProperty({ enum: ROLES })
+export class UpdateUserDto {
+  @ApiPropertyOptional({ type: String, format: "email" })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @ApiPropertyOptional({ enum: ROLES })
+  @IsOptional()
   @IsIn(ROLES)
-  role!: Role;
+  role?: Role;
 }
 
 export class SetPasswordDto {

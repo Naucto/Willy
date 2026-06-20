@@ -13,13 +13,16 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { Deployment } from "../api/types";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { Gated } from "./Gated";
 import { SettingRow } from "./SettingRow";
 
 // GitHub webhook + auto-deploy controls. Auto-deploy saves on toggle; the secret is
 // generated/rotated and shown once.
 export function WebhookTab({ deployment }: { deployment: Deployment }) {
   const { enqueueSnackbar } = useSnackbar();
+  const canOperate = useCan("operate");
   const { data } = useWebhook(deployment.id);
   const update = useUpdateDeployment(deployment.id);
   const rotate = useRotateWebhook(deployment.id);
@@ -56,11 +59,13 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
       >
         <FormControlLabel
           control={
-            <Switch
-              checked={deployment.autoDeploy}
-              disabled={update.isPending}
-              onChange={(event) => void onToggleAutoDeploy(event.target.checked)}
-            />
+            <Gated can={canOperate} reason={ROLE_REASON.operate}>
+              <Switch
+                checked={deployment.autoDeploy}
+                disabled={update.isPending}
+                onChange={(event) => void onToggleAutoDeploy(event.target.checked)}
+              />
+            </Gated>
           }
           label={deployment.autoDeploy ? "Enabled" : "Disabled"}
         />
@@ -97,9 +102,11 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
             {data?.configured ? "Secret configured" : "No secret set"}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
-          <Button variant="outlined" onClick={() => void onRotate()} disabled={rotate.isPending}>
-            {data?.configured ? "Rotate secret" : "Generate secret"}
-          </Button>
+          <Gated can={canOperate} reason={ROLE_REASON.operate}>
+            <Button variant="outlined" onClick={() => void onRotate()} disabled={rotate.isPending}>
+              {data?.configured ? "Rotate secret" : "Generate secret"}
+            </Button>
+          </Gated>
         </Box>
       </SettingRow>
     </Stack>

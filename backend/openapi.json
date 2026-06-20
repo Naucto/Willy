@@ -64,9 +64,42 @@
         ]
       }
     },
-    "/users/{id}/role": {
+    "/users/{id}": {
+      "get": {
+        "operationId": "UsersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
       "patch": {
-        "operationId": "UsersController_setRole",
+        "operationId": "UsersController_update",
         "parameters": [
           {
             "name": "id",
@@ -82,7 +115,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateUserRoleDto"
+                "$ref": "#/components/schemas/UpdateUserDto"
               }
             }
           }
@@ -94,6 +127,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
                 }
               }
             }
@@ -154,41 +220,6 @@
         ]
       }
     },
-    "/users/{id}": {
-      "delete": {
-        "operationId": "UsersController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OkResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "users"
-        ]
-      }
-    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -199,6 +230,99 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResultDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/2fa/login": {
+      "post": {
+        "operationId": "AuthController_totpLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/2fa/setup": {
+      "post": {
+        "operationId": "AuthController_totpSetup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpSetupStartDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetupResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/2fa/confirm": {
+      "post": {
+        "operationId": "AuthController_totpConfirm",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmDto"
               }
             }
           }
@@ -295,6 +419,156 @@
         ],
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/users/{id}/2fa/setup": {
+      "post": {
+        "operationId": "TwoFactorController_setup",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpSetupResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/users/{id}/2fa/confirm": {
+      "post": {
+        "operationId": "TwoFactorController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TotpConfirmDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/users/{id}/2fa/require": {
+      "post": {
+        "operationId": "TwoFactorController_require",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/users/{id}/2fa": {
+      "delete": {
+        "operationId": "TwoFactorController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
         ]
       }
     },
@@ -651,6 +925,256 @@
       "patch": {
         "operationId": "DeploymentsController_makeDomainPrimary",
         "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/domains/{domainId}/bindings": {
+      "get": {
+        "operationId": "DeploymentsController_portBindings",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortBindingDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "post": {
+        "operationId": "DeploymentsController_addPortBinding",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPortBindingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortBindingDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/domains/{domainId}/bindings/suggest": {
+      "get": {
+        "operationId": "DeploymentsController_suggestPortBinding",
+        "parameters": [
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestPortDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/deployments/{id}/domains/{domainId}/bindings/{bindingId}": {
+      "patch": {
+        "operationId": "DeploymentsController_updatePortBinding",
+        "parameters": [
+          {
+            "name": "bindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domainId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePortBindingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortBindingDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "deployments"
+        ]
+      },
+      "delete": {
+        "operationId": "DeploymentsController_removePortBinding",
+        "parameters": [
+          {
+            "name": "bindingId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "domainId",
             "required": true,
@@ -1145,6 +1669,223 @@
         },
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/admin/images": {
+      "get": {
+        "operationId": "AdminController_getImages",
+        "parameters": [
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminImageDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/images/{id}": {
+      "delete": {
+        "operationId": "AdminController_deleteImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Image ID or tag.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Image removed."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/images/prune": {
+      "post": {
+        "operationId": "AdminController_pruneImages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/containers": {
+      "get": {
+        "operationId": "AdminController_getContainers",
+        "parameters": [
+          {
+            "name": "all",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminContainerDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/containers/prune": {
+      "post": {
+        "operationId": "AdminController_pruneContainers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PruneResultDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/settings": {
+      "get": {
+        "operationId": "AdminController_getSettings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "AdminController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "admin"
         ]
       }
     },
@@ -2474,223 +3215,6 @@
         ]
       }
     },
-    "/admin/images": {
-      "get": {
-        "operationId": "AdminController_getImages",
-        "parameters": [
-          {
-            "name": "all",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AdminImageDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
-    "/admin/images/{id}": {
-      "delete": {
-        "operationId": "AdminController_deleteImage",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Image ID or tag.",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Image removed."
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
-    "/admin/images/prune": {
-      "post": {
-        "operationId": "AdminController_pruneImages",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PruneResultDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
-    "/admin/containers": {
-      "get": {
-        "operationId": "AdminController_getContainers",
-        "parameters": [
-          {
-            "name": "all",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AdminContainerDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
-    "/admin/containers/prune": {
-      "post": {
-        "operationId": "AdminController_pruneContainers",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PruneResultDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
-    "/admin/settings": {
-      "get": {
-        "operationId": "AdminController_getSettings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AppSettingsDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      },
-      "put": {
-        "operationId": "AdminController_updateSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAppSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AppSettingsDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "admin"
-        ]
-      }
-    },
     "/deployments/{id}/stats": {
       "get": {
         "operationId": "StatsController_deploymentStats",
@@ -2847,6 +3371,14 @@
         "operationId": "TasksController_list",
         "parameters": [
           {
+            "name": "deploymentId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "scope",
             "required": false,
             "in": "query",
@@ -2986,6 +3518,10 @@
           "email": {
             "type": "string"
           },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -2993,6 +3529,14 @@
               "OPERATOR",
               "VIEWER"
             ]
+          },
+          "twoFactorEnabled": {
+            "type": "boolean",
+            "description": "Whether 2FA is required for this user."
+          },
+          "twoFactorConfigured": {
+            "type": "boolean",
+            "description": "Whether a TOTP secret has been confirmed."
           },
           "createdAt": {
             "type": "string",
@@ -3002,7 +3546,10 @@
         "required": [
           "id",
           "email",
+          "name",
           "role",
+          "twoFactorEnabled",
+          "twoFactorConfigured",
           "createdAt"
         ]
       },
@@ -3012,6 +3559,9 @@
           "email": {
             "type": "string",
             "format": "email"
+          },
+          "name": {
+            "type": "string"
           },
           "password": {
             "type": "string",
@@ -3032,9 +3582,16 @@
           "role"
         ]
       },
-      "UpdateUserRoleDto": {
+      "UpdateUserDto": {
         "type": "object",
         "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": "string"
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -3043,10 +3600,7 @@
               "VIEWER"
             ]
           }
-        },
-        "required": [
-          "role"
-        ]
+        }
       },
       "SetPasswordDto": {
         "type": "object",
@@ -3099,6 +3653,10 @@
             "type": "string",
             "format": "email"
           },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -3106,12 +3664,25 @@
               "OPERATOR",
               "VIEWER"
             ]
+          },
+          "permissions": {
+            "type": "array",
+            "description": "UI capabilities for this role.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "operate",
+                "admin"
+              ]
+            }
           }
         },
         "required": [
           "id",
           "email",
-          "role"
+          "name",
+          "role",
+          "permissions"
         ]
       },
       "SessionDto": {
@@ -3133,6 +3704,91 @@
           "user"
         ]
       },
+      "LoginResultDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "authenticated",
+              "totp_required",
+              "totp_setup_required"
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionDto"
+          },
+          "challengeToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "TotpLoginDto": {
+        "type": "object",
+        "properties": {
+          "challengeToken": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "challengeToken",
+          "code"
+        ]
+      },
+      "TotpSetupStartDto": {
+        "type": "object",
+        "properties": {
+          "challengeToken": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "challengeToken"
+        ]
+      },
+      "TotpSetupResponseDto": {
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "description": "Base32 secret to enter manually."
+          },
+          "otpauthUri": {
+            "type": "string",
+            "description": "otpauth:// URI to render as a QR code."
+          },
+          "setupToken": {
+            "type": "string",
+            "description": "Opaque token to pass back when confirming the code."
+          }
+        },
+        "required": [
+          "secret",
+          "otpauthUri",
+          "setupToken"
+        ]
+      },
+      "TotpConfirmDto": {
+        "type": "object",
+        "properties": {
+          "setupToken": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "setupToken",
+          "code"
+        ]
+      },
       "AuthUserDto": {
         "type": "object",
         "properties": {
@@ -3144,6 +3800,10 @@
             "type": "string",
             "format": "email"
           },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -3151,12 +3811,25 @@
               "OPERATOR",
               "VIEWER"
             ]
+          },
+          "permissions": {
+            "type": "array",
+            "description": "UI capabilities for this role.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "operate",
+                "admin"
+              ]
+            }
           }
         },
         "required": [
           "userId",
           "email",
-          "role"
+          "name",
+          "role",
+          "permissions"
         ]
       },
       "CreateDeploymentDto": {
@@ -3639,6 +4312,96 @@
           }
         }
       },
+      "PortBindingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "domainId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hostPort": {
+            "type": "number",
+            "description": "Dedicated host port this domain is bound to."
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "description": "Compose service this binding routes to; null = the deployment's default container."
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "description": "Internal port this binding routes to; null = the deployment's web service port."
+          }
+        },
+        "required": [
+          "id",
+          "domainId",
+          "hostPort",
+          "targetService",
+          "targetPort"
+        ]
+      },
+      "SuggestPortDto": {
+        "type": "object",
+        "properties": {
+          "hostPort": {
+            "type": "number",
+            "description": "Lowest free host port in the active sub-range."
+          }
+        },
+        "required": [
+          "hostPort"
+        ]
+      },
+      "AddPortBindingDto": {
+        "type": "object",
+        "properties": {
+          "hostPort": {
+            "type": "number",
+            "example": 20001
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "rtc-1"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 5001
+          }
+        },
+        "required": [
+          "hostPort"
+        ]
+      },
+      "UpdatePortBindingDto": {
+        "type": "object",
+        "properties": {
+          "hostPort": {
+            "type": "number",
+            "example": 20001
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "rtc-1"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 5001
+          }
+        },
+        "required": [
+          "hostPort"
+        ]
+      },
       "ResourceLimitsDto": {
         "type": "object",
         "properties": {
@@ -3881,6 +4644,227 @@
         "required": [
           "ip"
         ]
+      },
+      "DeploymentRefDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "AdminImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Full Docker image ID (sha256:…)."
+          },
+          "repoTags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "size": {
+            "type": "number",
+            "description": "Actual on-disk size of the image in bytes."
+          },
+          "virtualSize": {
+            "type": "number",
+            "description": "Virtual size including shared layers, in bytes."
+          },
+          "created": {
+            "type": "number",
+            "description": "Unix timestamp when the image was created."
+          },
+          "deployments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeploymentRefDto"
+            }
+          },
+          "activeContainersCount": {
+            "type": "number",
+            "description": "Number of containers based on this image."
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "Built by Willy or run by a managed deployment."
+          }
+        },
+        "required": [
+          "id",
+          "repoTags",
+          "size",
+          "virtualSize",
+          "created",
+          "deployments",
+          "activeContainersCount",
+          "managed"
+        ]
+      },
+      "PruneResultDto": {
+        "type": "object",
+        "properties": {
+          "spaceReclaimedBytes": {
+            "type": "number",
+            "description": "Bytes reclaimed by the prune operation."
+          },
+          "itemsRemoved": {
+            "type": "number",
+            "description": "Number of images or containers removed."
+          }
+        },
+        "required": [
+          "spaceReclaimedBytes",
+          "itemsRemoved"
+        ]
+      },
+      "AdminContainerDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string",
+            "description": "Image tag or ID the container was started from."
+          },
+          "state": {
+            "type": "string",
+            "description": "Docker state: running, exited, created, paused, …"
+          },
+          "status": {
+            "type": "string",
+            "description": "Human-readable status, e.g. \"Up 2 hours\"."
+          },
+          "created": {
+            "type": "number",
+            "description": "Unix timestamp when the container was created."
+          },
+          "deployment": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeploymentRefDto"
+              }
+            ]
+          },
+          "managed": {
+            "type": "boolean",
+            "description": "Belongs to a Willy-managed deployment."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "image",
+          "state",
+          "status",
+          "created",
+          "managed"
+        ]
+      },
+      "PortBindingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "start": {
+            "type": "number",
+            "description": "Lowest allocatable host port."
+          },
+          "end": {
+            "type": "number",
+            "description": "Highest allocatable host port."
+          }
+        },
+        "required": [
+          "enabled",
+          "start",
+          "end"
+        ]
+      },
+      "PortBindingCapacityDto": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ]
+      },
+      "AppSettingsDto": {
+        "type": "object",
+        "properties": {
+          "showAllResources": {
+            "type": "boolean",
+            "description": "Show all host containers/images on the Images/Containers pages, not only Willy-managed ones."
+          },
+          "portBinding": {
+            "$ref": "#/components/schemas/PortBindingSettingsDto"
+          },
+          "portBindingCapacity": {
+            "nullable": true,
+            "description": "Provisioned host-port capacity; null when WILLY_PORT_BIND_RANGE is unset.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PortBindingCapacityDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "showAllResources",
+          "portBinding",
+          "portBindingCapacity"
+        ]
+      },
+      "UpdatePortBindingSettingsDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "start": {
+            "type": "number"
+          },
+          "end": {
+            "type": "number"
+          }
+        }
+      },
+      "UpdateAppSettingsDto": {
+        "type": "object",
+        "properties": {
+          "showAllResources": {
+            "type": "boolean"
+          },
+          "portBinding": {
+            "$ref": "#/components/schemas/UpdatePortBindingSettingsDto"
+          }
+        }
       },
       "MaskedEnvVarDto": {
         "type": "object",
@@ -4596,159 +5580,6 @@
           "removedImageTags"
         ]
       },
-      "DeploymentRefDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ]
-      },
-      "AdminImageDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Full Docker image ID (sha256:…)."
-          },
-          "repoTags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "size": {
-            "type": "number",
-            "description": "Actual on-disk size of the image in bytes."
-          },
-          "virtualSize": {
-            "type": "number",
-            "description": "Virtual size including shared layers, in bytes."
-          },
-          "created": {
-            "type": "number",
-            "description": "Unix timestamp when the image was created."
-          },
-          "deployments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DeploymentRefDto"
-            }
-          },
-          "activeContainersCount": {
-            "type": "number",
-            "description": "Number of containers based on this image."
-          },
-          "managed": {
-            "type": "boolean",
-            "description": "Built by Willy or run by a managed deployment."
-          }
-        },
-        "required": [
-          "id",
-          "repoTags",
-          "size",
-          "virtualSize",
-          "created",
-          "deployments",
-          "activeContainersCount",
-          "managed"
-        ]
-      },
-      "PruneResultDto": {
-        "type": "object",
-        "properties": {
-          "spaceReclaimedBytes": {
-            "type": "number",
-            "description": "Bytes reclaimed by the prune operation."
-          },
-          "itemsRemoved": {
-            "type": "number",
-            "description": "Number of images or containers removed."
-          }
-        },
-        "required": [
-          "spaceReclaimedBytes",
-          "itemsRemoved"
-        ]
-      },
-      "AdminContainerDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "image": {
-            "type": "string",
-            "description": "Image tag or ID the container was started from."
-          },
-          "state": {
-            "type": "string",
-            "description": "Docker state: running, exited, created, paused, …"
-          },
-          "status": {
-            "type": "string",
-            "description": "Human-readable status, e.g. \"Up 2 hours\"."
-          },
-          "created": {
-            "type": "number",
-            "description": "Unix timestamp when the container was created."
-          },
-          "deployment": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DeploymentRefDto"
-              }
-            ]
-          },
-          "managed": {
-            "type": "boolean",
-            "description": "Belongs to a Willy-managed deployment."
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "image",
-          "state",
-          "status",
-          "created",
-          "managed"
-        ]
-      },
-      "AppSettingsDto": {
-        "type": "object",
-        "properties": {
-          "showAllResources": {
-            "type": "boolean",
-            "description": "Show all host containers/images on the Images/Containers pages, not only Willy-managed ones."
-          }
-        },
-        "required": [
-          "showAllResources"
-        ]
-      },
-      "UpdateAppSettingsDto": {
-        "type": "object",
-        "properties": {
-          "showAllResources": {
-            "type": "boolean"
-          }
-        }
-      },
       "VolumeUsageDto": {
         "type": "object",
         "properties": {
@@ -5032,6 +5863,11 @@
             "type": "string",
             "nullable": true
           },
+          "backupId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Backup this task operates on, if any."
+          },
           "progress": {
             "type": "number",
             "nullable": true,
@@ -5057,6 +5893,7 @@
           "status",
           "title",
           "deploymentId",
+          "backupId",
           "progress",
           "errorMessage",
           "createdAt",

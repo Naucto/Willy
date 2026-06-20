@@ -1,5 +1,5 @@
 import { plainToInstance } from "class-transformer";
-import { IsInt, IsOptional, IsString, MinLength, validateSync } from "class-validator";
+import { IsInt, IsOptional, IsString, Matches, MinLength, validateSync } from "class-validator";
 import { ConfigError } from "../common/errors";
 
 export class EnvironmentVariables {
@@ -79,6 +79,16 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   LOG_MAX_FILES?: string;
+
+  // Provisioned host-port capacity for hard-bound domains, "START-END" (e.g. "20000-20099").
+  // Infra publishes this whole range on Traefik and declares one entrypoint per port; the panel's
+  // active sub-range must stay within it. Absent/empty = feature unprovisioned (disabled).
+  // Empty string is allowed (passed through as `${WILLY_PORT_BIND_RANGE:-}` when unset) and means
+  // the feature is off; a non-empty value must be START-END.
+  @IsOptional()
+  @IsString()
+  @Matches(/^(\d+-\d+)?$/, { message: "WILLY_PORT_BIND_RANGE must be START-END, e.g. 20000-20099" })
+  WILLY_PORT_BIND_RANGE?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

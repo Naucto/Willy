@@ -16,15 +16,18 @@ import {
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useDeployments, useDeploymentTransition } from "../api/hooks";
 import type { Deployment } from "../api/types";
-import { useAuth } from "../auth/AuthContext";
+import { ROLE_REASON, useCan } from "../auth/permissions";
 import { DeployActions } from "../components/DeployActions";
+import { Gated } from "../components/Gated";
 import { SystemUtilization } from "../components/ResourceUtilization";
 import { StatusBadge } from "../components/StatusBadge";
 import { describeError } from "../errors";
+import { humanizeType } from "../format";
 
 export function DeploymentsPage() {
   const { data, isLoading, error } = useDeployments();
-  const { user } = useAuth();
+  const canAdmin = useCan("admin");
+  const canOperate = useCan("operate");
   const navigate = useNavigate();
 
   return (
@@ -33,17 +36,19 @@ export function DeploymentsPage() {
         <Typography variant="h4" sx={{ fontWeight: 700, flexGrow: 1 }}>
           Deployments
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          component={RouterLink}
-          to="/deployments/new"
-        >
-          New deployment
-        </Button>
+        <Gated can={canOperate} reason={ROLE_REASON.operate}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            component={RouterLink}
+            to="/deployments/new"
+          >
+            New deployment
+          </Button>
+        </Gated>
       </Box>
 
-      {user?.role === "ADMIN" && <SystemUtilization />}
+      {canAdmin && <SystemUtilization />}
 
       {isLoading && (
         <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -99,7 +104,7 @@ function DeploymentRow({ deployment, onOpen }: { deployment: Deployment; onOpen:
       onClick={deleting ? undefined : onOpen}
     >
       <TableCell sx={{ fontWeight: 600 }}>{deployment.name}</TableCell>
-      <TableCell>{deployment.type}</TableCell>
+      <TableCell>{humanizeType(deployment.type)}</TableCell>
       <TableCell>
         <StatusBadge status={transition ?? deployment.state} />
       </TableCell>

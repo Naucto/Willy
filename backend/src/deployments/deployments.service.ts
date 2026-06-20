@@ -1,9 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
-import { deployments, domains, gitCredentials } from "../db/schema";
+import { deployments, domains, gitCredentials, portBindings } from "../db/schema";
 import type { HealthcheckSpec, ResourceLimits } from "./resource-limits";
 import type {
   ComposeConfig,
@@ -16,13 +16,23 @@ export type Deployment = typeof deployments.$inferSelect;
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type Domain = typeof domains.$inferSelect;
+export type PortBinding = typeof portBindings.$inferSelect;
 
 // A domain with its routing target, ordered primary-first — consumed by the Traefik route grouping.
+// A domain expands into its regular 443 route (hostPort null) plus one route per hard-bound host
+// port, each carrying its own internal target.
 export interface DomainRoute {
   fqdn: string;
   targetService: string | null;
   targetPort: number | null;
+  hostPort: number | null;
   isPrimary: boolean;
+}
+
+export interface PortBindingInput {
+  hostPort: number;
+  targetService?: string | null;
+  targetPort?: number | null;
 }
 
 export interface DomainTargetInput {
@@ -301,11 +311,13 @@ export class DeploymentsService {
     return rows[0];
   }
 
-  // All domains attached to a deployment (primary first) with their routing target, for building
-  // per-(service, port) Traefik routers.
+  // All routes for a deployment (primary first), for building Traefik routers. Each domain yields
+  // its regular 443 route (hostPort null) plus one route per hard-bound host port — the latter each
+  // carrying their own internal target and served on a dedicated entrypoint.
   async domainRoutes(deploymentId: string): Promise<DomainRoute[]> {
-    const rows = await this.db
+    const domainRows = await this.db
       .select({
+        id: domains.id,
         fqdn: domains.fqdn,
         targetService: domains.targetService,
         targetPort: domains.targetPort,
@@ -314,7 +326,48 @@ export class DeploymentsService {
       .from(domains)
       .where(eq(domains.deploymentId, deploymentId));
 
-    return rows.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+    const bindingRows = await this.db
+      .select({
+        domainId: portBindings.domainId,
+        hostPort: portBindings.hostPort,
+        targetService: portBindings.targetService,
+        targetPort: portBindings.targetPort,
+      })
+      .from(portBindings)
+      .innerJoin(domains, eq(portBindings.domainId, domains.id))
+      .where(eq(domains.deploymentId, deploymentId));
+
+    const bindingsByDomain = new Map<string, typeof bindingRows>();
+
+    for (const binding of bindingRows) {
+      const list = bindingsByDomain.get(binding.domainId) ?? [];
+      list.push(binding);
+      bindingsByDomain.set(binding.domainId, list);
+    }
+
+    const routes: DomainRoute[] = [];
+
+    for (const domain of domainRows) {
+      routes.push({
+        fqdn: domain.fqdn,
+        targetService: domain.targetService,
+        targetPort: domain.targetPort,
+        hostPort: null,
+        isPrimary: domain.isPrimary,
+      });
+
+      for (const binding of bindingsByDomain.get(domain.id) ?? []) {
+        routes.push({
+          fqdn: domain.fqdn,
+          targetService: binding.targetService,
+          targetPort: binding.targetPort,
+          hostPort: binding.hostPort,
+          isPrimary: domain.isPrimary,
+        });
+      }
+    }
+
+    return routes.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   }
 
   // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.
@@ -416,6 +469,110 @@ export class DeploymentsService {
       .update(domains)
       .set({ isPrimary: true })
       .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)));
+  }
+
+  // Confirms a domain belongs to a deployment (ownership check for the nested binding endpoints).
+  async findDomain(deploymentId: string, domainId: string): Promise<Domain | undefined> {
+    const rows = await this.db
+      .select()
+      .from(domains)
+      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
+      .limit(1);
+
+    return rows[0];
+  }
+
+  listPortBindings(domainId: string): Promise<PortBinding[]> {
+    return this.db
+      .select()
+      .from(portBindings)
+      .where(eq(portBindings.domainId, domainId))
+      .orderBy(portBindings.hostPort);
+  }
+
+  // Host ports already claimed across ALL domains/deployments — a host port binds at most once.
+  async allocatedHostPorts(): Promise<number[]> {
+    const rows = await this.db.select({ hostPort: portBindings.hostPort }).from(portBindings);
+
+    return rows.map((row) => row.hostPort);
+  }
+
+  // Lowest free port within the active sub-range, across all bindings. Throws when exhausted.
+  async suggestFreePort(range: { start: number; end: number }): Promise<number> {
+    const taken = new Set(await this.allocatedHostPorts());
+
+    for (let port = range.start; port <= range.end; port += 1) {
+      if (!taken.has(port)) {
+        return port;
+      }
+    }
+
+    throw new ConflictException("no free host port available in the configured range");
+  }
+
+  async addPortBinding(domainId: string, input: PortBindingInput): Promise<PortBinding> {
+    await this.assertHostPortFree(input.hostPort);
+
+    const [row] = await this.db
+      .insert(portBindings)
+      .values({
+        domainId,
+        hostPort: input.hostPort,
+        targetService: input.targetService ?? null,
+        targetPort: input.targetPort ?? null,
+      })
+      .returning();
+
+    if (!row) {
+      throw new DatabaseError("port binding insert returned no row");
+    }
+
+    return row;
+  }
+
+  async updatePortBinding(
+    domainId: string,
+    bindingId: string,
+    patch: PortBindingInput,
+  ): Promise<PortBinding> {
+    await this.assertHostPortFree(patch.hostPort, bindingId);
+
+    const [row] = await this.db
+      .update(portBindings)
+      .set({
+        hostPort: patch.hostPort,
+        targetService: patch.targetService ?? null,
+        targetPort: patch.targetPort ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(portBindings.id, bindingId), eq(portBindings.domainId, domainId)))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException("port binding not found for this domain");
+    }
+
+    return row;
+  }
+
+  async removePortBinding(domainId: string, bindingId: string): Promise<void> {
+    await this.db
+      .delete(portBindings)
+      .where(and(eq(portBindings.id, bindingId), eq(portBindings.domainId, domainId)));
+  }
+
+  // The DB UNIQUE(host_port) is the hard guarantee; this pre-check turns a concurrent clash into a
+  // friendly 409 instead of a 500 for the common (non-racing) case.
+  private async assertHostPortFree(hostPort: number, excludeBindingId?: string): Promise<void> {
+    const [clash] = await this.db
+      .select({ id: portBindings.id })
+      .from(portBindings)
+      .where(eq(portBindings.hostPort, hostPort))
+      .limit(1);
+
+    if (clash && clash.id !== excludeBindingId) {
+      throw new ConflictException(`host port ${hostPort} is already bound`);
+    }
   }
 
   // Updates a compose service's resource limits. The Resources and Health tabs each own a disjoint

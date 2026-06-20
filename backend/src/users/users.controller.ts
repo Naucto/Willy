@@ -3,9 +3,11 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Ip,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,22 +19,43 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/jwt-payload.interface";
 import { OkResponseDto } from "../common/dto/ok.dto";
-import { CreateUserDto, SetPasswordDto, UpdateUserRoleDto, UserDto } from "./dto/user.dto";
+import { CreateUserDto, SetPasswordDto, UpdateUserDto, UserDto } from "./dto/user.dto";
 import { type User, UsersService } from "./users.service";
 
 function toDto(user: User): UserDto {
   return {
     id: user.id,
     email: user.email,
+    name: user.name,
     role: user.role,
+    twoFactorEnabled: user.twoFactorEnabled,
+    twoFactorConfigured: user.twoFactorSecret !== null,
     createdAt: user.createdAt.toISOString(),
   };
 }
 
-// Panel access management — admin-only. Operates on the humans who can log into Willy.
+// Self-service is allowed on a user's own row; touching anyone else requires admin.
+function assertSelfOrAdmin(actor: AuthUser, id: string): void {
+  if (actor.role !== "ADMIN" && actor.userId !== id) {
+    throw new ForbiddenException("forbidden");
+  }
+}
+
+// Treat a blank name as "unset" so clearing the field stores NULL, not "".
+function normalizeName(name: string | undefined): string | null | undefined {
+  if (name === undefined) {
+    return undefined;
+  }
+
+  const trimmed = name.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+// Panel access management. The list + managing other users is admin-only; a signed-in user may view
+// and edit their own row (profile, password, 2FA) — enforced per route.
 @ApiTags("users")
 @ApiBearerAuth()
-@Roles("ADMIN")
 @Controller("users")
 export class UsersController {
   constructor(
@@ -40,12 +63,31 @@ export class UsersController {
     private readonly audit: AuditService,
   ) {}
 
+  @Roles("ADMIN")
   @ApiOkResponse({ type: [UserDto] })
   @Get()
   async list(): Promise<UserDto[]> {
     return (await this.users.list()).map(toDto);
   }
 
+  @ApiParam({ name: "id", type: String })
+  @ApiOkResponse({ type: UserDto })
+  @Get(":id")
+  async get(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthUser,
+  ): Promise<UserDto> {
+    assertSelfOrAdmin(actor, id);
+    const user = await this.users.findById(id);
+
+    if (!user) {
+      throw new NotFoundException("user not found");
+    }
+
+    return toDto(user);
+  }
+
+  @Roles("ADMIN")
   @ApiBody({ type: CreateUserDto })
   @ApiOkResponse({ type: UserDto })
   @Post()
@@ -54,7 +96,12 @@ export class UsersController {
     @CurrentUser() actor: AuthUser,
     @Ip() ip: string,
   ): Promise<UserDto> {
-    const user = await this.users.createWithPassword(dto.email, dto.password, dto.role);
+    const user = await this.users.createWithPassword(
+      dto.email,
+      dto.password,
+      dto.role,
+      normalizeName(dto.name),
+    );
     await this.audit.record({
       actorId: actor.userId,
       action: "USER_CREATE",
@@ -68,34 +115,46 @@ export class UsersController {
   }
 
   @ApiParam({ name: "id", type: String })
-  @ApiBody({ type: UpdateUserRoleDto })
+  @ApiBody({ type: UpdateUserDto })
   @ApiOkResponse({ type: UserDto })
-  @Patch(":id/role")
-  async setRole(
+  @Patch(":id")
+  async update(
     @Param("id", ParseUUIDPipe) id: string,
-    @Body() dto: UpdateUserRoleDto,
+    @Body() dto: UpdateUserDto,
     @CurrentUser() actor: AuthUser,
     @Ip() ip: string,
   ): Promise<UserDto> {
-    // Don't let the last admin demote themselves into a lockout.
-    if (id === actor.userId && dto.role !== "ADMIN") {
-      throw new BadRequestException("you cannot change your own role");
+    assertSelfOrAdmin(actor, id);
+
+    // Role changes are admin-only; the existing self-demote guard prevents an admin lockout.
+    if (dto.role !== undefined) {
+      if (actor.role !== "ADMIN") {
+        throw new ForbiddenException("only admins can change roles");
+      }
+
+      if (id === actor.userId && dto.role !== "ADMIN") {
+        throw new BadRequestException("you cannot change your own role");
+      }
     }
 
-    await this.users.setRole(id, dto.role);
-    const user = await this.users.findById(id);
-
-    if (!user) {
-      throw new BadRequestException("user not found");
-    }
+    const name = normalizeName(dto.name);
+    const user = await this.users.update(id, {
+      ...(dto.email !== undefined ? { email: dto.email } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(dto.role !== undefined ? { role: dto.role } : {}),
+    });
 
     await this.audit.record({
       actorId: actor.userId,
-      action: "USER_ROLE_CHANGE",
+      action: "USER_UPDATE",
       targetType: "user",
       targetId: id,
       ip,
-      metadata: { role: dto.role },
+      metadata: {
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(name !== undefined ? { name } : {}),
+        ...(dto.role !== undefined ? { role: dto.role } : {}),
+      },
     });
 
     return toDto(user);
@@ -112,6 +171,7 @@ export class UsersController {
     @CurrentUser() actor: AuthUser,
     @Ip() ip: string,
   ): Promise<{ ok: true }> {
+    assertSelfOrAdmin(actor, id);
     await this.users.setPassword(id, dto.password);
     await this.audit.record({
       actorId: actor.userId,
@@ -124,6 +184,7 @@ export class UsersController {
     return { ok: true };
   }
 
+  @Roles("ADMIN")
   @ApiParam({ name: "id", type: String })
   @ApiOkResponse({ type: OkResponseDto })
   @Delete(":id")
