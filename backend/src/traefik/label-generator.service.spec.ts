@@ -112,6 +112,12 @@ describe("LabelGeneratorService", () => {
     // Regular route stays on 443.
     expect(labels["traefik.http.routers.rtc-app-8080.entrypoints"]).toBe("websecure");
 
+    // Every router must be linked to its own service explicitly — with multiple services on one
+    // container Traefik refuses to auto-link and would otherwise drop all routers as ambiguous.
+    expect(labels["traefik.http.routers.rtc-app-8080.service"]).toBe("rtc-app-8080");
+    expect(labels["traefik.http.routers.rtc-rtc-a-p20001.service"]).toBe("rtc-rtc-a-p20001");
+    expect(labels["traefik.http.routers.rtc-rtc-b-p20002.service"]).toBe("rtc-rtc-b-p20002");
+
     // Each binding gets its own router on its own entrypoint, same Host rule, internal target port.
     expect(labels["traefik.http.routers.rtc-rtc-a-p20001.entrypoints"]).toBe("port-20001");
     expect(labels["traefik.http.routers.rtc-rtc-a-p20001.rule"]).toBe(

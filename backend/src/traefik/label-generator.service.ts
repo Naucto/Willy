@@ -129,6 +129,10 @@ export class LabelGeneratorService {
 
       labels[`traefik.http.routers.${router}.middlewares`] = "sec-headers@file";
       labels[`traefik.http.routers.${router}.priority`] = String(input.priority);
+      // Link the router to its service explicitly. Traefik only auto-links when a container exposes
+      // a single service; a domain with a hard-bound port (or several ports) puts multiple services
+      // on one container, and without this Traefik drops *every* router on it as ambiguous.
+      labels[`traefik.http.routers.${router}.service`] = router;
       labels[`traefik.http.services.${router}.loadbalancer.server.port`] = String(group.port);
     }
 
