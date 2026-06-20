@@ -436,7 +436,7 @@ function DomainStep({
               label="Service"
               placeholder="web"
               value={state.domainService}
-              helperText="Compose service this domain routes to. Blank uses the first declared service."
+              helperText="Compose service this domain routes to, on its internal port (below) — not a published host port. Blank uses the first declared service."
               onChange={(event) => patch({ domainService: event.target.value })}
             />
           )}

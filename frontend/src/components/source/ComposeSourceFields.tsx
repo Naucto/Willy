@@ -15,6 +15,7 @@ export function ComposeSourceFields(props: SourceFieldsProps) {
         label="Compose file path"
         placeholder="docker-compose.yml"
         value={value.composeFilePath}
+        helperText="Published host ports (ports:) are ignored — Willy routes each domain to a service's internal port, so stacks never collide on the host."
         onChange={(event) => onChange({ composeFilePath: event.target.value })}
       />
     </>
