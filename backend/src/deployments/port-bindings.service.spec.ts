@@ -2,7 +2,17 @@ import { ConflictException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
 import type { CryptoService } from "../crypto/crypto.service";
 import type { Database } from "../db/db.module";
-import { DeploymentsService, type PortBinding } from "./deployments.service";
+import { DeploymentsService, expandDomainRoutes, type PortBinding } from "./deployments.service";
+
+const domain = (over: Partial<Parameters<typeof expandDomainRoutes>[0][number]> = {}) => ({
+  id: "dom-1",
+  fqdn: "rtc.example.com",
+  webRoute: true,
+  targetService: null,
+  targetPort: null,
+  isPrimary: false,
+  ...over,
+});
 
 const crypto = {} as unknown as CryptoService;
 
@@ -19,6 +29,45 @@ function makeDb(selectRows: unknown[], insertRows: unknown[] = []): Database {
     insert: () => ({ values: () => ({ returning: () => Promise.resolve(insertRows) }) }),
   } as unknown as Database;
 }
+
+describe("expandDomainRoutes", () => {
+  const binds = [
+    { domainId: "dom-1", hostPort: 20001, targetService: "rtc-a", targetPort: 5001 },
+    { domainId: "dom-1", hostPort: 20002, targetService: "rtc-b", targetPort: 5002 },
+  ];
+
+  it("emits only port routes for a port-bind-only domain (no 443 route)", () => {
+    const routes = expandDomainRoutes([domain({ webRoute: false })], binds);
+
+    expect(routes).toHaveLength(2);
+    expect(routes.every((r) => r.hostPort !== null)).toBe(true);
+    expect(routes.map((r) => r.hostPort)).toEqual([20001, 20002]);
+  });
+
+  it("emits the 443 route plus a route per bind when webRoute is on", () => {
+    const routes = expandDomainRoutes([domain({ webRoute: true, targetPort: 8080 })], binds);
+
+    expect(routes).toHaveLength(3);
+    const web = routes.filter((r) => r.hostPort === null);
+    expect(web).toHaveLength(1);
+    expect(web[0]?.targetPort).toBe(8080);
+    expect(routes.filter((r) => r.hostPort !== null).map((r) => r.hostPort)).toEqual([
+      20001, 20002,
+    ]);
+  });
+
+  it("orders primary domains first", () => {
+    const routes = expandDomainRoutes(
+      [
+        domain({ id: "a", fqdn: "a.example.com", isPrimary: false }),
+        domain({ id: "b", fqdn: "b.example.com", isPrimary: true }),
+      ],
+      [],
+    );
+
+    expect(routes[0]?.fqdn).toBe("b.example.com");
+  });
+});
 
 describe("DeploymentsService.suggestFreePort", () => {
   it("returns the lowest free port in the range", async () => {

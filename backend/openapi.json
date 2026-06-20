@@ -4243,75 +4243,6 @@
           }
         }
       },
-      "DomainDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fqdn": {
-            "type": "string"
-          },
-          "isPrimary": {
-            "type": "boolean"
-          },
-          "targetService": {
-            "type": "string",
-            "nullable": true,
-            "description": "Compose service this domain routes to; null = the deployment's default container."
-          },
-          "targetPort": {
-            "type": "number",
-            "nullable": true,
-            "description": "Internal port this domain routes to; null = the deployment's web service port."
-          }
-        },
-        "required": [
-          "id",
-          "fqdn",
-          "isPrimary",
-          "targetService",
-          "targetPort"
-        ]
-      },
-      "AddDomainDto": {
-        "type": "object",
-        "properties": {
-          "fqdn": {
-            "type": "string",
-            "example": "app.example.com"
-          },
-          "targetService": {
-            "type": "string",
-            "nullable": true,
-            "example": "frontend"
-          },
-          "targetPort": {
-            "type": "number",
-            "nullable": true,
-            "example": 8080
-          }
-        },
-        "required": [
-          "fqdn"
-        ]
-      },
-      "UpdateDomainTargetDto": {
-        "type": "object",
-        "properties": {
-          "targetService": {
-            "type": "string",
-            "nullable": true,
-            "example": "frontend"
-          },
-          "targetPort": {
-            "type": "number",
-            "nullable": true,
-            "example": 8080
-          }
-        }
-      },
       "PortBindingDto": {
         "type": "object",
         "properties": {
@@ -4345,6 +4276,96 @@
           "targetService",
           "targetPort"
         ]
+      },
+      "DomainDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fqdn": {
+            "type": "string"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "webRoute": {
+            "type": "boolean",
+            "description": "Whether this domain serves a regular 443 web route; false = port-bind-only."
+          },
+          "bindings": {
+            "description": "Hard-bound host ports fronting this domain.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortBindingDto"
+            }
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "description": "Compose service this domain routes to; null = the deployment's default container."
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "description": "Internal port this domain routes to; null = the deployment's web service port."
+          }
+        },
+        "required": [
+          "id",
+          "fqdn",
+          "isPrimary",
+          "webRoute",
+          "bindings",
+          "targetService",
+          "targetPort"
+        ]
+      },
+      "AddDomainDto": {
+        "type": "object",
+        "properties": {
+          "fqdn": {
+            "type": "string",
+            "example": "app.example.com"
+          },
+          "webRoute": {
+            "type": "boolean",
+            "description": "false = create a port-bind-only domain with no 443 route. Defaults to true."
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "frontend"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 8080
+          }
+        },
+        "required": [
+          "fqdn"
+        ]
+      },
+      "UpdateDomainTargetDto": {
+        "type": "object",
+        "properties": {
+          "webRoute": {
+            "type": "boolean",
+            "description": "Toggle the domain's 443 web route on/off without touching its host-port binds."
+          },
+          "targetService": {
+            "type": "string",
+            "nullable": true,
+            "example": "frontend"
+          },
+          "targetPort": {
+            "type": "number",
+            "nullable": true,
+            "example": 8080
+          }
+        }
       },
       "SuggestPortDto": {
         "type": "object",

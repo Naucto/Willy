@@ -122,6 +122,10 @@ export const domains = pgTable(
     certStatus: certStatusEnum("cert_status").notNull().default("NONE"),
     certResolver: text("cert_resolver").notNull().default("ovh"),
     isPrimary: boolean("is_primary").notNull().default(false),
+    // Whether this domain serves a regular 443 web route. false = the domain exists only to anchor
+    // hard-bound host ports (and its ACME cert); it emits no websecure router. Both kinds of entry
+    // can coexist on one domain.
+    webRoute: boolean("web_route").notNull().default(true),
     // Granular routing: a domain points at a specific container/service (compose service name;
     // null = the deployment's single/default container) and an internal port (null = the
     // deployment's webServicePort). Lets one stack route many domains to different services/ports.

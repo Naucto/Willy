@@ -1409,30 +1409,6 @@ export interface components {
       /** @example app.example.com */
       domain?: string;
     };
-    DomainDto: {
-      /** Format: uuid */
-      id: string;
-      fqdn: string;
-      isPrimary: boolean;
-      /** @description Compose service this domain routes to; null = the deployment's default container. */
-      targetService: string | null;
-      /** @description Internal port this domain routes to; null = the deployment's web service port. */
-      targetPort: number | null;
-    };
-    AddDomainDto: {
-      /** @example app.example.com */
-      fqdn: string;
-      /** @example frontend */
-      targetService?: string | null;
-      /** @example 8080 */
-      targetPort?: number | null;
-    };
-    UpdateDomainTargetDto: {
-      /** @example frontend */
-      targetService?: string | null;
-      /** @example 8080 */
-      targetPort?: number | null;
-    };
     PortBindingDto: {
       /** Format: uuid */
       id: string;
@@ -1444,6 +1420,38 @@ export interface components {
       targetService: string | null;
       /** @description Internal port this binding routes to; null = the deployment's web service port. */
       targetPort: number | null;
+    };
+    DomainDto: {
+      /** Format: uuid */
+      id: string;
+      fqdn: string;
+      isPrimary: boolean;
+      /** @description Whether this domain serves a regular 443 web route; false = port-bind-only. */
+      webRoute: boolean;
+      /** @description Hard-bound host ports fronting this domain. */
+      bindings: components["schemas"]["PortBindingDto"][];
+      /** @description Compose service this domain routes to; null = the deployment's default container. */
+      targetService: string | null;
+      /** @description Internal port this domain routes to; null = the deployment's web service port. */
+      targetPort: number | null;
+    };
+    AddDomainDto: {
+      /** @example app.example.com */
+      fqdn: string;
+      /** @description false = create a port-bind-only domain with no 443 route. Defaults to true. */
+      webRoute?: boolean;
+      /** @example frontend */
+      targetService?: string | null;
+      /** @example 8080 */
+      targetPort?: number | null;
+    };
+    UpdateDomainTargetDto: {
+      /** @description Toggle the domain's 443 web route on/off without touching its host-port binds. */
+      webRoute?: boolean;
+      /** @example frontend */
+      targetService?: string | null;
+      /** @example 8080 */
+      targetPort?: number | null;
     };
     SuggestPortDto: {
       /** @description Lowest free host port in the active sub-range. */

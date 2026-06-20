@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsFQDN, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsBoolean, IsFQDN, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { PortBindingDto } from "./port-binding.dto";
 
 export class DomainDto {
   @ApiProperty({ type: String, format: "uuid" })
@@ -10,6 +11,18 @@ export class DomainDto {
 
   @ApiProperty({ type: Boolean })
   isPrimary!: boolean;
+
+  @ApiProperty({
+    type: Boolean,
+    description: "Whether this domain serves a regular 443 web route; false = port-bind-only.",
+  })
+  webRoute!: boolean;
+
+  @ApiProperty({
+    type: [PortBindingDto],
+    description: "Hard-bound host ports fronting this domain.",
+  })
+  bindings!: PortBindingDto[];
 
   @ApiProperty({
     type: String,
@@ -34,6 +47,15 @@ export class AddDomainDto {
   @IsFQDN({ require_tld: true }, { message: "fqdn must be a valid domain (e.g. app.example.com)" })
   fqdn!: string;
 
+  @ApiProperty({
+    type: Boolean,
+    required: false,
+    description: "false = create a port-bind-only domain with no 443 route. Defaults to true.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  webRoute?: boolean;
+
   @ApiProperty({ type: String, required: false, nullable: true, example: "frontend" })
   @IsOptional()
   @IsString()
@@ -48,6 +70,15 @@ export class AddDomainDto {
 }
 
 export class UpdateDomainTargetDto {
+  @ApiProperty({
+    type: Boolean,
+    required: false,
+    description: "Toggle the domain's 443 web route on/off without touching its host-port binds.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  webRoute?: boolean;
+
   @ApiProperty({ type: String, required: false, nullable: true, example: "frontend" })
   @IsOptional()
   @IsString()

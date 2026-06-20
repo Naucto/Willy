@@ -41,11 +41,13 @@ import {
 import { ResourceLimitsDto } from "./dto/resource-limits.dto";
 import { UpdateDeploymentDto } from "./dto/update-deployment.dto";
 
-function domainToDto(row: Domain): DomainDto {
+function domainToDto(row: Domain, bindings: PortBinding[] = []): DomainDto {
   return {
     id: row.id,
     fqdn: row.fqdn,
     isPrimary: row.isPrimary,
+    webRoute: row.webRoute,
+    bindings: bindings.map(bindingToDto),
     targetService: row.targetService,
     targetPort: row.targetPort,
   };
@@ -114,7 +116,9 @@ export class DeploymentsController {
   @ApiOkResponse({ type: [DomainDto] })
   @Get(":id/domains")
   async domains(@Param("id") id: string): Promise<DomainDto[]> {
-    return (await this.deployments.listDomains(id)).map(domainToDto);
+    return (await this.deployments.domainsWithBindings(id)).map(({ domain, bindings }) =>
+      domainToDto(domain, bindings),
+    );
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -129,6 +133,7 @@ export class DeploymentsController {
 
     const domain = await this.deployments.addDomain(id, {
       fqdn,
+      webRoute: dto.webRoute ?? true,
       targetService: dto.targetService?.trim() || null,
       targetPort: dto.targetPort ?? null,
     });
@@ -150,12 +155,13 @@ export class DeploymentsController {
     @Param("domainId", ParseUUIDPipe) domainId: string,
     @Body() dto: UpdateDomainTargetDto,
   ): Promise<DomainDto> {
-    return domainToDto(
-      await this.deployments.updateDomainTarget(id, domainId, {
-        targetService: dto.targetService?.trim() || null,
-        targetPort: dto.targetPort ?? null,
-      }),
-    );
+    const domain = await this.deployments.updateDomainTarget(id, domainId, {
+      ...(dto.webRoute === undefined ? {} : { webRoute: dto.webRoute }),
+      targetService: dto.targetService?.trim() || null,
+      targetPort: dto.targetPort ?? null,
+    });
+
+    return domainToDto(domain, await this.deployments.listPortBindings(domainId));
   }
 
   @Roles("ADMIN", "OPERATOR")

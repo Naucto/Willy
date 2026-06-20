@@ -37,6 +37,8 @@ export interface PortBindingInput {
 
 export interface DomainTargetInput {
   fqdn: string;
+  // false = port-bind-only domain (no regular 443 route). Defaults to true.
+  webRoute?: boolean;
   targetService?: string | null;
   targetPort?: number | null;
 }
@@ -154,6 +156,60 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "logMaxFiles",
   "healthcheck",
 ];
+
+// Expands stored domains + their hard-bound ports into flat Traefik routes (primary first). A domain
+// contributes a regular 443 route (hostPort null) only when its webRoute is on; every binding adds a
+// dedicated-port route regardless. Pure so the routing shape can be unit-tested without a database.
+export function expandDomainRoutes(
+  domainRows: Array<{
+    id: string;
+    fqdn: string;
+    webRoute: boolean;
+    targetService: string | null;
+    targetPort: number | null;
+    isPrimary: boolean;
+  }>,
+  bindingRows: Array<{
+    domainId: string;
+    hostPort: number;
+    targetService: string | null;
+    targetPort: number | null;
+  }>,
+): DomainRoute[] {
+  const bindingsByDomain = new Map<string, typeof bindingRows>();
+
+  for (const binding of bindingRows) {
+    const list = bindingsByDomain.get(binding.domainId) ?? [];
+    list.push(binding);
+    bindingsByDomain.set(binding.domainId, list);
+  }
+
+  const routes: DomainRoute[] = [];
+
+  for (const domain of domainRows) {
+    if (domain.webRoute) {
+      routes.push({
+        fqdn: domain.fqdn,
+        targetService: domain.targetService,
+        targetPort: domain.targetPort,
+        hostPort: null,
+        isPrimary: domain.isPrimary,
+      });
+    }
+
+    for (const binding of bindingsByDomain.get(domain.id) ?? []) {
+      routes.push({
+        fqdn: domain.fqdn,
+        targetService: binding.targetService,
+        targetPort: binding.targetPort,
+        hostPort: binding.hostPort,
+        isPrimary: domain.isPrimary,
+      });
+    }
+  }
+
+  return routes.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+}
 
 @Injectable()
 export class DeploymentsService {
@@ -319,6 +375,7 @@ export class DeploymentsService {
       .select({
         id: domains.id,
         fqdn: domains.fqdn,
+        webRoute: domains.webRoute,
         targetService: domains.targetService,
         targetPort: domains.targetPort,
         isPrimary: domains.isPrimary,
@@ -337,37 +394,7 @@ export class DeploymentsService {
       .innerJoin(domains, eq(portBindings.domainId, domains.id))
       .where(eq(domains.deploymentId, deploymentId));
 
-    const bindingsByDomain = new Map<string, typeof bindingRows>();
-
-    for (const binding of bindingRows) {
-      const list = bindingsByDomain.get(binding.domainId) ?? [];
-      list.push(binding);
-      bindingsByDomain.set(binding.domainId, list);
-    }
-
-    const routes: DomainRoute[] = [];
-
-    for (const domain of domainRows) {
-      routes.push({
-        fqdn: domain.fqdn,
-        targetService: domain.targetService,
-        targetPort: domain.targetPort,
-        hostPort: null,
-        isPrimary: domain.isPrimary,
-      });
-
-      for (const binding of bindingsByDomain.get(domain.id) ?? []) {
-        routes.push({
-          fqdn: domain.fqdn,
-          targetService: binding.targetService,
-          targetPort: binding.targetPort,
-          hostPort: binding.hostPort,
-          isPrimary: domain.isPrimary,
-        });
-      }
-    }
-
-    return routes.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+    return expandDomainRoutes(domainRows, bindingRows);
   }
 
   // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.
@@ -394,18 +421,46 @@ export class DeploymentsService {
       .orderBy(desc(domains.isPrimary), domains.fqdn);
   }
 
+  // Domains (primary-first) each with their hard-bound host ports attached, so the UI can render the
+  // full route list — a domain's 443 web route plus its port binds — without an N+1 fetch per domain.
+  async domainsWithBindings(
+    deploymentId: string,
+  ): Promise<Array<{ domain: Domain; bindings: PortBinding[] }>> {
+    const domainRows = await this.listDomains(deploymentId);
+
+    const bindingRows = await this.db
+      .select({ binding: portBindings })
+      .from(portBindings)
+      .innerJoin(domains, eq(portBindings.domainId, domains.id))
+      .where(eq(domains.deploymentId, deploymentId))
+      .orderBy(portBindings.hostPort);
+
+    const byDomain = new Map<string, PortBinding[]>();
+
+    for (const { binding } of bindingRows) {
+      const list = byDomain.get(binding.domainId) ?? [];
+      list.push(binding);
+      byDomain.set(binding.domainId, list);
+    }
+
+    return domainRows.map((domain) => ({ domain, bindings: byDomain.get(domain.id) ?? [] }));
+  }
+
   // Adds an extra FQDN; becomes primary only if the deployment has none yet. Optionally pins the
   // domain to a specific container/service + port (granular routing); omitted = deployment default.
   async addDomain(deploymentId: string, input: DomainTargetInput): Promise<Domain> {
+    const webRoute = input.webRoute ?? true;
     const existing = await this.primaryDomain(deploymentId);
     const [row] = await this.db
       .insert(domains)
       .values({
         deploymentId,
         fqdn: input.fqdn,
+        webRoute,
         targetService: input.targetService ?? null,
         targetPort: input.targetPort ?? null,
-        isPrimary: !existing,
+        // A port-bind-only domain never serves 443, so it can't be the primary landing page.
+        isPrimary: webRoute && !existing,
       })
       .returning();
 
@@ -421,11 +476,12 @@ export class DeploymentsService {
   async updateDomainTarget(
     deploymentId: string,
     domainId: string,
-    target: { targetService: string | null; targetPort: number | null },
+    target: { webRoute?: boolean; targetService: string | null; targetPort: number | null },
   ): Promise<Domain> {
     const [row] = await this.db
       .update(domains)
       .set({
+        ...(target.webRoute === undefined ? {} : { webRoute: target.webRoute }),
         targetService: target.targetService,
         targetPort: target.targetPort,
         updatedAt: new Date(),
@@ -437,7 +493,27 @@ export class DeploymentsService {
       throw new NotFoundException("domain not found for this deployment");
     }
 
+    // Dropping the 443 route off the primary domain hands primary to another web-serving domain.
+    if (target.webRoute === false && row.isPrimary) {
+      await this.demotePrimary(deploymentId, domainId);
+    }
+
     return row;
+  }
+
+  // Clears `domainId` as primary and promotes another web-serving domain (if any) in its place.
+  private async demotePrimary(deploymentId: string, domainId: string): Promise<void> {
+    await this.db.update(domains).set({ isPrimary: false }).where(eq(domains.id, domainId));
+
+    const [next] = await this.db
+      .select()
+      .from(domains)
+      .where(and(eq(domains.deploymentId, deploymentId), eq(domains.webRoute, true)))
+      .limit(1);
+
+    if (next) {
+      await this.db.update(domains).set({ isPrimary: true }).where(eq(domains.id, next.id));
+    }
   }
 
   // Removes a domain; if it was primary, promotes another (so a WEB deployment keeps a primary).
@@ -451,7 +527,7 @@ export class DeploymentsService {
       const [next] = await this.db
         .select()
         .from(domains)
-        .where(eq(domains.deploymentId, deploymentId))
+        .where(and(eq(domains.deploymentId, deploymentId), eq(domains.webRoute, true)))
         .limit(1);
 
       if (next) {
@@ -461,6 +537,17 @@ export class DeploymentsService {
   }
 
   async makePrimary(deploymentId: string, domainId: string): Promise<void> {
+    const domain = await this.findDomain(deploymentId, domainId);
+
+    if (!domain) {
+      throw new NotFoundException("domain not found for this deployment");
+    }
+
+    // A port-bind-only domain serves no 443 landing page, so it can't be the primary.
+    if (!domain.webRoute) {
+      throw new ConflictException("a port-bind-only domain cannot be made primary");
+    }
+
     await this.db
       .update(domains)
       .set({ isPrimary: false })

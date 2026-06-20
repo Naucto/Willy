@@ -1,0 +1,1 @@
+ALTER TABLE "domains" ADD COLUMN "web_route" boolean DEFAULT true NOT NULL;
