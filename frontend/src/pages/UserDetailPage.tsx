@@ -6,6 +6,7 @@ import { UserSecurityTab } from "../components/UserSecurityTab";
 import { UserTwoFactorTab } from "../components/UserTwoFactorTab";
 import { describeError } from "../errors";
 import { displayName, humanizeRole } from "../format";
+import { userSections } from "../userSections";
 
 export function UserDetailPage() {
   const { id = "", section } = useParams();
@@ -27,19 +28,25 @@ export function UserDetailPage() {
   }
 
   const named = Boolean(user.name?.trim());
+  // The heading names the section being viewed; who it belongs to drops to a subtitle so an admin
+  // editing another user still sees the identity.
+  const sectionLabel = userSections().find((s) => s.key === active)?.label ?? "General";
+  const subtitle = named ? `${displayName(user)} · ${user.email}` : user.email;
 
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", minWidth: 0 }}>
-        <Typography variant="h4" noWrap sx={{ fontWeight: 700, minWidth: 0 }}>
-          {displayName(user)}
-        </Typography>
-        <Chip size="small" label={humanizeRole(user.role)} variant="outlined" />
-        {named && (
-          <Typography variant="body2" color="text.secondary">
-            {user.email}
+      <Box sx={{ minWidth: 0 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", minWidth: 0 }}
+        >
+          <Typography variant="h4" noWrap sx={{ fontWeight: 700, minWidth: 0 }}>
+            {sectionLabel}
           </Typography>
-        )}
+          <Chip size="small" label={humanizeRole(user.role)} variant="outlined" />
+        </Box>
+        <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
+          {subtitle}
+        </Typography>
       </Box>
 
       {active === "general" && <UserGeneralTab user={user} />}

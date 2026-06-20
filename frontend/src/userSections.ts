@@ -9,6 +9,6 @@ export function userSections(): UserSection[] {
   return [
     { key: "general", label: "General" },
     { key: "security", label: "Security" },
-    { key: "twofa", label: "Two-factor auth" },
+    { key: "twofa", label: "2FA Auth" },
   ];
 }
