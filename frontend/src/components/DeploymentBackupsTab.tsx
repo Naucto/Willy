@@ -275,12 +275,7 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
           Backups
         </Typography>
         <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setAdding(true)}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
             New backup
           </Button>
         </Gated>

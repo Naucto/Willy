@@ -102,12 +102,7 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
           Schedules
         </Typography>
         <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setAdding(true)}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
             New schedule
           </Button>
         </Gated>

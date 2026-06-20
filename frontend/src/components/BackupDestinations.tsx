@@ -90,12 +90,7 @@ export function BackupDestinations() {
           Offsite destinations
         </Typography>
         <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setAdding(true)}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
             New destination
           </Button>
         </Gated>
