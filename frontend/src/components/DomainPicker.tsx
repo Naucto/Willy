@@ -8,6 +8,7 @@ import {
   DialogActions,
   DialogContent,
   IconButton,
+  InputAdornment,
   Stack,
   TextField,
   Tooltip,
@@ -90,31 +91,51 @@ export function DomainPicker({
 
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <TextField
-          label="Domain"
-          value={value}
-          placeholder="No domain set"
-          fullWidth
-          slotProps={{ input: { readOnly: true } }}
-        />
-        <Tooltip title="Choose domain">
-          <span>
-            <IconButton onClick={openPicker} disabled={disabled}>
-              <TrackChangesIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
-        {value && (
-          <Tooltip title="Clear domain">
-            <span>
-              <IconButton onClick={() => onChange("")} disabled={disabled}>
-                <DeleteIcon />
-              </IconButton>
-            </span>
-          </Tooltip>
-        )}
-      </Box>
+      <TextField
+        label="Domain"
+        value={value}
+        placeholder="No domain set"
+        fullWidth
+        slotProps={{
+          input: {
+            readOnly: true,
+            // In-field, edge-aligned action icons matching the password reveal toggle, so "wipe the
+            // value" and "show" controls sit coherently across the app's text fields.
+            endAdornment: (
+              <InputAdornment position="end">
+                {value && (
+                  <Tooltip title="Clear domain">
+                    <span>
+                      <IconButton
+                        size="small"
+                        edge="end"
+                        aria-label="Clear domain"
+                        onClick={() => onChange("")}
+                        disabled={disabled}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
+                <Tooltip title="Choose domain">
+                  <span>
+                    <IconButton
+                      size="small"
+                      edge="end"
+                      aria-label="Choose domain"
+                      onClick={openPicker}
+                      disabled={disabled}
+                    >
+                      <TrackChangesIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </InputAdornment>
+            ),
+          },
+        }}
+      />
       <Typography
         variant="caption"
         color="text.secondary"
