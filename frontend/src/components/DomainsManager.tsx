@@ -33,9 +33,10 @@ import {
   useRemoveBinding,
   useRemoveDomain,
   useSuggestBindingPort,
+  useUpdateBinding,
   useUpdateDomainTarget,
 } from "../api/hooks";
-import type { Container, Deployment, DeploymentDomain } from "../api/types";
+import type { Container, Deployment, DeploymentDomain, PortBinding } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
@@ -139,7 +140,9 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
   ];
 
   const [dialog, setDialog] = useState<
-    { mode: "add" } | { mode: "edit"; domain: DeploymentDomain }
+    | { mode: "add" }
+    | { mode: "edit-web"; domain: DeploymentDomain }
+    | { mode: "edit-port"; domain: DeploymentDomain; binding: PortBinding }
   >();
 
   const run = async (action: Promise<unknown>, ok: string) => {
@@ -239,7 +242,7 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
                 icon={<EditIcon />}
                 label="Edit route"
                 disabled={!canOperate}
-                onClick={() => setDialog({ mode: "edit", domain: row.domain })}
+                onClick={() => setDialog({ mode: "edit-web", domain: row.domain })}
               />,
               <GridActionsCellItem
                 key="primary"
@@ -259,6 +262,19 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
               />,
             ]
           : [
+              <GridActionsCellItem
+                key="edit"
+                icon={<EditIcon />}
+                label="Edit binding"
+                disabled={!canOperate || !row.bindingId}
+                onClick={() => {
+                  const binding = row.domain.bindings.find((b) => b.id === row.bindingId);
+
+                  if (binding) {
+                    setDialog({ mode: "edit-port", domain: row.domain, binding });
+                  }
+                }}
+              />,
               <GridActionsCellItem
                 key="delete"
                 icon={<DeleteIcon />}
@@ -317,7 +333,13 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
           serviceOptions={serviceOptions}
           containers={containers ?? []}
           range={portBinding ? { start: portBinding.start, end: portBinding.end } : null}
-          editing={dialog.mode === "edit" ? dialog.domain : null}
+          edit={
+            dialog.mode === "edit-web"
+              ? { kind: "web", domain: dialog.domain }
+              : dialog.mode === "edit-port"
+                ? { kind: "binding", domain: dialog.domain, binding: dialog.binding }
+                : null
+          }
           onClose={() => setDialog(undefined)}
         />
       )}
@@ -345,9 +367,13 @@ function exposedPortsFor(
 
 type RouteKind = "domain" | "port";
 
+type RouteEdit =
+  | { kind: "web"; domain: DeploymentDomain }
+  | { kind: "binding"; domain: DeploymentDomain; binding: PortBinding };
+
 // One dialog for every route operation: add a dedicated domain (443) OR a hard port bind, attaching to
-// a brand-new FQDN or an existing domain — and editing an existing domain's web-route target. A hard
-// port bind on a new FQDN creates a port-only domain (no 443); both kinds then coexist on that domain.
+// a brand-new FQDN or an existing domain — and editing an existing web route's or hard port bind's
+// target. A hard port bind on a new FQDN creates a port-only domain (no 443); both kinds then coexist.
 function RouteDialog({
   deploymentId,
   domains,
@@ -358,7 +384,7 @@ function RouteDialog({
   serviceOptions,
   containers,
   range,
-  editing,
+  edit,
   onClose,
 }: {
   deploymentId: string;
@@ -370,7 +396,7 @@ function RouteDialog({
   serviceOptions: ServiceOption[];
   containers: Container[];
   range: { start: number; end: number } | null;
-  editing: DeploymentDomain | null;
+  edit: RouteEdit | null;
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
@@ -378,12 +404,16 @@ function RouteDialog({
   const addDomain = useAddDomain(deploymentId);
   const updateTarget = useUpdateDomainTarget(deploymentId);
   const addBinding = useAddBinding(deploymentId);
+  const updateBinding = useUpdateBinding(deploymentId);
 
-  const [kind, setKind] = useState<RouteKind>("domain");
-  const [fqdn, setFqdn] = useState(editing?.fqdn ?? "");
-  const [service, setService] = useState(editing?.targetService ?? "");
-  const [port, setPort] = useState(editing?.targetPort ? String(editing.targetPort) : "");
-  const [hostPort, setHostPort] = useState("");
+  const editingBinding = edit?.kind === "binding" ? edit.binding : null;
+  const editTarget = editingBinding ?? (edit?.kind === "web" ? edit.domain : null);
+
+  const [kind, setKind] = useState<RouteKind>(editingBinding ? "port" : "domain");
+  const [fqdn, setFqdn] = useState(edit?.domain.fqdn ?? "");
+  const [service, setService] = useState(editTarget?.targetService ?? "");
+  const [port, setPort] = useState(editTarget?.targetPort ? String(editTarget.targetPort) : "");
+  const [hostPort, setHostPort] = useState(editingBinding ? String(editingBinding.hostPort) : "");
 
   const existingDomain = domains.find((d) => d.fqdn === fqdn.trim());
   // Suggestions are global, so any owned domain anchors the lookup; prefer the matched one.
@@ -391,18 +421,22 @@ function RouteDialog({
   const { data: suggested } = useSuggestBindingPort(
     deploymentId,
     anchorDomainId,
-    kind === "port" && !editing && anchorDomainId !== "",
+    kind === "port" && !edit && anchorDomainId !== "",
   );
   const hostPortValue = hostPort || (suggested ? String(suggested.hostPort) : "");
 
   const exposed = exposedPortsFor(containers, isCompose, service, defaultService);
   const fqdnInvalid = fqdn.trim().length > 0 && !isValidFqdn(fqdn);
-  const pending = addDomain.isPending || updateTarget.isPending || addBinding.isPending;
+  const pending =
+    addDomain.isPending ||
+    updateTarget.isPending ||
+    addBinding.isPending ||
+    updateBinding.isPending;
 
   const submit = async () => {
     const fq = fqdn.trim();
 
-    if (!editing && !isValidFqdn(fq)) {
+    if (!edit && !isValidFqdn(fq)) {
       enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
 
       return;
@@ -410,11 +444,30 @@ function RouteDialog({
 
     const targetService = isCompose && service ? service : null;
     const targetPort = port.trim() ? Number(port) : null;
+    const hostPortInRange = (value: number): boolean =>
+      !!range && Number.isInteger(value) && value >= range.start && value <= range.end;
 
     try {
-      if (kind === "domain") {
-        if (editing || existingDomain) {
-          const domainId = (editing ?? existingDomain)?.id ?? "";
+      if (kind === "port" && editingBinding && edit) {
+        const value = Number.parseInt(hostPortValue, 10);
+
+        if (!hostPortInRange(value)) {
+          enqueueSnackbar(`Host port must be within ${range?.start}–${range?.end}`, {
+            variant: "warning",
+          });
+
+          return;
+        }
+
+        await updateBinding.mutateAsync({
+          domainId: edit.domain.id,
+          bindingId: editingBinding.id,
+          body: { hostPort: value, targetService, targetPort },
+        });
+        enqueueSnackbar("Binding updated", { variant: "success" });
+      } else if (kind === "domain") {
+        if (edit || existingDomain) {
+          const domainId = (edit?.domain ?? existingDomain)?.id ?? "";
           await updateTarget.mutateAsync({
             domainId,
             body: { webRoute: true, targetService, targetPort },
@@ -423,11 +476,11 @@ function RouteDialog({
           await addDomain.mutateAsync({ fqdn: fq, webRoute: true, targetService, targetPort });
         }
 
-        enqueueSnackbar(editing ? "Route updated" : "Domain added", { variant: "success" });
+        enqueueSnackbar(edit ? "Route updated" : "Domain added", { variant: "success" });
       } else {
         const value = Number.parseInt(hostPortValue, 10);
 
-        if (!range || !Number.isInteger(value) || value < range.start || value > range.end) {
+        if (!hostPortInRange(value)) {
           enqueueSnackbar(`Host port must be within ${range?.start}–${range?.end}`, {
             variant: "warning",
           });
@@ -451,16 +504,20 @@ function RouteDialog({
     }
   };
 
-  const title = editing ? `Edit ${editing.fqdn}` : "Add route";
-  const submitLabel = editing ? "Save" : kind === "port" ? "Bind port" : "Add domain";
-  const submitDisabled = pending || (!editing && !isValidFqdn(fqdn));
+  const title = editingBinding
+    ? `Edit ${edit?.domain.fqdn}:${editingBinding.hostPort}`
+    : edit
+      ? `Edit ${edit.domain.fqdn}`
+      : "Add route";
+  const submitLabel = edit ? "Save" : kind === "port" ? "Bind port" : "Add domain";
+  const submitDisabled = pending || (!edit && !isValidFqdn(fqdn));
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
-          {!editing && bindingsEnabled && (
+          {!edit && bindingsEnabled && (
             <ToggleButtonGroup
               exclusive
               fullWidth
@@ -474,10 +531,10 @@ function RouteDialog({
             </ToggleButtonGroup>
           )}
 
-          {editing ? (
+          {edit ? (
             <TextField
               label="Domain"
-              value={editing.fqdn}
+              value={edit.domain.fqdn}
               slotProps={{ input: { readOnly: true } }}
             />
           ) : (
@@ -508,7 +565,7 @@ function RouteDialog({
             </Box>
           )}
 
-          {kind === "port" && !editing && (
+          {kind === "port" && (
             <TextField
               label="Host port"
               type="number"
@@ -575,7 +632,7 @@ function RouteDialog({
             )}
           />
 
-          {kind === "port" && !editing && (
+          {kind === "port" && !edit && (
             <Typography variant="caption" color="text.secondary">
               Serves the domain over TLS on its own host port, additive to any 443 routing. A new
               domain bound this way is created port-only (no 443 route).

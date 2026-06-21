@@ -18,6 +18,7 @@ import type {
   UpdateDnsRecordInput,
   UpdateDomainTargetInput,
   UpdateEnvVarMetaInput,
+  UpdatePortBindingInput,
   UpdateUserInput,
 } from "./types";
 
@@ -559,6 +560,25 @@ export function useAddBinding(id: string) {
       unwrap(
         await api.POST("/deployments/{id}/domains/{domainId}/bindings", {
           params: { path: { id, domainId: input.domainId } },
+          body: input.body,
+        }),
+      ),
+    onSuccess: () => invalidateDomains(queryClient, id),
+  });
+}
+
+export function useUpdateBinding(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      domainId: string;
+      bindingId: string;
+      body: UpdatePortBindingInput;
+    }) =>
+      unwrap(
+        await api.PATCH("/deployments/{id}/domains/{domainId}/bindings/{bindingId}", {
+          params: { path: { id, domainId: input.domainId, bindingId: input.bindingId } },
           body: input.body,
         }),
       ),
