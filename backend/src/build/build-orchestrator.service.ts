@@ -8,6 +8,7 @@ import {
   dockerfileConfig,
   imageConfig,
 } from "../deployments/deployments.service";
+import { DomainsService } from "../deployments/domains.service";
 import type { RestartPolicyName } from "../docker/docker.service";
 import { DockerService } from "../docker/docker.service";
 import { EnvVarsService } from "../env-vars/env-vars.service";
@@ -89,6 +90,7 @@ export class BuildOrchestrator {
 
   constructor(
     private readonly deployments: DeploymentsService,
+    private readonly domains: DomainsService,
     private readonly releases: ReleasesService,
     private readonly git: GitService,
     private readonly docker: DockerService,
@@ -545,7 +547,7 @@ export class BuildOrchestrator {
   private async firstUnreachableRoute(deployment: Deployment): Promise<string | null> {
     const [containers, routes] = await Promise.all([
       this.containers.listForDeployment(deployment),
-      this.deployments.domainRoutes(deployment.id),
+      this.domains.domainRoutes(deployment.id),
     ]);
 
     for (const route of routes) {
@@ -650,7 +652,7 @@ export class BuildOrchestrator {
     let network: string | undefined;
 
     if (deployment.type === "WEB") {
-      const routes = await this.deployments.domainRoutes(deployment.id);
+      const routes = await this.domains.domainRoutes(deployment.id);
 
       if (routes.length === 0) {
         throw new BadRequestException("WEB deployment requires a domain");

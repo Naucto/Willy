@@ -1,8 +1,8 @@
 import { ConflictException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
-import type { CryptoService } from "../crypto/crypto.service";
 import type { Database } from "../db/db.module";
-import { DeploymentsService, expandDomainRoutes, type PortBinding } from "./deployments.service";
+import { expandDomainRoutes } from "./domains.service";
+import { type PortBinding, PortBindingsService } from "./port-bindings.service";
 
 const domain = (over: Partial<Parameters<typeof expandDomainRoutes>[0][number]> = {}) => ({
   id: "dom-1",
@@ -13,8 +13,6 @@ const domain = (over: Partial<Parameters<typeof expandDomainRoutes>[0][number]> 
   isPrimary: false,
   ...over,
 });
-
-const crypto = {} as unknown as CryptoService;
 
 // A Drizzle-ish select chain that is both awaitable (allocatedHostPorts awaits `.from()`) and
 // supports `.from().where().limit()` (assertHostPortFree). `insert().values().returning()` covers
@@ -69,25 +67,22 @@ describe("expandDomainRoutes", () => {
   });
 });
 
-describe("DeploymentsService.suggestFreePort", () => {
+describe("PortBindingsService.suggestFreePort", () => {
   it("returns the lowest free port in the range", async () => {
-    const service = new DeploymentsService(
-      makeDb([{ hostPort: 20000 }, { hostPort: 20002 }]),
-      crypto,
-    );
+    const service = new PortBindingsService(makeDb([{ hostPort: 20000 }, { hostPort: 20002 }]));
 
     await expect(service.suggestFreePort({ start: 20000, end: 20005 })).resolves.toBe(20001);
   });
 
   it("returns the start when nothing is allocated", async () => {
-    const service = new DeploymentsService(makeDb([]), crypto);
+    const service = new PortBindingsService(makeDb([]));
 
     await expect(service.suggestFreePort({ start: 20000, end: 20005 })).resolves.toBe(20000);
   });
 
   it("throws when the range is exhausted", async () => {
     const taken = [{ hostPort: 20000 }, { hostPort: 20001 }];
-    const service = new DeploymentsService(makeDb(taken), crypto);
+    const service = new PortBindingsService(makeDb(taken));
 
     await expect(service.suggestFreePort({ start: 20000, end: 20001 })).rejects.toBeInstanceOf(
       ConflictException,
@@ -95,9 +90,9 @@ describe("DeploymentsService.suggestFreePort", () => {
   });
 });
 
-describe("DeploymentsService.addPortBinding", () => {
+describe("PortBindingsService.addPortBinding", () => {
   it("rejects a host port already bound", async () => {
-    const service = new DeploymentsService(makeDb([{ id: "other-binding" }]), crypto);
+    const service = new PortBindingsService(makeDb([{ id: "other-binding" }]));
 
     await expect(service.addPortBinding("dom-1", { hostPort: 20001 })).rejects.toBeInstanceOf(
       ConflictException,
@@ -114,7 +109,7 @@ describe("DeploymentsService.addPortBinding", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const service = new DeploymentsService(makeDb([], [row]), crypto);
+    const service = new PortBindingsService(makeDb([], [row]));
 
     await expect(
       service.addPortBinding("dom-1", {

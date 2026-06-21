@@ -29,6 +29,8 @@ import {
   DeploymentsService,
   type PortBinding,
 } from "./deployments.service";
+import { DomainsService } from "./domains.service";
+import { PortBindingsService } from "./port-bindings.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentDto } from "./dto/deployment.dto";
 import { AddDomainDto, DomainDto, UpdateDomainTargetDto } from "./dto/domain.dto";
@@ -69,6 +71,8 @@ function bindingToDto(row: PortBinding): PortBindingDto {
 export class DeploymentsController {
   constructor(
     private readonly deployments: DeploymentsService,
+    private readonly domainsService: DomainsService,
+    private readonly bindingsService: PortBindingsService,
     private readonly domainProvisioning: DomainProvisioningService,
     private readonly settings: SettingsService,
   ) {}
@@ -116,7 +120,7 @@ export class DeploymentsController {
   @ApiOkResponse({ type: [DomainDto] })
   @Get(":id/domains")
   async domains(@Param("id") id: string): Promise<DomainDto[]> {
-    return (await this.deployments.domainsWithBindings(id)).map(({ domain, bindings }) =>
+    return (await this.domainsService.domainsWithBindings(id)).map(({ domain, bindings }) =>
       domainToDto(domain, bindings),
     );
   }
@@ -131,7 +135,7 @@ export class DeploymentsController {
     // Reject domains outside the OVH perimeter before persisting (OVH provider only).
     await this.domainProvisioning.assertInPerimeter(fqdn);
 
-    const domain = await this.deployments.addDomain(id, {
+    const domain = await this.domainsService.addDomain(id, {
       fqdn,
       webRoute: dto.webRoute ?? true,
       targetService: dto.targetService?.trim() || null,
@@ -155,13 +159,13 @@ export class DeploymentsController {
     @Param("domainId", ParseUUIDPipe) domainId: string,
     @Body() dto: UpdateDomainTargetDto,
   ): Promise<DomainDto> {
-    const domain = await this.deployments.updateDomainTarget(id, domainId, {
+    const domain = await this.domainsService.updateDomainTarget(id, domainId, {
       ...(dto.webRoute === undefined ? {} : { webRoute: dto.webRoute }),
       targetService: dto.targetService?.trim() || null,
       targetPort: dto.targetPort ?? null,
     });
 
-    return domainToDto(domain, await this.deployments.listPortBindings(domainId));
+    return domainToDto(domain, await this.bindingsService.listPortBindings(domainId));
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -174,7 +178,7 @@ export class DeploymentsController {
     @Param("id") id: string,
     @Param("domainId", ParseUUIDPipe) domainId: string,
   ): Promise<{ ok: true }> {
-    await this.deployments.makePrimary(id, domainId);
+    await this.domainsService.makePrimary(id, domainId);
 
     return { ok: true };
   }
@@ -189,8 +193,8 @@ export class DeploymentsController {
     @Param("domainId", ParseUUIDPipe) domainId: string,
   ): Promise<{ ok: true }> {
     // Capture the fqdn before deletion so the managed A record can be torn down too.
-    const domain = (await this.deployments.listDomains(id)).find((row) => row.id === domainId);
-    await this.deployments.removeDomain(id, domainId);
+    const domain = (await this.domainsService.listDomains(id)).find((row) => row.id === domainId);
+    await this.domainsService.removeDomain(id, domainId);
 
     if (domain) {
       await this.domainProvisioning.deprovision(domain.fqdn);
@@ -209,7 +213,7 @@ export class DeploymentsController {
   ): Promise<PortBindingDto[]> {
     await this.requireDomain(id, domainId);
 
-    return (await this.deployments.listPortBindings(domainId)).map(bindingToDto);
+    return (await this.bindingsService.listPortBindings(domainId)).map(bindingToDto);
   }
 
   @ApiParam({ name: "id", type: String })
@@ -223,7 +227,7 @@ export class DeploymentsController {
     await this.requireDomain(id, domainId);
     const range = await this.activeRange();
 
-    return { hostPort: await this.deployments.suggestFreePort(range) };
+    return { hostPort: await this.bindingsService.suggestFreePort(range) };
   }
 
   @Roles("ADMIN", "OPERATOR")
@@ -241,7 +245,7 @@ export class DeploymentsController {
     await this.assertHostPortInRange(dto.hostPort);
 
     return bindingToDto(
-      await this.deployments.addPortBinding(domainId, {
+      await this.bindingsService.addPortBinding(domainId, {
         hostPort: dto.hostPort,
         targetService: dto.targetService?.trim() || null,
         targetPort: dto.targetPort ?? null,
@@ -266,7 +270,7 @@ export class DeploymentsController {
     await this.assertHostPortInRange(dto.hostPort);
 
     return bindingToDto(
-      await this.deployments.updatePortBinding(domainId, bindingId, {
+      await this.bindingsService.updatePortBinding(domainId, bindingId, {
         hostPort: dto.hostPort,
         targetService: dto.targetService?.trim() || null,
         targetPort: dto.targetPort ?? null,
@@ -286,7 +290,7 @@ export class DeploymentsController {
     @Param("bindingId", ParseUUIDPipe) bindingId: string,
   ): Promise<{ ok: true }> {
     await this.requireDomain(id, domainId);
-    await this.deployments.removePortBinding(domainId, bindingId);
+    await this.bindingsService.removePortBinding(domainId, bindingId);
 
     return { ok: true };
   }
@@ -321,7 +325,7 @@ export class DeploymentsController {
   }
 
   private async requireDomain(deploymentId: string, domainId: string): Promise<Domain> {
-    const domain = await this.deployments.findDomain(deploymentId, domainId);
+    const domain = await this.domainsService.findDomain(deploymentId, domainId);
 
     if (!domain) {
       throw new NotFoundException("domain not found for this deployment");

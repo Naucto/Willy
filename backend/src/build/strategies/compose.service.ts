@@ -5,11 +5,8 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { parse as parseYaml, stringify as toYaml } from "yaml";
 import { WillyError } from "../../common/errors";
-import {
-  type Deployment,
-  DeploymentsService,
-  composeConfig,
-} from "../../deployments/deployments.service";
+import { type Deployment, composeConfig } from "../../deployments/deployments.service";
+import { DomainsService } from "../../deployments/domains.service";
 import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
 import { EnvVarsService } from "../../env-vars/env-vars.service";
 import { DockerService } from "../../docker/docker.service";
@@ -162,7 +159,7 @@ export class ComposeService {
   constructor(
     config: ConfigService,
     private readonly docker: DockerService,
-    private readonly deployments: DeploymentsService,
+    private readonly domains: DomainsService,
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
   ) {
@@ -262,7 +259,7 @@ export class ComposeService {
     const networks: Record<string, unknown> = {};
 
     if (deployment.type === "WEB") {
-      const routes = await this.deployments.domainRoutes(deployment.id);
+      const routes = await this.domains.domainRoutes(deployment.id);
 
       if (routes.length === 0) {
         throw new ComposeError("WEB compose deployment requires a domain");

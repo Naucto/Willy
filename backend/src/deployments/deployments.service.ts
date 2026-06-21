@@ -1,10 +1,11 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
 import { requireRow } from "../db/query-helpers";
-import { deployments, domains, gitCredentials, portBindings } from "../db/schema";
+import { deployments, gitCredentials } from "../db/schema";
+import { DomainsService } from "./domains.service";
 import type { HealthcheckSpec, ResourceLimits } from "./resource-limits";
 import type {
   ComposeConfig,
@@ -16,33 +17,12 @@ import type {
 export type Deployment = typeof deployments.$inferSelect;
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
-export type Domain = typeof domains.$inferSelect;
-export type PortBinding = typeof portBindings.$inferSelect;
 
-// A domain with its routing target, ordered primary-first — consumed by the Traefik route grouping.
-// A domain expands into its regular 443 route (hostPort null) plus one route per hard-bound host
-// port, each carrying its own internal target.
-export interface DomainRoute {
-  fqdn: string;
-  targetService: string | null;
-  targetPort: number | null;
-  hostPort: number | null;
-  isPrimary: boolean;
-}
-
-export interface PortBindingInput {
-  hostPort: number;
-  targetService?: string | null;
-  targetPort?: number | null;
-}
-
-export interface DomainTargetInput {
-  fqdn: string;
-  // false = port-bind-only domain (no regular 443 route). Defaults to true.
-  webRoute?: boolean;
-  targetService?: string | null;
-  targetPort?: number | null;
-}
+// Domain/port-binding routing lives in its own services now; re-exported here so existing imports of
+// these types from deployments.service keep resolving.
+export type { Domain, DomainRoute, DomainTargetInput } from "./domains.service";
+export { expandDomainRoutes } from "./domains.service";
+export type { PortBinding, PortBindingInput } from "./port-bindings.service";
 
 // Raw per-strategy fields as they arrive from the API, normalised into the stored StrategyConfig.
 interface StrategyFields {
@@ -158,65 +138,12 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "healthcheck",
 ];
 
-// Expands stored domains + their hard-bound ports into flat Traefik routes (primary first). A domain
-// contributes a regular 443 route (hostPort null) only when its webRoute is on; every binding adds a
-// dedicated-port route regardless. Pure so the routing shape can be unit-tested without a database.
-export function expandDomainRoutes(
-  domainRows: Array<{
-    id: string;
-    fqdn: string;
-    webRoute: boolean;
-    targetService: string | null;
-    targetPort: number | null;
-    isPrimary: boolean;
-  }>,
-  bindingRows: Array<{
-    domainId: string;
-    hostPort: number;
-    targetService: string | null;
-    targetPort: number | null;
-  }>,
-): DomainRoute[] {
-  const bindingsByDomain = new Map<string, typeof bindingRows>();
-
-  for (const binding of bindingRows) {
-    const list = bindingsByDomain.get(binding.domainId) ?? [];
-    list.push(binding);
-    bindingsByDomain.set(binding.domainId, list);
-  }
-
-  const routes: DomainRoute[] = [];
-
-  for (const domain of domainRows) {
-    if (domain.webRoute) {
-      routes.push({
-        fqdn: domain.fqdn,
-        targetService: domain.targetService,
-        targetPort: domain.targetPort,
-        hostPort: null,
-        isPrimary: domain.isPrimary,
-      });
-    }
-
-    for (const binding of bindingsByDomain.get(domain.id) ?? []) {
-      routes.push({
-        fqdn: domain.fqdn,
-        targetService: binding.targetService,
-        targetPort: binding.targetPort,
-        hostPort: binding.hostPort,
-        isPrimary: domain.isPrimary,
-      });
-    }
-  }
-
-  return routes.sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
-}
-
 @Injectable()
 export class DeploymentsService {
   constructor(
     @Inject(DB) private readonly db: Database,
     private readonly crypto: CryptoService,
+    private readonly domains: DomainsService,
   ) {}
 
   async create(input: CreateDeploymentInput): Promise<Deployment> {
@@ -251,12 +178,10 @@ export class DeploymentsService {
     const deployment = requireRow(rows, "deployment insert returned no row");
 
     if (input.domain) {
-      await this.db.insert(domains).values({
-        deploymentId: deployment.id,
+      await this.domains.addDomain(deployment.id, {
         fqdn: input.domain,
-        isPrimary: true,
-        targetPort: input.domainPort ?? null,
         targetService: input.domainService ?? null,
+        targetPort: input.domainPort ?? null,
       });
     }
 
@@ -289,7 +214,7 @@ export class DeploymentsService {
   async update(id: string, input: UpdateDeploymentInput): Promise<Deployment> {
     // Domain lives in its own table; apply it separately (takes effect on next deploy/restart).
     if (input.domain !== undefined) {
-      await this.setPrimaryDomain(id, input.domain);
+      await this.domains.setPrimaryDomain(id, input.domain);
     }
 
     const fields: Partial<typeof deployments.$inferInsert> = { updatedAt: new Date() };
@@ -348,302 +273,6 @@ export class DeploymentsService {
       .where(eq(deployments.id, id));
   }
 
-  async primaryDomain(deploymentId: string): Promise<Domain | undefined> {
-    const rows = await this.db
-      .select()
-      .from(domains)
-      .where(and(eq(domains.deploymentId, deploymentId), eq(domains.isPrimary, true)))
-      .limit(1);
-
-    return rows[0];
-  }
-
-  // All routes for a deployment (primary first), for building Traefik routers. Each domain yields
-  // its regular 443 route (hostPort null) plus one route per hard-bound host port — the latter each
-  // carrying their own internal target and served on a dedicated entrypoint.
-  async domainRoutes(deploymentId: string): Promise<DomainRoute[]> {
-    const domainRows = await this.db
-      .select({
-        id: domains.id,
-        fqdn: domains.fqdn,
-        webRoute: domains.webRoute,
-        targetService: domains.targetService,
-        targetPort: domains.targetPort,
-        isPrimary: domains.isPrimary,
-      })
-      .from(domains)
-      .where(eq(domains.deploymentId, deploymentId));
-
-    const bindingRows = await this.db
-      .select({
-        domainId: portBindings.domainId,
-        hostPort: portBindings.hostPort,
-        targetService: portBindings.targetService,
-        targetPort: portBindings.targetPort,
-      })
-      .from(portBindings)
-      .innerJoin(domains, eq(portBindings.domainId, domains.id))
-      .where(eq(domains.deploymentId, deploymentId));
-
-    return expandDomainRoutes(domainRows, bindingRows);
-  }
-
-  // Sets/replaces the deployment's primary domain. Applies to routing on the next deploy/restart.
-  async setPrimaryDomain(deploymentId: string, fqdn: string): Promise<void> {
-    const existing = await this.primaryDomain(deploymentId);
-
-    if (existing) {
-      await this.db
-        .update(domains)
-        .set({ fqdn, updatedAt: new Date() })
-        .where(eq(domains.id, existing.id));
-
-      return;
-    }
-
-    await this.db.insert(domains).values({ deploymentId, fqdn, isPrimary: true });
-  }
-
-  listDomains(deploymentId: string): Promise<Domain[]> {
-    return this.db
-      .select()
-      .from(domains)
-      .where(eq(domains.deploymentId, deploymentId))
-      .orderBy(desc(domains.isPrimary), domains.fqdn);
-  }
-
-  // Domains (primary-first) each with their hard-bound host ports attached, so the UI can render the
-  // full route list — a domain's 443 web route plus its port binds — without an N+1 fetch per domain.
-  async domainsWithBindings(
-    deploymentId: string,
-  ): Promise<Array<{ domain: Domain; bindings: PortBinding[] }>> {
-    const domainRows = await this.listDomains(deploymentId);
-
-    const bindingRows = await this.db
-      .select({ binding: portBindings })
-      .from(portBindings)
-      .innerJoin(domains, eq(portBindings.domainId, domains.id))
-      .where(eq(domains.deploymentId, deploymentId))
-      .orderBy(portBindings.hostPort);
-
-    const byDomain = new Map<string, PortBinding[]>();
-
-    for (const { binding } of bindingRows) {
-      const list = byDomain.get(binding.domainId) ?? [];
-      list.push(binding);
-      byDomain.set(binding.domainId, list);
-    }
-
-    return domainRows.map((domain) => ({ domain, bindings: byDomain.get(domain.id) ?? [] }));
-  }
-
-  // Adds an extra FQDN; becomes primary only if the deployment has none yet. Optionally pins the
-  // domain to a specific container/service + port (granular routing); omitted = deployment default.
-  async addDomain(deploymentId: string, input: DomainTargetInput): Promise<Domain> {
-    const webRoute = input.webRoute ?? true;
-    const existing = await this.primaryDomain(deploymentId);
-    return requireRow(
-      await this.db
-        .insert(domains)
-        .values({
-          deploymentId,
-          fqdn: input.fqdn,
-          webRoute,
-          targetService: input.targetService ?? null,
-          targetPort: input.targetPort ?? null,
-          // A port-bind-only domain never serves 443, so it can't be the primary landing page.
-          isPrimary: webRoute && !existing,
-        })
-        .returning(),
-      "domain insert returned no row",
-    );
-  }
-
-  // Repoints a domain at a different container/service + port. null clears the override (back to
-  // the deployment default). Applies to routing on the next deploy/restart.
-  async updateDomainTarget(
-    deploymentId: string,
-    domainId: string,
-    target: { webRoute?: boolean; targetService: string | null; targetPort: number | null },
-  ): Promise<Domain> {
-    const [row] = await this.db
-      .update(domains)
-      .set({
-        ...(target.webRoute === undefined ? {} : { webRoute: target.webRoute }),
-        targetService: target.targetService,
-        targetPort: target.targetPort,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
-      .returning();
-
-    if (!row) {
-      throw new NotFoundException("domain not found for this deployment");
-    }
-
-    // Dropping the 443 route off the primary domain hands primary to another web-serving domain.
-    if (target.webRoute === false && row.isPrimary) {
-      await this.demotePrimary(deploymentId, domainId);
-    }
-
-    return row;
-  }
-
-  // Makes the first remaining web-serving domain primary (so a WEB deployment keeps a primary after
-  // its primary is demoted or removed). No-op when none qualify.
-  private async promoteAnotherPrimary(deploymentId: string): Promise<void> {
-    const [next] = await this.db
-      .select()
-      .from(domains)
-      .where(and(eq(domains.deploymentId, deploymentId), eq(domains.webRoute, true)))
-      .limit(1);
-
-    if (next) {
-      await this.db.update(domains).set({ isPrimary: true }).where(eq(domains.id, next.id));
-    }
-  }
-
-  // Clears `domainId` as primary and promotes another web-serving domain (if any) in its place.
-  private async demotePrimary(deploymentId: string, domainId: string): Promise<void> {
-    await this.db.update(domains).set({ isPrimary: false }).where(eq(domains.id, domainId));
-    await this.promoteAnotherPrimary(deploymentId);
-  }
-
-  // Removes a domain; if it was primary, promotes another (so a WEB deployment keeps a primary).
-  async removeDomain(deploymentId: string, domainId: string): Promise<void> {
-    const [removed] = await this.db
-      .delete(domains)
-      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
-      .returning();
-
-    if (removed?.isPrimary) {
-      await this.promoteAnotherPrimary(deploymentId);
-    }
-  }
-
-  async makePrimary(deploymentId: string, domainId: string): Promise<void> {
-    const domain = await this.findDomain(deploymentId, domainId);
-
-    if (!domain) {
-      throw new NotFoundException("domain not found for this deployment");
-    }
-
-    // A port-bind-only domain serves no 443 landing page, so it can't be the primary.
-    if (!domain.webRoute) {
-      throw new ConflictException("a port-bind-only domain cannot be made primary");
-    }
-
-    await this.db
-      .update(domains)
-      .set({ isPrimary: false })
-      .where(eq(domains.deploymentId, deploymentId));
-    await this.db
-      .update(domains)
-      .set({ isPrimary: true })
-      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)));
-  }
-
-  // Confirms a domain belongs to a deployment (ownership check for the nested binding endpoints).
-  async findDomain(deploymentId: string, domainId: string): Promise<Domain | undefined> {
-    const rows = await this.db
-      .select()
-      .from(domains)
-      .where(and(eq(domains.id, domainId), eq(domains.deploymentId, deploymentId)))
-      .limit(1);
-
-    return rows[0];
-  }
-
-  listPortBindings(domainId: string): Promise<PortBinding[]> {
-    return this.db
-      .select()
-      .from(portBindings)
-      .where(eq(portBindings.domainId, domainId))
-      .orderBy(portBindings.hostPort);
-  }
-
-  // Host ports already claimed across ALL domains/deployments — a host port binds at most once.
-  async allocatedHostPorts(): Promise<number[]> {
-    const rows = await this.db.select({ hostPort: portBindings.hostPort }).from(portBindings);
-
-    return rows.map((row) => row.hostPort);
-  }
-
-  // Lowest free port within the active sub-range, across all bindings. Throws when exhausted.
-  async suggestFreePort(range: { start: number; end: number }): Promise<number> {
-    const taken = new Set(await this.allocatedHostPorts());
-
-    for (let port = range.start; port <= range.end; port += 1) {
-      if (!taken.has(port)) {
-        return port;
-      }
-    }
-
-    throw new ConflictException("no free host port available in the configured range");
-  }
-
-  async addPortBinding(domainId: string, input: PortBindingInput): Promise<PortBinding> {
-    await this.assertHostPortFree(input.hostPort);
-
-    return requireRow(
-      await this.db
-        .insert(portBindings)
-        .values({
-          domainId,
-          hostPort: input.hostPort,
-          targetService: input.targetService ?? null,
-          targetPort: input.targetPort ?? null,
-        })
-        .returning(),
-      "port binding insert returned no row",
-    );
-  }
-
-  async updatePortBinding(
-    domainId: string,
-    bindingId: string,
-    patch: PortBindingInput,
-  ): Promise<PortBinding> {
-    await this.assertHostPortFree(patch.hostPort, bindingId);
-
-    const [row] = await this.db
-      .update(portBindings)
-      .set({
-        hostPort: patch.hostPort,
-        targetService: patch.targetService ?? null,
-        targetPort: patch.targetPort ?? null,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(portBindings.id, bindingId), eq(portBindings.domainId, domainId)))
-      .returning();
-
-    if (!row) {
-      throw new NotFoundException("port binding not found for this domain");
-    }
-
-    return row;
-  }
-
-  async removePortBinding(domainId: string, bindingId: string): Promise<void> {
-    await this.db
-      .delete(portBindings)
-      .where(and(eq(portBindings.id, bindingId), eq(portBindings.domainId, domainId)));
-  }
-
-  // The DB UNIQUE(host_port) is the hard guarantee; this pre-check turns a concurrent clash into a
-  // friendly 409 instead of a 500 for the common (non-racing) case.
-  private async assertHostPortFree(hostPort: number, excludeBindingId?: string): Promise<void> {
-    const [clash] = await this.db
-      .select({ id: portBindings.id })
-      .from(portBindings)
-      .where(eq(portBindings.hostPort, hostPort))
-      .limit(1);
-
-    if (clash && clash.id !== excludeBindingId) {
-      throw new ConflictException(`host port ${hostPort} is already bound`);
-    }
-  }
-
   // Updates a compose service's resource limits. The Resources and Health tabs each own a disjoint
   // subset of a service's limits (memory/cpu/caps/logs vs restart/healthcheck), so the incoming
   // partial is *merged* onto the stored entry rather than replacing it — otherwise saving one tab
@@ -678,11 +307,7 @@ export class DeploymentsService {
   // List/get enriched with the primary domain fqdn for API responses.
   async findAllForApi(): Promise<DeploymentView[]> {
     const rows = await this.db.select().from(deployments);
-    const primary = await this.db
-      .select({ deploymentId: domains.deploymentId, fqdn: domains.fqdn })
-      .from(domains)
-      .where(eq(domains.isPrimary, true));
-    const byDeployment = new Map(primary.map((row) => [row.deploymentId, row.fqdn]));
+    const byDeployment = await this.domains.primaryFqdns();
 
     return rows.map((row) => ({ ...row, primaryDomain: byDeployment.get(row.id) ?? null }));
   }
@@ -694,7 +319,7 @@ export class DeploymentsService {
       return undefined;
     }
 
-    const domain = await this.primaryDomain(id);
+    const domain = await this.domains.primaryDomain(id);
 
     return { ...deployment, primaryDomain: domain?.fqdn ?? null };
   }
