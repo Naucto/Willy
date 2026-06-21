@@ -13,6 +13,7 @@ import { CronService } from "./cron.service";
 import { DeploymentActionsController } from "./deployment-actions.controller";
 import { HealthProber } from "./health-prober.service";
 import { ImageBuilder } from "./image-builder.service";
+import { ReleaseRunner } from "./release-runner.service";
 import { ReleasesService } from "./releases.service";
 import { RuntimeLogCollector } from "./runtime-log.collector";
 import { ComposeService } from "./strategies/compose.service";
@@ -23,6 +24,7 @@ import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
   controllers: [DeploymentActionsController],
   providers: [
     BuildOrchestrator,
+    ReleaseRunner,
     BuildQueue,
     ReleasesService,
     BuildLogStore,
