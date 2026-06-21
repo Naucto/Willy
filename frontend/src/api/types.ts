@@ -62,6 +62,17 @@ export type Task = components["schemas"]["TaskDto"];
 export type AuditLog = components["schemas"]["AuditLogDto"];
 export type DeploymentRef = components["schemas"]["DeploymentRefDto"];
 
+export type DirEntry = components["schemas"]["DirEntryDto"];
+export type ListDirResponse = components["schemas"]["ListDirResponseDto"];
+export type ReadFileResponse = components["schemas"]["ReadFileResponseDto"];
+export type WriteFileInput = components["schemas"]["WriteFileDto"];
+export type VolumeIdentity = components["schemas"]["VolumeIdentityDto"];
+export type VolumeIdentities = components["schemas"]["VolumeIdentitiesDto"];
+export type MoveInput = components["schemas"]["MoveDto"];
+export type ChmodInput = components["schemas"]["ChmodDto"];
+export type ChownInput = components["schemas"]["ChownDto"];
+export type FileEntryType = DirEntry["type"];
+
 export type DeploymentType = Deployment["type"];
 export type DeploymentState = Deployment["state"];
 export type BuildStrategy = Deployment["buildStrategy"];

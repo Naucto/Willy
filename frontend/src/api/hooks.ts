@@ -1,15 +1,19 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
+import { uploadFile } from "./files";
 import { tokens } from "./tokens";
 import type {
   AddDomainInput,
   AddPortBindingInput,
+  ChmodInput,
+  ChownInput,
   CreateBackupDestinationInput,
   CreateBackupInput,
   CreateBackupScheduleInput,
   CreateDeploymentInput,
   CreateDnsRecordInput,
   CreateUserInput,
+  MoveInput,
   ResourceLimits,
   SetEnvVarInput,
   StatsWindow,
@@ -20,6 +24,7 @@ import type {
   UpdateEnvVarMetaInput,
   UpdatePortBindingInput,
   UpdateUserInput,
+  WriteFileInput,
 } from "./types";
 
 export const queryKeys = {
@@ -1049,4 +1054,119 @@ export function useUpdateAppSettings() {
       unwrap(await api.PUT("/admin/settings", { body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "settings"] }),
   });
+}
+
+// --- Volume file manager ----------------------------------------------------------------------
+
+// Directory listings are cached per (deployment, volume, path); the tree fetches them imperatively
+// via queryClient.fetchQuery with this key, and every mutation invalidates the whole volume subtree
+// so the tree and open dirs refresh.
+export function filesKey(deploymentId: string, volume: string, path?: string) {
+  const base = ["deployments", deploymentId, "files", volume] as const;
+
+  return path === undefined ? base : ([...base, path] as const);
+}
+
+// Users/groups defined inside the volume, to label the chmod/chown pickers. Cached for a while —
+// passwd/group rarely change mid-session.
+export function useVolumeIdentities(deploymentId: string, volume: string) {
+  return useQuery({
+    queryKey: ["deployments", deploymentId, "identities", volume],
+    enabled: deploymentId.length > 0 && volume.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/deployments/{id}/volumes/{name}/identities", {
+          params: { path: { id: deploymentId, name: volume } },
+        }),
+      ),
+  });
+}
+
+function useFileMutation<TInput>(
+  deploymentId: string,
+  volume: string,
+  mutationFn: (input: TInput) => Promise<unknown>,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: filesKey(deploymentId, volume) }),
+  });
+}
+
+export function useWriteFile(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, async (body: WriteFileInput) =>
+    unwrap(
+      await api.POST("/deployments/{id}/volumes/{name}/file", {
+        params: { path: { id: deploymentId, name: volume } },
+        body,
+      }),
+    ),
+  );
+}
+
+export function useMkdir(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, async (path: string) =>
+    unwrap(
+      await api.POST("/deployments/{id}/volumes/{name}/mkdir", {
+        params: { path: { id: deploymentId, name: volume } },
+        body: { path },
+      }),
+    ),
+  );
+}
+
+export function useMoveFile(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, async (body: MoveInput) =>
+    unwrap(
+      await api.POST("/deployments/{id}/volumes/{name}/move", {
+        params: { path: { id: deploymentId, name: volume } },
+        body,
+      }),
+    ),
+  );
+}
+
+export function useChmod(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, async (body: ChmodInput) =>
+    unwrap(
+      await api.POST("/deployments/{id}/volumes/{name}/chmod", {
+        params: { path: { id: deploymentId, name: volume } },
+        body,
+      }),
+    ),
+  );
+}
+
+export function useChown(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, async (body: ChownInput) =>
+    unwrap(
+      await api.POST("/deployments/{id}/volumes/{name}/chown", {
+        params: { path: { id: deploymentId, name: volume } },
+        body,
+      }),
+    ),
+  );
+}
+
+export function useDeleteFile(deploymentId: string, volume: string) {
+  return useFileMutation(
+    deploymentId,
+    volume,
+    async (input: { path: string; recursive?: boolean }) =>
+      unwrap(
+        await api.DELETE("/deployments/{id}/volumes/{name}/file", {
+          params: { path: { id: deploymentId, name: volume } },
+          body: input,
+        }),
+      ),
+  );
+}
+
+export function useUploadFile(deploymentId: string, volume: string) {
+  return useFileMutation(deploymentId, volume, (input: { dir: string; file: File }) =>
+    uploadFile(deploymentId, volume, input.dir, input.file),
+  );
 }

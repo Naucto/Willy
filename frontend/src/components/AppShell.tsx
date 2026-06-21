@@ -2,6 +2,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArticleOutlinedIcon from "@mui/icons-material/ArticleOutlined";
 import BackupIcon from "@mui/icons-material/Backup";
 import DnsIcon from "@mui/icons-material/Dns";
+import FolderIcon from "@mui/icons-material/Folder";
 import HealthAndSafetyIcon from "@mui/icons-material/HealthAndSafety";
 import HistoryIcon from "@mui/icons-material/History";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
@@ -82,6 +83,7 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   console: <TerminalIcon />,
   env: <TuneIcon />,
   volumes: <StorageIcon />,
+  files: <FolderIcon />,
   backups: <BackupIcon />,
   networking: <HubOutlinedIcon />,
   domains: <LanguageIcon />,

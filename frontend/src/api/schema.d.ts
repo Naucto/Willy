@@ -1044,6 +1044,150 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/volumes/{name}/files": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FilesController_list"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FilesController_read"];
+    put?: never;
+    post: operations["FilesController_write"];
+    delete: operations["FilesController_remove"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/identities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FilesController_identities"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/download": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FilesController_download"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/mkdir": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FilesController_mkdir"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FilesController_move"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/chmod": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FilesController_chmod"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/chown": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FilesController_chown"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/deployments/{id}/volumes/{name}/upload": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FilesController_upload"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/maintenance/cleanup": {
     parameters: {
       query?: never;
@@ -1823,6 +1967,90 @@ export interface components {
       /** @example healthy */
       health: string | null;
       declaredHealthcheck: components["schemas"]["DeclaredHealthcheckDto"] | null;
+    };
+    DirEntryDto: {
+      name: string;
+      /** @enum {string} */
+      type: "file" | "dir" | "symlink" | "other";
+      /** @description Size in bytes */
+      size: number;
+      /**
+       * @description Octal permission bits
+       * @example 0644
+       */
+      mode: string;
+      /** @example rw-r--r-- */
+      modeHuman: string;
+      uid: number;
+      gid: number;
+      /** Format: date-time */
+      mtime: string;
+    };
+    ListDirResponseDto: {
+      /** @description Volume-relative directory that was listed */
+      path: string;
+      entries: components["schemas"]["DirEntryDto"][];
+    };
+    ReadFileResponseDto: {
+      /** @description Volume-relative file path */
+      path: string;
+      /** @description Size in bytes */
+      size: number;
+      /** @description True when the content looks binary (download-only) */
+      isBinary: boolean;
+      /** @description base64-encoded file bytes */
+      contentBase64: string;
+      /** @example 0644 */
+      mode: string;
+      uid: number;
+      gid: number;
+      /** Format: date-time */
+      mtime: string;
+    };
+    VolumeIdentityDto: {
+      id: number;
+      name: string;
+    };
+    VolumeIdentitiesDto: {
+      users: components["schemas"]["VolumeIdentityDto"][];
+      groups: components["schemas"]["VolumeIdentityDto"][];
+    };
+    WriteFileDto: {
+      /** @description Volume-relative file path */
+      path: string;
+      /** @description base64-encoded new content */
+      contentBase64: string;
+      /** @default true */
+      create: boolean;
+    };
+    MkdirDto: {
+      path: string;
+    };
+    MoveDto: {
+      /** @description Source path (volume-relative) */
+      from: string;
+      /** @description Destination path (volume-relative) */
+      to: string;
+    };
+    ChmodDto: {
+      path: string;
+      /**
+       * @description Octal mode (3 or 4 digits)
+       * @example 0644
+       */
+      mode: string;
+      recursive?: boolean;
+    };
+    ChownDto: {
+      path: string;
+      uid: number;
+      gid: number;
+      recursive?: boolean;
+    };
+    DeleteDto: {
+      path: string;
+      /** @description Recurse into a non-empty directory */
+      recursive?: boolean;
     };
     CleanupResultDto: {
       /** @description Bytes reclaimed by pruning dangling images. */
@@ -3837,6 +4065,296 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_list: {
+    parameters: {
+      query?: {
+        path?: string;
+      };
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ListDirResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_read: {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReadFileResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_write: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["WriteFileDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeleteDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_identities: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["VolumeIdentitiesDto"];
+        };
+      };
+    };
+  };
+  FilesController_download: {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  FilesController_mkdir: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MkdirDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_move: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MoveDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_chmod: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChmodDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_chown: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChownDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  FilesController_upload: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Volume name */
+        name: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": {
+          /** Format: binary */
+          file?: string;
+          /** @description target directory */
+          path?: string;
+        };
+      };
+    };
     responses: {
       200: {
         headers: {

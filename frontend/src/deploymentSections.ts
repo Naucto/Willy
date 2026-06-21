@@ -24,6 +24,7 @@ export function deploymentSections(type: DeploymentType): DeploymentSection[] {
     { key: "webhook", label: "Webhook" },
     { key: "health", label: "Health" },
     { key: "volumes", label: "Volumes" },
+    { key: "files", label: "Files" },
     { key: "backups", label: "Backups" },
     { key: "monitoring", label: "Monitoring" },
     // Logs/console sit last. CRON shows "Runs" instead of the live Runtime-logs/Console sections.

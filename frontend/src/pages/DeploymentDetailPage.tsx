@@ -1,4 +1,5 @@
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   Alert,
   Box,
@@ -10,6 +11,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Link,
   MenuItem,
   Stack,
@@ -19,7 +21,7 @@ import {
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   useDeleteRelease,
@@ -48,6 +50,7 @@ import { DeploymentUtilization } from "../components/ResourceUtilization";
 import { SelectOption } from "../components/SelectOption";
 import { SettingsTab } from "../components/SettingsTab";
 import { StatusBadge } from "../components/StatusBadge";
+import { VolumeSelector } from "../components/VolumeSelector";
 import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
@@ -59,6 +62,10 @@ import { useAction } from "../useAction";
 const Console = lazy(() => import("../components/Console").then((m) => ({ default: m.Console })));
 const MonitoringTab = lazy(() =>
   import("../components/MonitoringTab").then((m) => ({ default: m.MonitoringTab })),
+);
+// The Files tab pulls in the Monaco editor + tree view; load it only when opened.
+const FilesTab = lazy(() =>
+  import("../components/files/FilesTab").then((m) => ({ default: m.FilesTab })),
 );
 
 // Tabs whose content is scoped to a single container; only these show the container selector
@@ -146,6 +153,31 @@ export function DeploymentDetailPage() {
     setSearchParams(next, { replace: true });
   };
 
+  // The Files tab's volume picker lives in this bar (like the container selector). Volumes come from
+  // the deployment's containers; selection is persisted in the URL (?volume=).
+  const volumes = useMemo(() => {
+    const names = new Set<string>();
+
+    for (const container of containers ?? []) {
+      for (const mount of container.volumes) {
+        names.add(mount.name);
+      }
+    }
+
+    return [...names].sort();
+  }, [containers]);
+
+  const volumeParam = searchParams.get("volume") ?? "";
+  const volume = volumes.includes(volumeParam) ? volumeParam : (volumes[0] ?? "");
+  const selectVolume = (value: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("volume", value);
+    setSearchParams(next, { replace: true });
+  };
+
+  // Bumped by the Files toolbar Refresh button to tell the open FilesTab to re-list its loaded dirs.
+  const [filesRefresh, setFilesRefresh] = useState(0);
+
   if (isLoading) {
     return (
       <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
@@ -191,6 +223,16 @@ export function DeploymentDetailPage() {
         {active === "build" && (
           <ReleaseSelector deploymentId={id} value={releaseParam} onChange={selectRelease} />
         )}
+        {active === "files" && volumes.length > 0 && (
+          <>
+            <VolumeSelector volumes={volumes} value={volume} onChange={selectVolume} />
+            <Tooltip title="Refresh">
+              <IconButton size="small" onClick={() => setFilesRefresh((nonce) => nonce + 1)}>
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </>
+        )}
         {/* DeployActions flex-grows to fill the rest of the row and right-aligns; it folds its
             buttons to icons when that remaining space gets tight. */}
         <DeployActions
@@ -218,6 +260,9 @@ export function DeploymentDetailPage() {
           ))}
         {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
         {active === "volumes" && <VolumesTab deploymentId={id} />}
+        {active === "files" && (
+          <FilesTab deploymentId={id} volume={volume} refreshNonce={filesRefresh} />
+        )}
         {active === "backups" && <DeploymentBackupsTab deploymentId={id} />}
         {active === "networking" && <NetworkingTab deploymentId={id} />}
         {active === "domains" && <DomainsManager deployment={deployment} />}
