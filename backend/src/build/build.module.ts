@@ -7,9 +7,12 @@ import { TraefikModule } from "../traefik/traefik.module";
 import { BuildLogStore } from "./build-log.store";
 import { BuildOrchestrator } from "./build-orchestrator.service";
 import { BuildQueue } from "./build-queue";
+import { ContainerOps } from "./container-ops.service";
 import { CronRunsService } from "./cron-runs.service";
 import { CronService } from "./cron.service";
 import { DeploymentActionsController } from "./deployment-actions.controller";
+import { HealthProber } from "./health-prober.service";
+import { ImageBuilder } from "./image-builder.service";
 import { ReleasesService } from "./releases.service";
 import { RuntimeLogCollector } from "./runtime-log.collector";
 import { ComposeService } from "./strategies/compose.service";
@@ -28,6 +31,9 @@ import { DockerfileStrategy } from "./strategies/dockerfile.strategy";
     ComposeService,
     CronService,
     CronRunsService,
+    HealthProber,
+    ContainerOps,
+    ImageBuilder,
   ],
   exports: [BuildOrchestrator, ReleasesService, BuildLogStore, RuntimeLogCollector],
 })
