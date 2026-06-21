@@ -10,6 +10,7 @@ import type { AdminImage } from "../api/types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { describeError } from "../errors";
 import { formatBytes, formatRelativeTime } from "../format";
+import { useAction } from "../useAction";
 
 // Visually distinct colors for the stacked bar segments (MUI-friendly palette).
 const SEGMENT_COLORS = [
@@ -139,6 +140,7 @@ function ImageSizeChart({ images }: { images: AdminImage[] }) {
 
 export function ImagesPage() {
   const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const [toDelete, setToDelete] = useState<AdminImage | null>(null);
   const [pruneConfirm, setPruneConfirm] = useState(false);
 
@@ -151,14 +153,8 @@ export function ImagesPage() {
   const onDelete = async () => {
     if (!toDelete) return;
 
-    try {
-      await deleteImage.mutateAsync(toDelete.id);
-      enqueueSnackbar("Image removed", { variant: "success" });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    } finally {
-      setToDelete(null);
-    }
+    await run(() => deleteImage.mutateAsync(toDelete.id), "Image removed");
+    setToDelete(null);
   };
 
   const onPrune = async () => {

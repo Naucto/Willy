@@ -1,19 +1,18 @@
 import { Box, Button, Paper, Stack, Typography } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDeleteUser, useSetUserPassword } from "../api/hooks";
 import type { PanelUser } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useCan } from "../auth/permissions";
-import { describeError } from "../errors";
 import { generatePassword } from "../password";
+import { useAction } from "../useAction";
 import { PasswordField } from "./PasswordField";
 import { SettingRow } from "./SettingRow";
 
 export function UserSecurityTab({ user }: { user: PanelUser }) {
   const { user: me } = useAuth();
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const setPassword = useSetUserPassword();
   const [password, setPasswordValue] = useState("");
 
@@ -21,12 +20,8 @@ export function UserSecurityTab({ user }: { user: PanelUser }) {
   const isSelf = user.id === me?.userId;
 
   const onReset = async () => {
-    try {
-      await setPassword.mutateAsync({ id: user.id, password });
-      enqueueSnackbar("Password updated", { variant: "success" });
+    if (await run(() => setPassword.mutateAsync({ id: user.id, password }), "Password updated")) {
       setPasswordValue("");
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 
@@ -63,17 +58,13 @@ export function UserSecurityTab({ user }: { user: PanelUser }) {
 }
 
 function DangerZone({ user }: { user: PanelUser }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const navigate = useNavigate();
   const deleteUser = useDeleteUser();
 
   const onDelete = async () => {
-    try {
-      await deleteUser.mutateAsync(user.id);
-      enqueueSnackbar("User deleted", { variant: "success" });
+    if (await run(() => deleteUser.mutateAsync(user.id), "User deleted")) {
       navigate("/users", { replace: true });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

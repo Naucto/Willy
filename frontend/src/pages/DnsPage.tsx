@@ -29,6 +29,7 @@ import { ROLE_REASON, useCan } from "../auth/permissions";
 import { Gated } from "../components/Gated";
 import { ManageZonesDialog } from "../components/ManageZonesDialog";
 import { describeError } from "../errors";
+import { useAction } from "../useAction";
 
 const RECORD_TYPE_OPTIONS = [
   { value: "A", label: "A", description: "Maps a hostname to an IPv4 address." },
@@ -55,6 +56,7 @@ const emptySelection = (): GridRowSelectionModel => ({ type: "include", ids: new
 
 export function DnsPage() {
   const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const [zone, setZone] = useState("");
   const [adding, setAdding] = useState(false);
@@ -89,14 +91,8 @@ export function DnsPage() {
       ? allIds.filter((id) => selection.ids.has(id))
       : allIds.filter((id) => !selection.ids.has(id));
 
-  const onDelete = async (record: DnsRecord) => {
-    try {
-      await deleteRecord.mutateAsync(record.id);
-      enqueueSnackbar("Record deleted", { variant: "success" });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const onDelete = (record: DnsRecord) =>
+    run(() => deleteRecord.mutateAsync(record.id), "Record deleted");
 
   const onBulkDelete = async () => {
     setBulkBusy(true);
@@ -118,13 +114,14 @@ export function DnsPage() {
   };
 
   const onCreate = async () => {
-    try {
-      await createRecord.mutateAsync({ ...draft, ttl: draft.ttl ? Number(draft.ttl) : 3600 });
-      enqueueSnackbar("Record created", { variant: "success" });
+    if (
+      await run(
+        () => createRecord.mutateAsync({ ...draft, ttl: draft.ttl ? Number(draft.ttl) : 3600 }),
+        "Record created",
+      )
+    ) {
       setAdding(false);
       setDraft(EMPTY_RECORD);
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 

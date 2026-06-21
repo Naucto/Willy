@@ -1,10 +1,9 @@
 import { Box, Button, Divider, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useUpdateDeployment } from "../api/hooks";
 import type { Deployment, UpdateDeploymentInput } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 import { SettingRow } from "./SettingRow";
 import { SOURCE_OPTIONS, SourceFields } from "./source/SourceFields";
@@ -39,7 +38,7 @@ function initialValues(deployment: Deployment): FormValues {
 }
 
 export function SettingsTab({ deployment }: { deployment: Deployment }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const update = useUpdateDeployment(deployment.id);
   const [values, setValues] = useState<FormValues>(() => initialValues(deployment));
@@ -74,12 +73,7 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
 
-    try {
-      await update.mutateAsync(payload);
-      enqueueSnackbar("Settings saved", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
+    await run(() => update.mutateAsync(payload), "Settings saved");
   };
 
   return (

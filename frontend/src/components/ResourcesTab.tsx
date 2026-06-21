@@ -12,7 +12,6 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   useHostResources,
@@ -22,7 +21,7 @@ import {
 } from "../api/hooks";
 import type { Container, Deployment, ResourceLimits } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 import { SettingRow } from "./SettingRow";
@@ -116,7 +115,7 @@ function ComposeServiceResources({
   deploymentId: string;
   service: string;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const { data, isLoading } = useServiceResources(deploymentId, service);
   const update = useUpdateServiceResources(deploymentId);
 
@@ -128,20 +127,14 @@ function ComposeServiceResources({
     );
   }
 
-  const onSave = async (limits: ResourceLimits) => {
-    try {
-      await update.mutateAsync({ service, body: limits });
-      enqueueSnackbar(`Resources saved for ${service}`, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onSave = (limits: ResourceLimits) =>
+    run(() => update.mutateAsync({ service, body: limits }), `Resources saved for ${service}`);
 
   return <ResourceForm initial={data} saving={update.isPending} onSave={onSave} />;
 }
 
 function DeploymentResources({ deployment }: { deployment: Deployment }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const update = useUpdateDeployment(deployment.id);
 
   const initial: ResourceLimits = {
@@ -153,21 +146,19 @@ function DeploymentResources({ deployment }: { deployment: Deployment }) {
     logMaxFiles: deployment.logMaxFiles,
   };
 
-  const onSave = async (limits: ResourceLimits) => {
-    try {
-      await update.mutateAsync({
-        memoryLimitMb: limits.memoryLimitMb ?? null,
-        nanoCpus: limits.nanoCpus ?? null,
-        capAdd: limits.capAdd ?? [],
-        capDrop: limits.capDrop ?? [],
-        logMaxSizeMb: limits.logMaxSizeMb ?? null,
-        logMaxFiles: limits.logMaxFiles ?? null,
-      });
-      enqueueSnackbar("Resources saved", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onSave = (limits: ResourceLimits) =>
+    run(
+      () =>
+        update.mutateAsync({
+          memoryLimitMb: limits.memoryLimitMb ?? null,
+          nanoCpus: limits.nanoCpus ?? null,
+          capAdd: limits.capAdd ?? [],
+          capDrop: limits.capDrop ?? [],
+          logMaxSizeMb: limits.logMaxSizeMb ?? null,
+          logMaxFiles: limits.logMaxFiles ?? null,
+        }),
+      "Resources saved",
+    );
 
   return <ResourceForm initial={initial} saving={update.isPending} onSave={onSave} />;
 }
@@ -179,7 +170,7 @@ function ResourceForm({
 }: {
   initial: ResourceLimits;
   saving: boolean;
-  onSave: (limits: ResourceLimits) => Promise<void>;
+  onSave: (limits: ResourceLimits) => Promise<unknown>;
 }) {
   const [memoryMb, setMemoryMb] = useState(initial.memoryLimitMb ?? 0);
   const [cpuCores, setCpuCores] = useState(initial.nanoCpus ? initial.nanoCpus / 1e9 : 0);

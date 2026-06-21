@@ -10,11 +10,10 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useCronRuns, useRunCron } from "../api/hooks";
 import type { CronRun } from "../api/types";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 
 const STATUS_COLOR: Record<string, "info" | "success" | "error"> = {
   RUNNING: "info",
@@ -23,19 +22,12 @@ const STATUS_COLOR: Record<string, "info" | "success" | "error"> = {
 };
 
 export function CronRunsTab({ deploymentId }: { deploymentId: string }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const { data: runs, isLoading } = useCronRuns(deploymentId);
   const runNow = useRunCron(deploymentId);
   const [logRun, setLogRun] = useState<CronRun | null>(null);
 
-  const onRunNow = async () => {
-    try {
-      await runNow.mutateAsync();
-      enqueueSnackbar("Run started", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onRunNow = () => run(() => runNow.mutateAsync(), "Run started");
 
   const columns: GridColDef<CronRun>[] = [
     {

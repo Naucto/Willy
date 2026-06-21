@@ -40,6 +40,7 @@ import type { Container, Deployment, DeploymentDomain, PortBinding } from "../ap
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { DomainPicker } from "./DomainPicker";
 import { Gated } from "./Gated";
 import { RunningChip, SelectOption } from "./SelectOption";
@@ -104,7 +105,7 @@ function toRows(domains: DeploymentDomain[]): RouteRow[] {
 // container/service (compose only) and port. Adding and editing both go through one modal; changes
 // apply on the next deploy/restart.
 export function DomainsManager({ deployment }: { deployment: Deployment }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const { data: domains } = useDeploymentDomains(deployment.id);
   const { data: containers } = useDeploymentContainers(deployment.id);
@@ -144,15 +145,6 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     | { mode: "edit-web"; domain: DeploymentDomain }
     | { mode: "edit-port"; domain: DeploymentDomain; binding: PortBinding }
   >();
-
-  const run = async (action: Promise<unknown>, ok: string) => {
-    try {
-      await action;
-      enqueueSnackbar(ok, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
 
   // Removing a web route off a domain that still fronts host ports keeps the domain (now port-only);
   // removing its last entry drops the whole domain (and its managed DNS).

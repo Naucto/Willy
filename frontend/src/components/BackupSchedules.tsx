@@ -15,7 +15,6 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   useBackupSchedules,
@@ -26,33 +25,21 @@ import {
 } from "../api/hooks";
 import type { BackupSchedule } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 
 export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const { data: schedules, isLoading } = useBackupSchedules(deploymentId);
   const setEnabled = useSetScheduleEnabled();
   const deleteSchedule = useDeleteSchedule();
   const [adding, setAdding] = useState(false);
 
-  const onToggle = async (id: string, enabled: boolean) => {
-    try {
-      await setEnabled.mutateAsync({ id, enabled });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onToggle = (id: string, enabled: boolean) =>
+    run(() => setEnabled.mutateAsync({ id, enabled }));
 
-  const onDelete = async (id: string) => {
-    try {
-      await deleteSchedule.mutateAsync(id);
-      enqueueSnackbar("Schedule deleted", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onDelete = (id: string) => run(() => deleteSchedule.mutateAsync(id), "Schedule deleted");
 
   const columns: GridColDef<BackupSchedule>[] = [
     { field: "target", headerName: "Volume", flex: 1, minWidth: 180 },
@@ -140,7 +127,7 @@ function NewScheduleDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const createSchedule = useCreateSchedule();
 
@@ -161,13 +148,14 @@ function NewScheduleDialog({
   };
 
   const onCreate = async () => {
-    try {
-      await createSchedule.mutateAsync({ target: volume, cron, retention, deploymentId });
-      enqueueSnackbar("Schedule created", { variant: "success" });
+    if (
+      await run(
+        () => createSchedule.mutateAsync({ target: volume, cron, retention, deploymentId }),
+        "Schedule created",
+      )
+    ) {
       reset();
       onClose();
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

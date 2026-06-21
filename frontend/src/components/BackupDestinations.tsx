@@ -14,7 +14,6 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   useBackupDestinations,
@@ -24,7 +23,7 @@ import {
 } from "../api/hooks";
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 import { PasswordField } from "./PasswordField";
 
@@ -42,20 +41,14 @@ const DEST_OPTIONS = [
 type DestType = (typeof DEST_OPTIONS)[number]["value"];
 
 export function BackupDestinations() {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const { data: destinations, isLoading } = useBackupDestinations();
   const deleteDestination = useDeleteDestination();
   const [adding, setAdding] = useState(false);
 
-  const onDelete = async (id: string) => {
-    try {
-      await deleteDestination.mutateAsync(id);
-      enqueueSnackbar("Destination deleted", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onDelete = (id: string) =>
+    run(() => deleteDestination.mutateAsync(id), "Destination deleted");
 
   const columns: GridColDef<BackupDestination>[] = [
     { field: "name", headerName: "Name", flex: 1, minWidth: 160 },
@@ -115,7 +108,7 @@ export function BackupDestinations() {
 }
 
 function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const create = useCreateDestination();
   const test = useTestDestination();
@@ -140,24 +133,13 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
     } as CreateBackupDestinationInput;
   };
 
-  const onTest = async () => {
-    try {
-      await test.mutateAsync(buildBody());
-      enqueueSnackbar("Connection OK", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onTest = () => run(() => test.mutateAsync(buildBody()), "Connection OK");
 
   const onCreate = async () => {
-    try {
-      // Server re-tests the connection on create, so a bad destination is never saved.
-      await create.mutateAsync(buildBody());
-      enqueueSnackbar("Destination created", { variant: "success" });
+    // Server re-tests the connection on create, so a bad destination is never saved.
+    if (await run(() => create.mutateAsync(buildBody()), "Destination created")) {
       reset();
       onClose();
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

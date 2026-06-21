@@ -13,10 +13,9 @@ import {
   Tooltip,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { useSnackbar } from "notistack";
 import { useMemo, useState } from "react";
 import { useCreateBackupFor, useDeploymentContainers, useResetVolume } from "../api/hooks";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 
 interface VolumeRow {
   id: string;
@@ -26,7 +25,7 @@ interface VolumeRow {
 }
 
 export function VolumesTab({ deploymentId }: { deploymentId: string }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const { data: containers, isLoading } = useDeploymentContainers(deploymentId);
   const backup = useCreateBackupFor(deploymentId);
   const reset = useResetVolume(deploymentId);
@@ -51,22 +50,11 @@ export function VolumesTab({ deploymentId }: { deploymentId: string }) {
     return rows;
   }, [containers]);
 
-  const onBackup = async (name: string) => {
-    try {
-      await backup.mutateAsync(name);
-      enqueueSnackbar(`Backing up ${name}`, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onBackup = (name: string) => run(() => backup.mutateAsync(name), `Backing up ${name}`);
 
   const onReset = async (name: string) => {
-    try {
-      await reset.mutateAsync(name);
-      enqueueSnackbar(`Resetting ${name}`, { variant: "success" });
+    if (await run(() => reset.mutateAsync(name), `Resetting ${name}`)) {
       setConfirmReset(null);
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

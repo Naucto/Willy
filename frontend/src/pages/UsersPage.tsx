@@ -18,7 +18,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateUser, useUsers } from "../api/hooks";
@@ -28,6 +27,7 @@ import { RoleSelect } from "../components/RoleSelect";
 import { describeError } from "../errors";
 import { humanizeRole } from "../format";
 import { generatePassword } from "../password";
+import { useAction } from "../useAction";
 
 export function UsersPage() {
   const navigate = useNavigate();
@@ -97,18 +97,14 @@ function UserRow({ user, onOpen }: { user: PanelUser; onOpen: () => void }) {
 }
 
 function NewUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const create = useCreateUser();
   const [form, setForm] = useState<CreateUserInput>({ email: "", password: "", role: "VIEWER" });
 
   const onCreate = async () => {
-    try {
-      await create.mutateAsync(form);
-      enqueueSnackbar("User created", { variant: "success" });
+    if (await run(() => create.mutateAsync(form), "User created")) {
       setForm({ email: "", password: "", role: "VIEWER" });
       onClose();
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

@@ -1,16 +1,15 @@
 import { Box, Button, Stack, TextField, Typography } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { useUpdateUser } from "../api/hooks";
 import type { PanelUser, Role } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { RoleSelect } from "./RoleSelect";
 import { SettingRow } from "./SettingRow";
 
 export function UserGeneralTab({ user }: { user: PanelUser }) {
   const { user: me } = useAuth();
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const update = useUpdateUser();
 
   const [name, setName] = useState(user.name ?? "");
@@ -26,16 +25,13 @@ export function UserGeneralTab({ user }: { user: PanelUser }) {
 
   const isSelf = user.id === me?.userId;
 
-  const onSave = async () => {
-    try {
-      // Role is editable only for an admin acting on someone else; omit it otherwise so the
-      // backend's "only admins can change roles" guard isn't tripped on a self-edit.
-      await update.mutateAsync({ id: user.id, name, email, ...(isSelf ? {} : { role }) });
-      enqueueSnackbar("User updated", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  // Role is editable only for an admin acting on someone else; omit it otherwise so the
+  // backend's "only admins can change roles" guard isn't tripped on a self-edit.
+  const onSave = () =>
+    run(
+      () => update.mutateAsync({ id: user.id, name, email, ...(isSelf ? {} : { role }) }),
+      "User updated",
+    );
 
   return (
     <Stack spacing={0} sx={{ maxWidth: 760 }}>

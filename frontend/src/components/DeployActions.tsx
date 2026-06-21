@@ -28,6 +28,7 @@ import { useDeploy, useRemoveDeployment, useRestart, useStart, useStop } from ".
 import type { Deployment } from "../api/types";
 import { type Capability, ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 interface DeployActionsProps {
@@ -50,6 +51,7 @@ interface Action {
 
 export function DeployActions({ deployment, variant = "full", onDeleted }: DeployActionsProps) {
   const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   // Fold to icon-only based on the real space the row gives us (not a viewport breakpoint): the
   // root flex-grows to fill the remaining width, so a narrow measured width means it's cramped.
   const rowRef = useRef<HTMLDivElement>(null);
@@ -209,14 +211,11 @@ export function DeployActions({ deployment, variant = "full", onDeleted }: Deplo
       onCancel={() => setConfirmDelete(false)}
       onConfirm={() => {
         setConfirmDelete(false);
-        void (async () => {
-          try {
-            await remove.mutateAsync();
+        void run(() => remove.mutateAsync()).then((ok) => {
+          if (ok) {
             onDeleted?.();
-          } catch (error) {
-            enqueueSnackbar(describeError(error), { variant: "error" });
           }
-        })();
+        });
       }}
     />
   );

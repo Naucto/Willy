@@ -1,5 +1,4 @@
 import { Alert, Box, Button, Chip, Stack, TextField, Typography } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import {
@@ -11,7 +10,7 @@ import {
 import type { PanelUser, TotpSetupResponse } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { SettingRow } from "./SettingRow";
 
 function StatusChip({ user }: { user: PanelUser }) {
@@ -47,7 +46,7 @@ export function UserTwoFactorTab({ user }: { user: PanelUser }) {
 }
 
 function SelfControls({ user }: { user: PanelUser }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const start = useStartTwoFactor(user.id);
   const confirm = useConfirmTwoFactor(user.id);
   const disable = useDisableTwoFactor(user.id);
@@ -55,38 +54,29 @@ function SelfControls({ user }: { user: PanelUser }) {
   const [setup, setSetup] = useState<TotpSetupResponse | null>(null);
   const [code, setCode] = useState("");
 
-  const onStart = async () => {
-    try {
+  const onStart = () =>
+    run(async () => {
       setSetup(await start.mutateAsync());
       setCode("");
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+    });
 
   const onConfirm = async () => {
     if (!setup) {
       return;
     }
 
-    try {
-      await confirm.mutateAsync({ setupToken: setup.setupToken, code });
-      enqueueSnackbar("Two-factor authentication enabled", { variant: "success" });
+    if (
+      await run(
+        () => confirm.mutateAsync({ setupToken: setup.setupToken, code }),
+        "Two-factor authentication enabled",
+      )
+    ) {
       setSetup(null);
       setCode("");
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 
-  const onDisable = async () => {
-    try {
-      await disable.mutateAsync();
-      enqueueSnackbar("Two-factor authentication disabled", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onDisable = () => run(() => disable.mutateAsync(), "Two-factor authentication disabled");
 
   if (user.twoFactorConfigured) {
     return (
@@ -148,27 +138,13 @@ function SelfControls({ user }: { user: PanelUser }) {
 }
 
 function AdminControls({ user }: { user: PanelUser }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const require = useRequireTwoFactor(user.id);
   const disable = useDisableTwoFactor(user.id);
 
-  const onRequire = async () => {
-    try {
-      await require.mutateAsync();
-      enqueueSnackbar("Two-factor authentication required", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onRequire = () => run(() => require.mutateAsync(), "Two-factor authentication required");
 
-  const onReset = async () => {
-    try {
-      await disable.mutateAsync();
-      enqueueSnackbar("Two-factor authentication reset", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onReset = () => run(() => disable.mutateAsync(), "Two-factor authentication reset");
 
   if (!user.twoFactorEnabled) {
     return (

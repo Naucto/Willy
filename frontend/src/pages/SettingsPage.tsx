@@ -8,24 +8,19 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useAppSettings, useUpdateAppSettings } from "../api/hooks";
 import { SettingRow } from "../components/SettingRow";
 import { describeError } from "../errors";
+import { useAction } from "../useAction";
 
 export function SettingsPage() {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const { data: settings, isLoading, error } = useAppSettings();
   const updateSettings = useUpdateAppSettings();
 
-  const onToggleShowAll = async (showAllResources: boolean) => {
-    try {
-      await updateSettings.mutateAsync({ showAllResources });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const onToggleShowAll = (showAllResources: boolean) =>
+    run(() => updateSettings.mutateAsync({ showAllResources }));
 
   return (
     <Stack spacing={3}>
@@ -69,7 +64,7 @@ function PortBindingSetting({
 }: {
   settings: NonNullable<ReturnType<typeof useAppSettings>["data"]>;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const updateSettings = useUpdateAppSettings();
   const capacity = settings.portBindingCapacity;
   const { portBinding } = settings;
@@ -78,13 +73,8 @@ function PortBindingSetting({
   const [start, setStart] = useState(String(portBinding.start));
   const [end, setEnd] = useState(String(portBinding.end));
 
-  const save = async (patch: { enabled?: boolean; start?: number; end?: number }) => {
-    try {
-      await updateSettings.mutateAsync({ portBinding: patch });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const save = (patch: { enabled?: boolean; start?: number; end?: number }) =>
+    run(() => updateSettings.mutateAsync({ portBinding: patch }));
 
   if (!capacity) {
     return (

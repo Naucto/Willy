@@ -9,19 +9,18 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { Deployment } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 import { SettingRow } from "./SettingRow";
 
 // GitHub webhook + auto-deploy controls. Auto-deploy saves on toggle; the secret is
 // generated/rotated and shown once.
 export function WebhookTab({ deployment }: { deployment: Deployment }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const { data } = useWebhook(deployment.id);
   const update = useUpdateDeployment(deployment.id);
@@ -30,26 +29,17 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
 
   const url = data ? `${window.location.origin}${data.path}` : "";
 
-  const onToggleAutoDeploy = async (autoDeploy: boolean) => {
-    try {
-      await update.mutateAsync({ autoDeploy });
-      enqueueSnackbar(autoDeploy ? "Auto-deploy enabled" : "Auto-deploy disabled", {
-        variant: "success",
-      });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onToggleAutoDeploy = (autoDeploy: boolean) =>
+    run(
+      () => update.mutateAsync({ autoDeploy }),
+      autoDeploy ? "Auto-deploy enabled" : "Auto-deploy disabled",
+    );
 
-  const onRotate = async () => {
-    try {
+  const onRotate = () =>
+    run(async () => {
       const result = await rotate.mutateAsync();
       setSecret(result.secret);
-      enqueueSnackbar("Webhook secret generated", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+    }, "Webhook secret generated");
 
   return (
     <Stack spacing={0} sx={{ maxWidth: 760 }}>

@@ -15,10 +15,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useRegisterZone, useUnregisterZone } from "../api/hooks";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 
 // The zone-registration config surface: register zones for Willy to manage (handy when the OVH token
 // can't auto-list them) and unregister ones added here. Kept separate from the records view.
@@ -31,7 +30,7 @@ export function ManageZonesDialog({
   onClose: () => void;
   zones: string[];
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const register = useRegisterZone();
   const unregister = useUnregisterZone();
   const [zone, setZone] = useState("");
@@ -43,23 +42,13 @@ export function ManageZonesDialog({
       return;
     }
 
-    try {
-      await register.mutateAsync(value);
-      enqueueSnackbar(`Registered ${value}`, { variant: "success" });
+    if (await run(() => register.mutateAsync(value), `Registered ${value}`)) {
       setZone("");
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 
-  const onRemove = async (value: string) => {
-    try {
-      await unregister.mutateAsync(value);
-      enqueueSnackbar(`Unregistered ${value}`, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onRemove = (value: string) =>
+    run(() => unregister.mutateAsync(value), `Unregistered ${value}`);
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">

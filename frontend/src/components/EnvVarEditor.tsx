@@ -25,6 +25,7 @@ import { useDeleteEnvVar, useEnvVars, useSetEnvVar, useUpdateEnvVarMeta } from "
 import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
 import { Gated } from "./Gated";
 import { PasswordField } from "./PasswordField";
@@ -56,7 +57,7 @@ export function EnvVarEditor({
   deployment: Deployment;
   service?: string;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const deploymentId = deployment.id;
 
@@ -66,14 +67,8 @@ export function EnvVarEditor({
   const [editing, setEditing] = useState<MaskedEnvVar | null>(null);
   const [adding, setAdding] = useState(false);
 
-  const remove = async (envKey: string) => {
-    try {
-      await deleteEnvVar.mutateAsync(envKey);
-      enqueueSnackbar(`Removed ${envKey}`, { variant: "success" });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const remove = (envKey: string) =>
+    run(() => deleteEnvVar.mutateAsync(envKey), `Removed ${envKey}`);
 
   const columns: GridColDef<MaskedEnvVar>[] = [
     { field: "key", headerName: "Key", flex: 1, minWidth: 180, cellClassName: "willy-mono" },
@@ -184,6 +179,7 @@ function EnvVarDialog({
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const setEnvVar = useSetEnvVar(deploymentId, service);
   const updateMeta = useUpdateEnvVarMeta(deploymentId, service);
@@ -206,17 +202,16 @@ function EnvVarDialog({
       return;
     }
 
-    try {
+    const saved = await run(() => {
       if (envSaveMode({ editing, existingIsSecret, value }) === "meta") {
-        await updateMeta.mutateAsync({ key: key.trim(), body: { scope, isSecret } });
-      } else {
-        await setEnvVar.mutateAsync({ key: key.trim(), body: { value, scope, isSecret } });
+        return updateMeta.mutateAsync({ key: key.trim(), body: { scope, isSecret } });
       }
 
-      enqueueSnackbar(`Saved ${key.trim()}`, { variant: "success" });
+      return setEnvVar.mutateAsync({ key: key.trim(), body: { value, scope, isSecret } });
+    }, `Saved ${key.trim()}`);
+
+    if (saved) {
       onClose();
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 

@@ -53,6 +53,7 @@ import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
 import { formatRelativeTime, humanizeType } from "../format";
+import { useAction } from "../useAction";
 
 // The console pulls in the xterm terminal and monitoring pulls in the charting lib; both are split out
 // so those heavy deps load only when their tab is opened.
@@ -303,6 +304,7 @@ function ReleasesGrid({
   deploymentUpdatedAt?: string;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const rollback = useRollback(deploymentId);
   const deleteRelease = useDeleteRelease(deploymentId);
@@ -388,12 +390,8 @@ function ReleasesGrid({
   ];
 
   const onDelete = async (releaseId: string) => {
-    try {
-      await deleteRelease.mutateAsync(releaseId);
-      enqueueSnackbar("Release deleted", { variant: "success" });
+    if (await run(() => deleteRelease.mutateAsync(releaseId), "Release deleted")) {
       setPendingDeleteId(null);
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
     }
   };
 

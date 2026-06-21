@@ -12,12 +12,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useServiceResources, useUpdateDeployment, useUpdateServiceResources } from "../api/hooks";
 import type { Container, DeclaredHealthcheck, Deployment, Healthcheck } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { Gated } from "./Gated";
 import { SettingRow } from "./SettingRow";
 
@@ -90,20 +89,18 @@ function DeploymentHealth({
   deployment: Deployment;
   container?: Container | undefined;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const update = useUpdateDeployment(deployment.id);
 
-  const onSave = async (values: HealthValues) => {
-    try {
-      await update.mutateAsync({
-        restartPolicy: values.restartPolicy,
-        healthcheck: values.healthcheck,
-      });
-      enqueueSnackbar("Health settings saved", { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onSave = (values: HealthValues) =>
+    run(
+      () =>
+        update.mutateAsync({
+          restartPolicy: values.restartPolicy,
+          healthcheck: values.healthcheck,
+        }),
+      "Health settings saved",
+    );
 
   return (
     <HealthForm
@@ -128,7 +125,7 @@ function ComposeServiceHealth({
   service: string;
   container?: Container | undefined;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const { data, isLoading } = useServiceResources(deployment.id, service);
   const updateResources = useUpdateServiceResources(deployment.id);
 
@@ -140,18 +137,15 @@ function ComposeServiceHealth({
     );
   }
 
-  const onSave = async (values: HealthValues) => {
-    try {
-      await updateResources.mutateAsync({
-        service,
-        body: { restartPolicy: values.restartPolicy, healthcheck: values.healthcheck },
-      });
-
-      enqueueSnackbar(`Health settings saved for ${service}`, { variant: "success" });
-    } catch (error) {
-      enqueueSnackbar(describeError(error), { variant: "error" });
-    }
-  };
+  const onSave = (values: HealthValues) =>
+    run(
+      () =>
+        updateResources.mutateAsync({
+          service,
+          body: { restartPolicy: values.restartPolicy, healthcheck: values.healthcheck },
+        }),
+      `Health settings saved for ${service}`,
+    );
 
   return (
     <HealthForm
@@ -178,7 +172,7 @@ function HealthForm({
   declared: DeclaredHealthcheck | null;
   runtimeHealth: string | null;
   saving: boolean;
-  onSave: (values: HealthValues) => Promise<void>;
+  onSave: (values: HealthValues) => Promise<unknown>;
 }) {
   const canOperate = useCan("operate");
   const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>(initial.restartPolicy);

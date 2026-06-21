@@ -21,7 +21,6 @@ import {
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { useSnackbar } from "notistack";
 import { useState } from "react";
 import {
   downloadBackup,
@@ -37,7 +36,7 @@ import {
 import type { Backup, Task } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { latestTaskByBackup } from "../backupActivity";
-import { describeError } from "../errors";
+import { useAction } from "../useAction";
 import { BackupSchedules } from "./BackupSchedules";
 import { Gated } from "./Gated";
 
@@ -101,7 +100,7 @@ function formatBytes(bytes: number | null): string {
 }
 
 export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const { data: backups, isLoading } = useBackups(deploymentId);
   const { data: tasks } = useDeploymentTasks(deploymentId);
@@ -116,30 +115,13 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
   const [pushId, setPushId] = useState<string | null>(null);
   const [destinationId, setDestinationId] = useState("");
 
-  const onDownload = async (id: string) => {
-    try {
-      await downloadBackup(id);
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const onDownload = (id: string) => run(() => downloadBackup(id));
 
-  const onDelete = async (id: string) => {
-    try {
-      await deleteBackup.mutateAsync(id);
-      enqueueSnackbar("Backup deleted", { variant: "success" });
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
-    }
-  };
+  const onDelete = (id: string) => run(() => deleteBackup.mutateAsync(id), "Backup deleted");
 
   const onRestore = async (id: string) => {
-    try {
-      await restoreBackup.mutateAsync(id);
-      enqueueSnackbar("Restore started", { variant: "success" });
+    if (await run(() => restoreBackup.mutateAsync(id), "Restore started")) {
       setRestoreId(null);
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 
@@ -148,13 +130,11 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
       return;
     }
 
-    try {
-      await pushBackup.mutateAsync({ id: pushId, destinationId });
-      enqueueSnackbar("Offsite push started", { variant: "success" });
+    if (
+      await run(() => pushBackup.mutateAsync({ id: pushId, destinationId }), "Offsite push started")
+    ) {
       setPushId(null);
       setDestinationId("");
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 
@@ -374,7 +354,7 @@ function NewBackupDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const { enqueueSnackbar } = useSnackbar();
+  const run = useAction();
   const canOperate = useCan("operate");
   const [containerId, setContainerId] = useState("");
   const [volume, setVolume] = useState("");
@@ -391,13 +371,9 @@ function NewBackupDialog({
   };
 
   const onCreate = async () => {
-    try {
-      await createBackup.mutateAsync(volume);
-      enqueueSnackbar("Backup started", { variant: "success" });
+    if (await run(() => createBackup.mutateAsync(volume), "Backup started")) {
       reset();
       onClose();
-    } catch (caught) {
-      enqueueSnackbar(describeError(caught), { variant: "error" });
     }
   };
 
