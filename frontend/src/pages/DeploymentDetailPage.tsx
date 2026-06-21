@@ -10,7 +10,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Link,
   MenuItem,
   Stack,
@@ -39,10 +38,10 @@ import { DeployActions } from "../components/DeployActions";
 import { DeploymentBackupsTab } from "../components/DeploymentBackupsTab";
 import { DomainsManager } from "../components/DomainsManager";
 import { EnvVarEditor } from "../components/EnvVarEditor";
-import { Gated } from "../components/Gated";
 import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
 import { NetworkingTab } from "../components/NetworkingTab";
+import { OperateButton, OperateIconButton } from "../components/OperateButton";
 import { PageLoader } from "../components/PageLoader";
 import { ResourcesTab } from "../components/ResourcesTab";
 import { DeploymentUtilization } from "../components/ResourceUtilization";
@@ -406,33 +405,29 @@ function ReleasesGrid({
     renderCell: (params) => (
       <Box>
         {params.row.imageTag && params.row.id !== activeReleaseId && (
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              size="small"
-              disabled={rollbackBusy}
-              startIcon={
-                pendingRollbackId === params.row.id ? (
-                  <CircularProgress size={16} color="inherit" />
-                ) : undefined
-              }
-              onClick={() => void onRollback(params.row.id)}
-            >
-              Rollback
-            </Button>
-          </Gated>
+          <OperateButton
+            size="small"
+            disabled={rollbackBusy}
+            startIcon={
+              pendingRollbackId === params.row.id ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : undefined
+            }
+            onClick={() => void onRollback(params.row.id)}
+          >
+            Rollback
+          </OperateButton>
         )}
         {params.row.id !== activeReleaseId && (
           <Tooltip title={canOperate ? "Delete release" : ROLE_REASON.operate}>
             <span>
-              <Gated can={canOperate} reason={ROLE_REASON.operate}>
-                <IconButton
-                  size="small"
-                  disabled={deleteRelease.isPending}
-                  onClick={() => setPendingDeleteId(params.row.id)}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Gated>
+              <OperateIconButton
+                size="small"
+                disabled={deleteRelease.isPending}
+                onClick={() => setPendingDeleteId(params.row.id)}
+              >
+                <DeleteIcon fontSize="small" />
+              </OperateIconButton>
             </span>
           </Tooltip>
         )}

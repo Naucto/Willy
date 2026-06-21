@@ -37,12 +37,12 @@ import {
   useUpdateDomainTarget,
 } from "../api/hooks";
 import type { Container, Deployment, DeploymentDomain, PortBinding } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
+import { useCan } from "../auth/permissions";
 import { isValidFqdn } from "../domain";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
 import { DomainPicker } from "./DomainPicker";
-import { Gated } from "./Gated";
+import { OperateButton } from "./OperateButton";
 import { RunningChip, SelectOption } from "./SelectOption";
 
 interface ServiceOption {
@@ -282,15 +282,13 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
     <Stack spacing={2}>
       <Box sx={{ display: "flex" }}>
         <Box sx={{ flexGrow: 1 }} />
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setDialog({ mode: "add" })}
-          >
-            Add route
-          </Button>
-        </Gated>
+        <OperateButton
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setDialog({ mode: "add" })}
+        >
+          Add route
+        </OperateButton>
       </Box>
 
       <Box sx={{ width: "100%" }}>
@@ -392,7 +390,6 @@ function RouteDialog({
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
-  const canOperate = useCan("operate");
   const addDomain = useAddDomain(deploymentId);
   const updateTarget = useUpdateDomainTarget(deploymentId);
   const addBinding = useAddBinding(deploymentId);
@@ -634,11 +631,9 @@ function RouteDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" disabled={submitDisabled} onClick={() => void submit()}>
-            {submitLabel}
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" disabled={submitDisabled} onClick={() => void submit()}>
+          {submitLabel}
+        </OperateButton>
       </DialogActions>
     </Dialog>
   );

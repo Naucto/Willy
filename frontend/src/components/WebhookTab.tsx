@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Button,
   Divider,
   FormControlLabel,
   Stack,
@@ -15,6 +14,7 @@ import type { Deployment } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
 import { Gated } from "./Gated";
+import { OperateButton } from "./OperateButton";
 import { SettingRow } from "./SettingRow";
 
 // GitHub webhook + auto-deploy controls. Auto-deploy saves on toggle; the secret is
@@ -92,11 +92,13 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
             {data?.configured ? "Secret configured" : "No secret set"}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button variant="outlined" onClick={() => void onRotate()} disabled={rotate.isPending}>
-              {data?.configured ? "Rotate secret" : "Generate secret"}
-            </Button>
-          </Gated>
+          <OperateButton
+            variant="outlined"
+            onClick={() => void onRotate()}
+            disabled={rotate.isPending}
+          >
+            {data?.configured ? "Rotate secret" : "Generate secret"}
+          </OperateButton>
         </Box>
       </SettingRow>
     </Stack>

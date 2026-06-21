@@ -22,9 +22,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment, useHostResources } from "../api/hooks";
 import type { CreateDeploymentInput, DeploymentType } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { DomainPicker } from "../components/DomainPicker";
-import { Gated } from "../components/Gated";
+import { OperateButton } from "../components/OperateButton";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "../components/resourceScale";
 import { SOURCE_OPTIONS, SourceFields, sourceDescription } from "../components/source/SourceFields";
 import type { SourceValue } from "../components/source/sourceTypes";
@@ -208,7 +207,6 @@ export function CreateDeploymentPage() {
   const { enqueueSnackbar } = useSnackbar();
   const createDeployment = useCreateDeployment();
   const { data: host } = useHostResources();
-  const canOperate = useCan("operate");
   const [step, setStep] = useState(0);
   const [state, setState] = useState<WizardState>(INITIAL);
 
@@ -276,15 +274,13 @@ export function CreateDeploymentPage() {
           {stepIndex === 0 ? "Cancel" : "Back"}
         </Button>
         {isLast ? (
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              variant="contained"
-              disabled={createDeployment.isPending || Boolean(error)}
-              onClick={() => void onCreate()}
-            >
-              Create
-            </Button>
-          </Gated>
+          <OperateButton
+            variant="contained"
+            disabled={createDeployment.isPending || Boolean(error)}
+            onClick={() => void onCreate()}
+          >
+            Create
+          </OperateButton>
         ) : (
           <Button
             variant="contained"

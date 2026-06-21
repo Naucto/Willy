@@ -1,7 +1,6 @@
 import {
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -15,9 +14,8 @@ import {
 import { useState } from "react";
 import { useServiceResources, useUpdateDeployment, useUpdateServiceResources } from "../api/hooks";
 import type { Container, DeclaredHealthcheck, Deployment, Healthcheck } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
-import { Gated } from "./Gated";
+import { OperateButton } from "./OperateButton";
 import { SettingRow } from "./SettingRow";
 
 const RESTART_OPTIONS = [
@@ -174,7 +172,6 @@ function HealthForm({
   saving: boolean;
   onSave: (values: HealthValues) => Promise<unknown>;
 }) {
-  const canOperate = useCan("operate");
   const [restartPolicy, setRestartPolicy] = useState<RestartPolicy>(initial.restartPolicy);
   const [enabled, setEnabled] = useState(Boolean(initial.healthcheck));
   const [test, setTest] = useState(initial.healthcheck?.test ?? "");
@@ -294,11 +291,9 @@ function HealthForm({
         <Typography variant="caption" color="text.secondary">
           Health changes apply on the next deploy or restart.
         </Typography>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" disabled={saving} onClick={submit}>
-            Save changes
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" disabled={saving} onClick={submit}>
+          Save changes
+        </OperateButton>
       </Box>
     </Stack>
   );

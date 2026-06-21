@@ -7,7 +7,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   MenuItem,
   Stack,
   TextField,
@@ -22,9 +21,8 @@ import {
   useTestDestination,
 } from "../api/hooks";
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
-import { Gated } from "./Gated";
+import { OperateButton, OperateIconButton } from "./OperateButton";
 import { PasswordField } from "./PasswordField";
 
 const DEST_OPTIONS = [
@@ -42,7 +40,6 @@ type DestType = (typeof DEST_OPTIONS)[number]["value"];
 
 export function BackupDestinations() {
   const run = useAction();
-  const canOperate = useCan("operate");
   const { data: destinations, isLoading } = useBackupDestinations();
   const deleteDestination = useDeleteDestination();
   const [adding, setAdding] = useState(false);
@@ -67,11 +64,9 @@ export function BackupDestinations() {
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Gated>
+        <OperateIconButton size="small" onClick={() => void onDelete(params.row.id)}>
+          <DeleteIcon fontSize="small" />
+        </OperateIconButton>
       ),
     },
   ];
@@ -82,11 +77,9 @@ export function BackupDestinations() {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Offsite destinations
         </Typography>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-            New destination
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+          New destination
+        </OperateButton>
       </Box>
 
       <Box sx={{ height: 280 }}>
@@ -109,7 +102,6 @@ export function BackupDestinations() {
 
 function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const run = useAction();
-  const canOperate = useCan("operate");
   const create = useCreateDestination();
   const test = useTestDestination();
   const [type, setType] = useState<DestType>("S3");
@@ -237,20 +229,16 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button disabled={test.isPending || !ready} onClick={() => void onTest()}>
-            {test.isPending ? "Testing…" : "Test connection"}
-          </Button>
-        </Gated>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            disabled={create.isPending || !ready}
-            onClick={() => void onCreate()}
-          >
-            Create
-          </Button>
-        </Gated>
+        <OperateButton disabled={test.isPending || !ready} onClick={() => void onTest()}>
+          {test.isPending ? "Testing…" : "Test connection"}
+        </OperateButton>
+        <OperateButton
+          variant="contained"
+          disabled={create.isPending || !ready}
+          onClick={() => void onCreate()}
+        >
+          Create
+        </OperateButton>
       </DialogActions>
     </Dialog>
   );

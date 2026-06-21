@@ -1,19 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutlined";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  MenuItem,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, MenuItem, Switch, TextField, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useState } from "react";
 import {
@@ -26,7 +13,9 @@ import {
 import type { BackupSchedule } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
+import { BaseDialog } from "./BaseDialog";
 import { Gated } from "./Gated";
+import { OperateButton, OperateIconButton } from "./OperateButton";
 
 export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
   const run = useAction();
@@ -73,11 +62,9 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <IconButton size="small" onClick={() => void onDelete(params.row.id)}>
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Gated>
+        <OperateIconButton size="small" onClick={() => void onDelete(params.row.id)}>
+          <DeleteIcon fontSize="small" />
+        </OperateIconButton>
       ),
     },
   ];
@@ -88,11 +75,9 @@ export function BackupSchedules({ deploymentId }: { deploymentId: string }) {
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Schedules
         </Typography>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-            New schedule
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+          New schedule
+        </OperateButton>
       </Box>
 
       <Box sx={{ height: 320 }}>
@@ -128,7 +113,6 @@ function NewScheduleDialog({
   onClose: () => void;
 }) {
   const run = useAction();
-  const canOperate = useCan("operate");
   const createSchedule = useCreateSchedule();
 
   const [containerId, setContainerId] = useState("");
@@ -160,68 +144,58 @@ function NewScheduleDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>New backup schedule</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            select
-            label="Container"
-            value={containerId}
-            disabled={(containers ?? []).length === 0}
-            onChange={(event) => {
-              setContainerId(event.target.value);
-              setVolume("");
-            }}
-          >
-            {(containers ?? []).map((container) => (
-              <MenuItem key={container.id} value={container.id}>
-                {container.name}
-              </MenuItem>
-            ))}
-          </TextField>
+    <BaseDialog
+      open={open}
+      title="New backup schedule"
+      onClose={onClose}
+      onConfirm={() => void onCreate()}
+      confirmLabel="Create"
+      confirmDisabled={createSchedule.isPending || !volume || !cron.trim()}
+    >
+      <TextField
+        select
+        label="Container"
+        value={containerId}
+        disabled={(containers ?? []).length === 0}
+        onChange={(event) => {
+          setContainerId(event.target.value);
+          setVolume("");
+        }}
+      >
+        {(containers ?? []).map((container) => (
+          <MenuItem key={container.id} value={container.id}>
+            {container.name}
+          </MenuItem>
+        ))}
+      </TextField>
 
-          <TextField
-            select
-            label="Volume"
-            value={volume}
-            disabled={!containerId || volumes.length === 0}
-            onChange={(event) => setVolume(event.target.value)}
-          >
-            {volumes.map((mount) => (
-              <MenuItem key={mount.name} value={mount.name}>
-                {mount.name} ({mount.destination})
-              </MenuItem>
-            ))}
-          </TextField>
+      <TextField
+        select
+        label="Volume"
+        value={volume}
+        disabled={!containerId || volumes.length === 0}
+        onChange={(event) => setVolume(event.target.value)}
+      >
+        {volumes.map((mount) => (
+          <MenuItem key={mount.name} value={mount.name}>
+            {mount.name} ({mount.destination})
+          </MenuItem>
+        ))}
+      </TextField>
 
-          <TextField
-            label="Cron expression"
-            value={cron}
-            helperText="Standard 5-field cron, e.g. 0 3 * * * (daily at 03:00)."
-            onChange={(event) => setCron(event.target.value)}
-          />
+      <TextField
+        label="Cron expression"
+        value={cron}
+        helperText="Standard 5-field cron, e.g. 0 3 * * * (daily at 03:00)."
+        onChange={(event) => setCron(event.target.value)}
+      />
 
-          <TextField
-            label="Keep (most recent backups)"
-            type="number"
-            value={retention}
-            onChange={(event) => setRetention(Math.max(1, Number(event.target.value)))}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            disabled={createSchedule.isPending || !volume || !cron.trim()}
-            onClick={() => void onCreate()}
-          >
-            Create
-          </Button>
-        </Gated>
-      </DialogActions>
-    </Dialog>
+      <TextField
+        label="Keep (most recent backups)"
+        type="number"
+        value={retention}
+        onChange={(event) => setRetention(Math.max(1, Number(event.target.value)))}
+      />
+    </BaseDialog>
   );
 }

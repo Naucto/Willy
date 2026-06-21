@@ -2,7 +2,6 @@ import {
   Alert,
   Autocomplete,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -20,9 +19,8 @@ import {
   useUpdateServiceResources,
 } from "../api/hooks";
 import type { Container, Deployment, ResourceLimits } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
-import { Gated } from "./Gated";
+import { OperateButton } from "./OperateButton";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "./resourceScale";
 import { SettingRow } from "./SettingRow";
 
@@ -180,7 +178,6 @@ function ResourceForm({
   const [logMaxFiles, setLogMaxFiles] = useState(initial.logMaxFiles ?? 0);
 
   const { data: host } = useHostResources();
-  const canOperate = useCan("operate");
   const memMax = memoryMaxMb(host?.memoryMb);
   const cpuCeiling = cpuMax(host?.cpus);
 
@@ -274,11 +271,9 @@ function ResourceForm({
         <Typography variant="caption" color="text.secondary">
           Resource changes apply on the next deploy or restart.
         </Typography>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" disabled={saving} onClick={submit}>
-            Save changes
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" disabled={saving} onClick={submit}>
+          Save changes
+        </OperateButton>
       </Box>
     </Stack>
   );

@@ -4,13 +4,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import {
   Alert,
   Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControlLabel,
-  IconButton,
   MenuItem,
   Stack,
   Switch,
@@ -23,11 +17,11 @@ import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useDeleteEnvVar, useEnvVars, useSetEnvVar, useUpdateEnvVarMeta } from "../api/hooks";
 import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
+import { BaseDialog } from "./BaseDialog";
 import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
-import { Gated } from "./Gated";
+import { OperateButton, OperateIconButton } from "./OperateButton";
 import { PasswordField } from "./PasswordField";
 
 const SCOPE_OPTIONS: { value: EnvScope; label: string; description: string }[] = [
@@ -58,7 +52,6 @@ export function EnvVarEditor({
   service?: string;
 }) {
   const run = useAction();
-  const canOperate = useCan("operate");
   const deploymentId = deployment.id;
 
   const { data, isLoading, error } = useEnvVars(deploymentId, service);
@@ -99,18 +92,14 @@ export function EnvVarEditor({
       renderCell: (params) => (
         <Box>
           <Tooltip title="Edit">
-            <Gated can={canOperate} reason={ROLE_REASON.operate}>
-              <IconButton size="small" onClick={() => setEditing(params.row)}>
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Gated>
+            <OperateIconButton size="small" onClick={() => setEditing(params.row)}>
+              <EditIcon fontSize="small" />
+            </OperateIconButton>
           </Tooltip>
           <Tooltip title="Delete">
-            <Gated can={canOperate} reason={ROLE_REASON.operate}>
-              <IconButton size="small" onClick={() => void remove(params.row.key)}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Gated>
+            <OperateIconButton size="small" onClick={() => void remove(params.row.key)}>
+              <DeleteIcon fontSize="small" />
+            </OperateIconButton>
           </Tooltip>
         </Box>
       ),
@@ -123,11 +112,9 @@ export function EnvVarEditor({
 
       <Box sx={{ display: "flex" }}>
         <Box sx={{ flexGrow: 1 }} />
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-            Add variable
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+          Add variable
+        </OperateButton>
       </Box>
 
       <Box sx={{ height: 420 }}>
@@ -180,7 +167,6 @@ function EnvVarDialog({
 }) {
   const { enqueueSnackbar } = useSnackbar();
   const run = useAction();
-  const canOperate = useCan("operate");
   const setEnvVar = useSetEnvVar(deploymentId, service);
   const updateMeta = useUpdateEnvVarMeta(deploymentId, service);
 
@@ -223,74 +209,61 @@ function EnvVarDialog({
       : " ";
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{editing ? `Edit ${existing.key}` : "Add environment variable"}</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            label="Key"
-            value={key}
-            disabled={editing}
-            onChange={(event) => setKey(event.target.value)}
-          />
-          {isSecret ? (
-            <PasswordField
-              label="Value"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              helperText={valueHelper}
-            />
-          ) : (
-            <TextField
-              label="Value"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              helperText={valueHelper}
-            />
-          )}
-          <TextField
-            select
-            label="Scope"
-            value={scope}
-            onChange={(event) => setScope(event.target.value as EnvScope)}
-            slotProps={{
-              select: {
-                renderValue: (v) =>
-                  SCOPE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
-              },
-            }}
-          >
-            {SCOPE_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                <Stack spacing={0.25}>
-                  <Typography variant="body2">{opt.label}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {opt.description}
-                  </Typography>
-                </Stack>
-              </MenuItem>
-            ))}
-          </TextField>
-          <FormControlLabel
-            control={
-              <Switch checked={isSecret} onChange={(event) => setIsSecret(event.target.checked)} />
-            }
-            label="Secret"
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            onClick={() => void save()}
-            disabled={setEnvVar.isPending || updateMeta.isPending || blocked}
-          >
-            Save
-          </Button>
-        </Gated>
-      </DialogActions>
-    </Dialog>
+    <BaseDialog
+      title={editing ? `Edit ${existing.key}` : "Add environment variable"}
+      onClose={onClose}
+      onConfirm={() => void save()}
+      confirmDisabled={setEnvVar.isPending || updateMeta.isPending || blocked}
+    >
+      <TextField
+        label="Key"
+        value={key}
+        disabled={editing}
+        onChange={(event) => setKey(event.target.value)}
+      />
+      {isSecret ? (
+        <PasswordField
+          label="Value"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          helperText={valueHelper}
+        />
+      ) : (
+        <TextField
+          label="Value"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          helperText={valueHelper}
+        />
+      )}
+      <TextField
+        select
+        label="Scope"
+        value={scope}
+        onChange={(event) => setScope(event.target.value as EnvScope)}
+        slotProps={{
+          select: {
+            renderValue: (v) => SCOPE_OPTIONS.find((o) => o.value === v)?.label ?? (v as string),
+          },
+        }}
+      >
+        {SCOPE_OPTIONS.map((opt) => (
+          <MenuItem key={opt.value} value={opt.value}>
+            <Stack spacing={0.25}>
+              <Typography variant="body2">{opt.label}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {opt.description}
+              </Typography>
+            </Stack>
+          </MenuItem>
+        ))}
+      </TextField>
+      <FormControlLabel
+        control={
+          <Switch checked={isSecret} onChange={(event) => setIsSecret(event.target.checked)} />
+        }
+        label="Secret"
+      />
+    </BaseDialog>
   );
 }

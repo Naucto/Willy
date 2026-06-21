@@ -34,11 +34,10 @@ import {
   useRestoreBackup,
 } from "../api/hooks";
 import type { Backup, Task } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
 import { latestTaskByBackup } from "../backupActivity";
 import { useAction } from "../useAction";
 import { BackupSchedules } from "./BackupSchedules";
-import { Gated } from "./Gated";
+import { OperateButton, OperateIconButton } from "./OperateButton";
 
 // Per-row labels for the non-create operations a backup can be the subject of.
 const ACTIVITY_LABEL: Record<string, { running: string; success: string; failed: string }> = {
@@ -101,7 +100,6 @@ function formatBytes(bytes: number | null): string {
 
 export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string }) {
   const run = useAction();
-  const canOperate = useCan("operate");
   const { data: backups, isLoading } = useBackups(deploymentId);
   const { data: tasks } = useDeploymentTasks(deploymentId);
   const activity = latestTaskByBackup(tasks);
@@ -204,42 +202,36 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
               title={params.row.offsiteUrl ? `Pushed: ${params.row.offsiteUrl}` : "Push offsite"}
             >
               <span>
-                <Gated can={canOperate} reason={ROLE_REASON.operate}>
-                  <IconButton
-                    size="small"
-                    color={params.row.offsiteUrl ? "success" : "default"}
-                    disabled={params.row.status !== "SUCCESS" || busy}
-                    onClick={() => setPushId(params.row.id)}
-                  >
-                    <CloudUploadIcon fontSize="small" />
-                  </IconButton>
-                </Gated>
+                <OperateIconButton
+                  size="small"
+                  color={params.row.offsiteUrl ? "success" : "default"}
+                  disabled={params.row.status !== "SUCCESS" || busy}
+                  onClick={() => setPushId(params.row.id)}
+                >
+                  <CloudUploadIcon fontSize="small" />
+                </OperateIconButton>
               </span>
             </Tooltip>
             <Tooltip title="Restore to this deployment">
               <span>
-                <Gated can={canOperate} reason={ROLE_REASON.operate}>
-                  <IconButton
-                    size="small"
-                    disabled={params.row.status !== "SUCCESS" || busy}
-                    onClick={() => setRestoreId(params.row.id)}
-                  >
-                    <RestoreIcon fontSize="small" />
-                  </IconButton>
-                </Gated>
+                <OperateIconButton
+                  size="small"
+                  disabled={params.row.status !== "SUCCESS" || busy}
+                  onClick={() => setRestoreId(params.row.id)}
+                >
+                  <RestoreIcon fontSize="small" />
+                </OperateIconButton>
               </span>
             </Tooltip>
             <Tooltip title="Delete">
               <span>
-                <Gated can={canOperate} reason={ROLE_REASON.operate}>
-                  <IconButton
-                    size="small"
-                    disabled={busy}
-                    onClick={() => void onDelete(params.row.id)}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Gated>
+                <OperateIconButton
+                  size="small"
+                  disabled={busy}
+                  onClick={() => void onDelete(params.row.id)}
+                >
+                  <DeleteIcon fontSize="small" />
+                </OperateIconButton>
               </span>
             </Tooltip>
           </Box>
@@ -254,11 +246,9 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
           Backups
         </Typography>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-            New backup
-          </Button>
-        </Gated>
+        <OperateButton variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
+          New backup
+        </OperateButton>
       </Box>
 
       <Box sx={{ height: 360 }}>
@@ -307,15 +297,13 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPushId(null)}>Cancel</Button>
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              variant="contained"
-              disabled={pushBackup.isPending || !destinationId}
-              onClick={() => void onPush()}
-            >
-              Push
-            </Button>
-          </Gated>
+          <OperateButton
+            variant="contained"
+            disabled={pushBackup.isPending || !destinationId}
+            onClick={() => void onPush()}
+          >
+            Push
+          </OperateButton>
         </DialogActions>
       </Dialog>
 
@@ -329,16 +317,14 @@ export function DeploymentBackupsTab({ deploymentId }: { deploymentId: string })
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRestoreId(null)}>Cancel</Button>
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              color="error"
-              variant="contained"
-              disabled={restoreBackup.isPending}
-              onClick={() => restoreId && void onRestore(restoreId)}
-            >
-              Restore
-            </Button>
-          </Gated>
+          <OperateButton
+            color="error"
+            variant="contained"
+            disabled={restoreBackup.isPending}
+            onClick={() => restoreId && void onRestore(restoreId)}
+          >
+            Restore
+          </OperateButton>
         </DialogActions>
       </Dialog>
     </Stack>
@@ -355,7 +341,6 @@ function NewBackupDialog({
   onClose: () => void;
 }) {
   const run = useAction();
-  const canOperate = useCan("operate");
   const [containerId, setContainerId] = useState("");
   const [volume, setVolume] = useState("");
 
@@ -419,15 +404,13 @@ function NewBackupDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <Button
-            variant="contained"
-            disabled={createBackup.isPending || !volume}
-            onClick={() => void onCreate()}
-          >
-            Back up
-          </Button>
-        </Gated>
+        <OperateButton
+          variant="contained"
+          disabled={createBackup.isPending || !volume}
+          onClick={() => void onCreate()}
+        >
+          Back up
+        </OperateButton>
       </DialogActions>
     </Dialog>
   );

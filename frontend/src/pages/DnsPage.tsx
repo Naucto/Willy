@@ -8,7 +8,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   MenuItem,
   Stack,
   TextField,
@@ -25,9 +24,8 @@ import {
   useHostPublicIp,
 } from "../api/hooks";
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
-import { ROLE_REASON, useCan } from "../auth/permissions";
-import { Gated } from "../components/Gated";
 import { ManageZonesDialog } from "../components/ManageZonesDialog";
+import { OperateButton, OperateIconButton } from "../components/OperateButton";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
 
@@ -57,7 +55,6 @@ const emptySelection = (): GridRowSelectionModel => ({ type: "include", ids: new
 export function DnsPage() {
   const { enqueueSnackbar } = useSnackbar();
   const run = useAction();
-  const canOperate = useCan("operate");
   const [zone, setZone] = useState("");
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<CreateDnsRecordInput>(EMPTY_RECORD);
@@ -143,15 +140,13 @@ export function DnsPage() {
       filterable: false,
       align: "right",
       renderCell: (params) => (
-        <Gated can={canOperate} reason={ROLE_REASON.operate}>
-          <IconButton
-            size="small"
-            disabled={deleteRecord.isPending}
-            onClick={() => void onDelete(params.row)}
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        </Gated>
+        <OperateIconButton
+          size="small"
+          disabled={deleteRecord.isPending}
+          onClick={() => void onDelete(params.row)}
+        >
+          <DeleteIcon fontSize="small" />
+        </OperateIconButton>
       ),
     },
   ];
@@ -187,22 +182,22 @@ export function DnsPage() {
           <>
             <Box sx={{ flexGrow: 1 }} />
             {selectedIds.length > 0 && (
-              <Gated can={canOperate} reason={ROLE_REASON.operate}>
-                <Button
-                  color="error"
-                  variant="outlined"
-                  startIcon={<DeleteIcon />}
-                  onClick={() => setConfirmBulk(true)}
-                >
-                  Delete {selectedIds.length}
-                </Button>
-              </Gated>
+              <OperateButton
+                color="error"
+                variant="outlined"
+                startIcon={<DeleteIcon />}
+                onClick={() => setConfirmBulk(true)}
+              >
+                Delete {selectedIds.length}
+              </OperateButton>
             )}
-            <Gated can={canOperate} reason={ROLE_REASON.operate}>
-              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>
-                Add record
-              </Button>
-            </Gated>
+            <OperateButton
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setAdding(true)}
+            >
+              Add record
+            </OperateButton>
           </>
         )}
       </Box>
@@ -298,15 +293,13 @@ export function DnsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAdding(false)}>Cancel</Button>
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              variant="contained"
-              disabled={createRecord.isPending || !draft.target.trim()}
-              onClick={() => void onCreate()}
-            >
-              Create
-            </Button>
-          </Gated>
+          <OperateButton
+            variant="contained"
+            disabled={createRecord.isPending || !draft.target.trim()}
+            onClick={() => void onCreate()}
+          >
+            Create
+          </OperateButton>
         </DialogActions>
       </Dialog>
 
@@ -325,16 +318,14 @@ export function DnsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmBulk(false)}>Cancel</Button>
-          <Gated can={canOperate} reason={ROLE_REASON.operate}>
-            <Button
-              color="error"
-              variant="contained"
-              disabled={bulkBusy}
-              onClick={() => void onBulkDelete()}
-            >
-              Delete
-            </Button>
-          </Gated>
+          <OperateButton
+            color="error"
+            variant="contained"
+            disabled={bulkBusy}
+            onClick={() => void onBulkDelete()}
+          >
+            Delete
+          </OperateButton>
         </DialogActions>
       </Dialog>
     </Stack>
