@@ -10,19 +10,10 @@ import {
   VolumeHelperService,
 } from "../docker/volume-helper.service";
 import { assertBasename, basename, containerPath, parentAndName, VOLUME_ROOT } from "./file-path";
-import type { DirEntryDto, FileEntryType } from "./dto/file-entry.dto";
+import { modeOctal, parseStatLine, type StatInfo, toEntry } from "./file-stat";
+import type { DirEntryDto } from "./dto/file-entry.dto";
 import type { ReadFileResponseDto } from "./dto/file-content.dto";
 import { buildFileTar, extractSingleFile, streamSingleFile } from "./tar.util";
-
-interface StatInfo {
-  type: FileEntryType;
-  // Permission bits only (mode & 07777).
-  perm: number;
-  uid: number;
-  gid: number;
-  size: number;
-  mtimeMs: number;
-}
 
 export interface DownloadResult {
   stream: NodeJS.ReadableStream;
@@ -108,13 +99,13 @@ export class FilesService {
           return;
         }
 
-        const info = this.parseStatLine(line);
+        const info = parseStatLine(line);
 
         if (!info) {
           return;
         }
 
-        entries.push(this.toEntry(basename(fullPath), info));
+        entries.push(toEntry(basename(fullPath), info));
       });
 
       entries.sort((a, b) => {
@@ -165,7 +156,7 @@ export class FilesService {
         size: content.length,
         isBinary: sniff.includes(0),
         contentBase64: content.toString("base64"),
-        mode: this.modeOctal(info.perm),
+        mode: modeOctal(info.perm),
         uid: info.uid,
         gid: info.gid,
         mtime: new Date(info.mtimeMs).toISOString(),
@@ -484,75 +475,7 @@ export class FilesService {
       return null;
     }
 
-    return this.parseStatLine(result.stdout.trim());
-  }
-
-  private parseStatLine(line: string): StatInfo | null {
-    const parts = line.split("|");
-
-    if (parts.length < 5) {
-      return null;
-    }
-
-    const raw = Number.parseInt(parts[0] ?? "", 16);
-
-    if (Number.isNaN(raw)) {
-      return null;
-    }
-
-    return {
-      type: this.fileType(raw),
-      perm: raw & 0o7777,
-      size: Number(parts[1]),
-      uid: Number(parts[2]),
-      gid: Number(parts[3]),
-      mtimeMs: Number(parts[4]) * 1000,
-    };
-  }
-
-  private fileType(rawMode: number): FileEntryType {
-    const fmt = rawMode & 0o170000;
-
-    if (fmt === 0o040000) {
-      return "dir";
-    }
-
-    if (fmt === 0o100000) {
-      return "file";
-    }
-
-    if (fmt === 0o120000) {
-      return "symlink";
-    }
-
-    return "other";
-  }
-
-  private toEntry(name: string, info: StatInfo): DirEntryDto {
-    return {
-      name,
-      type: info.type,
-      size: info.size,
-      mode: this.modeOctal(info.perm),
-      modeHuman: this.modeHuman(info.perm),
-      uid: info.uid,
-      gid: info.gid,
-      mtime: new Date(info.mtimeMs).toISOString(),
-    };
-  }
-
-  private modeOctal(perm: number): string {
-    return perm.toString(8).padStart(4, "0");
-  }
-
-  private modeHuman(perm: number): string {
-    const bits = ["r", "w", "x"];
-
-    return [6, 3, 0]
-      .map((shift) =>
-        bits.map((flag, index) => ((perm >> (shift + (2 - index))) & 1 ? flag : "-")).join(""),
-      )
-      .join("");
+    return parseStatLine(result.stdout.trim());
   }
 
   // New files/dirs adopt the parent directory's owner so a container running as a non-root uid keeps
