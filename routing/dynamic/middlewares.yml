@@ -30,7 +30,5 @@ http:
           frame-ancestors 'none';
           base-uri 'self';
           object-src 'none'
-    rate-limit:
-      rateLimit:
-        average: 100
-        burst: 50
+    # No blanket rate-limit middleware: it isn't wired to any router, and a global cap would throttle
+    # the high-connection WebRTC tenant apps Willy fronts. Add a scoped limiter per-app if ever needed.
