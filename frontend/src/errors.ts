@@ -12,6 +12,9 @@ export class WillyError extends Error {
 
 export class MissingRootElementError extends WillyError {}
 
+// A React context hook (e.g. useAuth) was called outside its provider — a programming error.
+export class ContextUsageError extends WillyError {}
+
 // Best-effort human-readable message for any thrown value (for toasts/logs).
 export function describeError(error: unknown): string {
   if (error instanceof Error) {

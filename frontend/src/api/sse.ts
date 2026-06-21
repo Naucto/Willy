@@ -1,3 +1,4 @@
+import { ApiError } from "./client";
 import { tokens } from "./tokens";
 
 // Pulls complete SSE frames out of a rolling buffer, returning their `data:` lines
@@ -32,7 +33,7 @@ export async function streamSse(
   });
 
   if (!response.ok || !response.body) {
-    throw new Error(`log stream failed (${response.status})`);
+    throw new ApiError(`log stream failed (${response.status})`, response.status);
   }
 
   const reader = response.body.getReader();

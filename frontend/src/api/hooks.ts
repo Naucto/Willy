@@ -1,5 +1,5 @@
 import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap } from "./client";
+import { ApiError, api, unwrap } from "./client";
 import { uploadFile } from "./files";
 import { tokens } from "./tokens";
 import type {
@@ -314,7 +314,7 @@ export async function downloadBackup(id: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Download failed (${response.status})`);
+    throw new ApiError(`Download failed (${response.status})`, response.status);
   }
 
   const url = URL.createObjectURL(await response.blob());

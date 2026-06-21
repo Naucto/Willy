@@ -10,6 +10,7 @@ import {
 import { AUTH_EXPIRED_EVENT, api, unwrap } from "../api/client";
 import { tokens } from "../api/tokens";
 import type { AuthUser, Session, TotpSetupResponse } from "../api/types";
+import { ContextUsageError } from "../errors";
 
 // Outcome of the first login step: either we're in, or a second 2FA step is needed.
 export type LoginOutcome =
@@ -136,7 +137,7 @@ export function useAuth(): AuthState {
   const context = use(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new ContextUsageError("useAuth must be used within an AuthProvider");
   }
 
   return context;
