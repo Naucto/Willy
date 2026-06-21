@@ -34,7 +34,7 @@ services:
       - "80:80"
       - "443:443"
       # willy:port-bind-publish (generated from WILLY_PORT_BIND_RANGE by scripts/willy_deploy.sh) — do not edit by hand
-      - "10000-10999:10000-10999"
+      - "10000-10019:10000-10019"
       # /willy:port-bind-publish
     environment:
       OVH_ENDPOINT: ${OVH_ENDPOINT:-}
