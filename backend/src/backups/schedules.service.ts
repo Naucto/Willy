@@ -109,6 +109,8 @@ export class BackupSchedulesService implements OnApplicationBootstrap {
     this.unregister(schedule.id);
 
     const job = new CronJob(schedule.cron, () => void this.run(schedule.id));
+    // SchedulerRegistry types its CronJob against @nestjs/schedule's bundled `cron`, whose generic
+    // params differ from the `cron` package we construct from; the cast bridges that mismatch.
     this.registry.addCronJob(this.jobName(schedule.id), job as unknown as CronJob);
     job.start();
   }

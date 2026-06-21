@@ -1,6 +1,10 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Redis } from "ioredis";
+import { WillyError } from "../common/errors";
 import { REDIS } from "../redis/redis.module";
+
+// A metrics stream entry was not shaped as written — an internal invariant violation.
+export class MetricsError extends WillyError {}
 
 // How long history is kept. Streams are trimmed by entry timestamp on every write, and a matching
 // key TTL lets streams for deleted deployments expire on their own once sampling stops.
@@ -52,7 +56,7 @@ function fieldValue(fields: string[], name: string): string {
   const index = fields.indexOf(name);
 
   if (index < 0 || index + 1 >= fields.length) {
-    throw new Error(`metrics entry missing field "${name}"`);
+    throw new MetricsError(`metrics entry missing field "${name}"`);
   }
 
   return fields[index + 1] as string;

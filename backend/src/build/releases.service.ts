@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { desc, eq, inArray } from "drizzle-orm";
-import { DatabaseError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
+import { requireRow } from "../db/query-helpers";
 import { releases } from "../db/schema";
 import { TasksService } from "../tasks/tasks.service";
 
@@ -48,11 +48,7 @@ export class ReleasesService {
       .values({ deploymentId, createdById: createdById ?? null })
       .returning();
 
-    const release = rows[0];
-
-    if (!release) {
-      throw new DatabaseError("release insert returned no row");
-    }
+    const release = requireRow(rows, "release insert returned no row");
 
     const task = await this.tasks.create({
       kind: "DEPLOY",

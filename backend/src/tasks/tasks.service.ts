@@ -1,6 +1,7 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, inArray, notInArray } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
+import { requireRow } from "../db/query-helpers";
 import { tasks } from "../db/schema";
 
 export type Task = typeof tasks.$inferSelect;
@@ -29,23 +30,20 @@ export class TasksService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
   async create(input: CreateTaskInput): Promise<Task> {
-    const [row] = await this.db
-      .insert(tasks)
-      .values({
-        kind: input.kind,
-        title: input.title,
-        deploymentId: input.deploymentId ?? null,
-        backupId: input.backupId ?? null,
-        actorId: input.actorId ?? null,
-        progress: input.progress ?? null,
-      })
-      .returning();
-
-    if (!row) {
-      throw new Error("Failed to create task");
-    }
-
-    return row;
+    return requireRow(
+      await this.db
+        .insert(tasks)
+        .values({
+          kind: input.kind,
+          title: input.title,
+          deploymentId: input.deploymentId ?? null,
+          backupId: input.backupId ?? null,
+          actorId: input.actorId ?? null,
+          progress: input.progress ?? null,
+        })
+        .returning(),
+      "task insert returned no row",
+    );
   }
 
   async start(id: string): Promise<void> {

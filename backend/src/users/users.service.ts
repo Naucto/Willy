@@ -1,8 +1,8 @@
 import { ConflictException, Inject, Injectable } from "@nestjs/common";
 import * as argon2 from "argon2";
 import { eq } from "drizzle-orm";
-import { DatabaseError } from "../common/errors";
 import { type Database, DB } from "../db/db.module";
+import { requireRow } from "../db/query-helpers";
 import { users } from "../db/schema";
 
 export type User = typeof users.$inferSelect;
@@ -48,11 +48,7 @@ export class UsersService {
       })
       .returning();
 
-    const user = rows[0];
-
-    if (!user) {
-      throw new DatabaseError("user insert returned no row");
-    }
+    const user = requireRow(rows, "user insert returned no row");
 
     return user;
   }
@@ -104,14 +100,10 @@ export class UsersService {
       changes.role = input.role;
     }
 
-    const rows = await this.db.update(users).set(changes).where(eq(users.id, id)).returning();
-    const user = rows[0];
-
-    if (!user) {
-      throw new DatabaseError("user update returned no row");
-    }
-
-    return user;
+    return requireRow(
+      await this.db.update(users).set(changes).where(eq(users.id, id)).returning(),
+      "user update returned no row",
+    );
   }
 
   async setPassword(id: string, password: string): Promise<void> {

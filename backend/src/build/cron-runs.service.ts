@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { desc, eq } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
+import { requireRow } from "../db/query-helpers";
 import { cronRuns } from "../db/schema";
 
 export type CronRun = typeof cronRuns.$inferSelect;
@@ -17,13 +18,10 @@ export class CronRunsService {
   constructor(@Inject(DB) private readonly db: Database) {}
 
   async start(deploymentId: string): Promise<CronRun> {
-    const [row] = await this.db.insert(cronRuns).values({ deploymentId }).returning();
-
-    if (!row) {
-      throw new Error("failed to record cron run");
-    }
-
-    return row;
+    return requireRow(
+      await this.db.insert(cronRuns).values({ deploymentId }).returning(),
+      "cron run insert returned no row",
+    );
   }
 
   async finish(id: string, result: CronRunResult): Promise<void> {

@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
+import { requireRow } from "../db/query-helpers";
 import { deployments, domains, gitCredentials, portBindings } from "../db/schema";
 import type { HealthcheckSpec, ResourceLimits } from "./resource-limits";
 import type {
@@ -247,11 +248,7 @@ export class DeploymentsService {
       })
       .returning();
 
-    const deployment = rows[0];
-
-    if (!deployment) {
-      throw new DatabaseError("deployment insert returned no row");
-    }
+    const deployment = requireRow(rows, "deployment insert returned no row");
 
     if (input.domain) {
       await this.db.insert(domains).values({
@@ -330,13 +327,7 @@ export class DeploymentsService {
       .where(eq(deployments.id, id))
       .returning();
 
-    const deployment = rows[0];
-
-    if (!deployment) {
-      throw new DatabaseError("deployment update returned no row");
-    }
-
-    return deployment;
+    return requireRow(rows, "deployment update returned no row");
   }
 
   async remove(id: string): Promise<void> {
@@ -451,24 +442,21 @@ export class DeploymentsService {
   async addDomain(deploymentId: string, input: DomainTargetInput): Promise<Domain> {
     const webRoute = input.webRoute ?? true;
     const existing = await this.primaryDomain(deploymentId);
-    const [row] = await this.db
-      .insert(domains)
-      .values({
-        deploymentId,
-        fqdn: input.fqdn,
-        webRoute,
-        targetService: input.targetService ?? null,
-        targetPort: input.targetPort ?? null,
-        // A port-bind-only domain never serves 443, so it can't be the primary landing page.
-        isPrimary: webRoute && !existing,
-      })
-      .returning();
-
-    if (!row) {
-      throw new DatabaseError("domain insert returned no row");
-    }
-
-    return row;
+    return requireRow(
+      await this.db
+        .insert(domains)
+        .values({
+          deploymentId,
+          fqdn: input.fqdn,
+          webRoute,
+          targetService: input.targetService ?? null,
+          targetPort: input.targetPort ?? null,
+          // A port-bind-only domain never serves 443, so it can't be the primary landing page.
+          isPrimary: webRoute && !existing,
+        })
+        .returning(),
+      "domain insert returned no row",
+    );
   }
 
   // Repoints a domain at a different container/service + port. null clears the override (back to
@@ -501,10 +489,9 @@ export class DeploymentsService {
     return row;
   }
 
-  // Clears `domainId` as primary and promotes another web-serving domain (if any) in its place.
-  private async demotePrimary(deploymentId: string, domainId: string): Promise<void> {
-    await this.db.update(domains).set({ isPrimary: false }).where(eq(domains.id, domainId));
-
+  // Makes the first remaining web-serving domain primary (so a WEB deployment keeps a primary after
+  // its primary is demoted or removed). No-op when none qualify.
+  private async promoteAnotherPrimary(deploymentId: string): Promise<void> {
     const [next] = await this.db
       .select()
       .from(domains)
@@ -516,6 +503,12 @@ export class DeploymentsService {
     }
   }
 
+  // Clears `domainId` as primary and promotes another web-serving domain (if any) in its place.
+  private async demotePrimary(deploymentId: string, domainId: string): Promise<void> {
+    await this.db.update(domains).set({ isPrimary: false }).where(eq(domains.id, domainId));
+    await this.promoteAnotherPrimary(deploymentId);
+  }
+
   // Removes a domain; if it was primary, promotes another (so a WEB deployment keeps a primary).
   async removeDomain(deploymentId: string, domainId: string): Promise<void> {
     const [removed] = await this.db
@@ -524,15 +517,7 @@ export class DeploymentsService {
       .returning();
 
     if (removed?.isPrimary) {
-      const [next] = await this.db
-        .select()
-        .from(domains)
-        .where(and(eq(domains.deploymentId, deploymentId), eq(domains.webRoute, true)))
-        .limit(1);
-
-      if (next) {
-        await this.db.update(domains).set({ isPrimary: true }).where(eq(domains.id, next.id));
-      }
+      await this.promoteAnotherPrimary(deploymentId);
     }
   }
 
@@ -600,21 +585,18 @@ export class DeploymentsService {
   async addPortBinding(domainId: string, input: PortBindingInput): Promise<PortBinding> {
     await this.assertHostPortFree(input.hostPort);
 
-    const [row] = await this.db
-      .insert(portBindings)
-      .values({
-        domainId,
-        hostPort: input.hostPort,
-        targetService: input.targetService ?? null,
-        targetPort: input.targetPort ?? null,
-      })
-      .returning();
-
-    if (!row) {
-      throw new DatabaseError("port binding insert returned no row");
-    }
-
-    return row;
+    return requireRow(
+      await this.db
+        .insert(portBindings)
+        .values({
+          domainId,
+          hostPort: input.hostPort,
+          targetService: input.targetService ?? null,
+          targetPort: input.targetPort ?? null,
+        })
+        .returning(),
+      "port binding insert returned no row",
+    );
   }
 
   async updatePortBinding(
