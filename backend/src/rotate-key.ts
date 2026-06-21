@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { ConfigError } from "./common/errors";
 import { backupDestinations, envVars, gitCredentials, webhookSecrets } from "./db/schema";
 
 // Re-encrypts every stored secret from the current WILLY_MASTER_KEY to a new one.
@@ -45,7 +46,7 @@ function encrypt(key: Buffer, plaintext: string, keyVersion: number): Sealed {
 
 function loadKey(hex: string | undefined, label: string): Buffer {
   if (!hex || Buffer.from(hex, "hex").length !== 32) {
-    throw new Error(`${label} must be 32 bytes encoded as 64 hex characters`);
+    throw new ConfigError(`${label} must be 32 bytes encoded as 64 hex characters`);
   }
 
   return Buffer.from(hex, "hex");

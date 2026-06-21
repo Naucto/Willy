@@ -34,11 +34,13 @@ export class SshOffsiteDriver implements OffsiteDriver {
       image: "alpine:3.20",
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],
-      env: this.env(c),
+      // host/path/file flow through env vars (never interpolated into the command) so a hostile
+      // destination value can't break out of the shell. destinations.service also rejects metachars.
+      env: { ...this.env(c), WILLY_DIR: dir, WILLY_FILE: file },
       command: [
         this.script(
           c,
-          `scp ${SSH_OPTS} %AUTH% -P "$WILLY_PORT" /backup/${file} "$WILLY_SSH:${dir}"`,
+          `scp ${SSH_OPTS} %AUTH% -P "$WILLY_PORT" "/backup/$WILLY_FILE" "$WILLY_SSH:$WILLY_DIR"`,
         ),
       ],
     });

@@ -50,6 +50,32 @@ function requireString(config: Record<string, unknown>, key: string): string {
   return value;
 }
 
+// host/path land in shell commands inside the offsite helper containers. The drivers pass them via
+// env vars (never argv), but we still reject shell-dangerous characters here — the single choke point
+// where config is normalised before being sealed — so a hostile value can never reach a driver.
+const HOST_PATTERN = /^[A-Za-z0-9.:_\-[\]]+$/;
+const PATH_PATTERN = /^[A-Za-z0-9._\-/]+$/;
+
+function requireHost(config: Record<string, unknown>): string {
+  const host = requireString(config, "host");
+
+  if (!HOST_PATTERN.test(host)) {
+    throw new DestinationError("Destination host contains invalid characters");
+  }
+
+  return host;
+}
+
+function optionalPath(config: Record<string, unknown>): string | undefined {
+  const path = optionalString(config, "path");
+
+  if (path !== undefined && !PATH_PATTERN.test(path)) {
+    throw new DestinationError("Destination path contains invalid characters");
+  }
+
+  return path;
+}
+
 function optionalString(config: Record<string, unknown>, key: string): string | undefined {
   const value = config[key];
 
@@ -139,7 +165,7 @@ export class BackupDestinationsService {
     }
 
     const port = config.port;
-    const path = optionalString(config, "path");
+    const path = optionalPath(config);
 
     if (type === "SSH") {
       const password = optionalString(config, "password");
@@ -150,7 +176,7 @@ export class BackupDestinationsService {
       }
 
       return {
-        host: requireString(config, "host"),
+        host: requireHost(config),
         username: requireString(config, "username"),
         ...(typeof port === "number" ? { port } : {}),
         ...(path ? { path } : {}),
@@ -160,7 +186,7 @@ export class BackupDestinationsService {
     }
 
     return {
-      host: requireString(config, "host"),
+      host: requireHost(config),
       username: requireString(config, "username"),
       password: requireString(config, "password"),
       ...(typeof port === "number" ? { port } : {}),

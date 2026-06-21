@@ -23,8 +23,10 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
     return runHelper(this.dockerContainers, `${this.scheme} connection`, this.network, {
       image: IMAGE,
       entrypoint: ["sh", "-c"],
-      env: { WILLY_USER: c.username, WILLY_PASS: c.password },
-      command: [`curl -fsS ${this.flags} -u "$WILLY_USER:$WILLY_PASS" "${this.base(c)}"`],
+      // credentials + host/path flow through env (never argv/interpolation) so they never leak into
+      // argv or break out of the shell; destinations.service also rejects host/path metachars.
+      env: { WILLY_USER: c.username, WILLY_PASS: c.password, WILLY_URL: this.base(c) },
+      command: [`curl -fsS ${this.flags} -u "$WILLY_USER:$WILLY_PASS" "$WILLY_URL"`],
     });
   }
 
@@ -36,9 +38,9 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
       image: IMAGE,
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],
-      env: { WILLY_USER: c.username, WILLY_PASS: c.password },
+      env: { WILLY_USER: c.username, WILLY_PASS: c.password, WILLY_URL: base, WILLY_FILE: file },
       command: [
-        `curl -fsS ${this.flags} -u "$WILLY_USER:$WILLY_PASS" -T /backup/${file} "${base}"`,
+        `curl -fsS ${this.flags} -u "$WILLY_USER:$WILLY_PASS" -T "/backup/$WILLY_FILE" "$WILLY_URL"`,
       ],
     });
 
