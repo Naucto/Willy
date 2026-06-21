@@ -7,7 +7,7 @@ import {
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
 import { EnvVarsService } from "../env-vars/env-vars.service";
 import { CronRunsService } from "./cron-runs.service";
 import { ReleasesService } from "./releases.service";
@@ -31,7 +31,7 @@ export class CronService implements OnApplicationBootstrap {
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
     private readonly envVars: EnvVarsService,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
     private readonly runs: CronRunsService,
   ) {}
 
@@ -118,7 +118,7 @@ export class CronService implements OnApplicationBootstrap {
 
     try {
       const env = await this.envVars.resolveForInjection(deploymentId, "RUNTIME");
-      const result = await this.docker.runToCompletion({
+      const result = await this.dockerContainers.runToCompletion({
         image: release.imageTag,
         env,
         ...(deployment.runCommand ? { command: ["sh", "-c", deployment.runCommand] } : {}),

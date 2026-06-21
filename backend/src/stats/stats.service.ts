@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerSystemService } from "../docker/docker-system.service";
 import type {
   DeploymentStatsDto,
   DeploymentStatsHistoryDto,
@@ -15,7 +15,7 @@ import { type StatsWindow, windowToMs } from "./stats.util";
 @Injectable()
 export class StatsService {
   constructor(
-    private readonly docker: DockerService,
+    private readonly dockerSystem: DockerSystemService,
     private readonly containers: ContainersService,
     private readonly deployments: DeploymentsService,
     private readonly store: MetricsStoreService,
@@ -54,7 +54,7 @@ export class StatsService {
     const perContainer = (
       await Promise.all(
         running.map(async (container) => {
-          const stat = await this.docker.containerStats(container.id);
+          const stat = await this.dockerSystem.containerStats(container.id);
 
           return stat ? { id: container.id, name: container.name, ...stat } : null;
         }),
@@ -69,7 +69,7 @@ export class StatsService {
     const volumeNames = new Set(
       containers.flatMap((container) => container.volumes.map((mount) => mount.name)),
     );
-    const disk = await this.docker.diskUsage();
+    const disk = await this.dockerSystem.diskUsage();
     const volumes = disk.volumes.filter((volume) => volumeNames.has(volume.name));
     const volumesBytes = volumes.reduce((sum, volume) => sum + volume.bytes, 0);
 
@@ -92,13 +92,13 @@ export class StatsService {
 
   async systemStats(): Promise<SystemStatsDto> {
     const [host, allContainers, disk] = await Promise.all([
-      this.docker.hostInfo(),
-      this.docker.listAllContainers(),
-      this.docker.diskUsage(),
+      this.dockerSystem.hostInfo(),
+      this.dockerSystem.listAllContainers(),
+      this.dockerSystem.diskUsage(),
     ]);
 
     const running = allContainers.filter((container) => container.State === "running");
-    const samples = await Promise.all(running.map((c) => this.docker.containerStats(c.Id)));
+    const samples = await Promise.all(running.map((c) => this.dockerSystem.containerStats(c.Id)));
     const live = samples.filter((stat) => stat !== null);
 
     return {

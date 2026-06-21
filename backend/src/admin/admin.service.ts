@@ -2,7 +2,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import { eq, inArray, isNotNull, or } from "drizzle-orm";
 import { DB, type Database } from "../db/db.module";
 import { deployments, releases } from "../db/schema";
-import { DockerService } from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
+import { DockerImageService } from "../docker/docker-image.service";
+import { DockerSystemService } from "../docker/docker-system.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 import type { AdminContainerDto } from "./dto/admin-container.dto";
 import type { AdminImageDto } from "./dto/admin-image.dto";
@@ -39,13 +41,15 @@ export function isManagedImage(
 export class AdminService {
   constructor(
     @Inject(DB) private readonly db: Database,
-    private readonly docker: DockerService,
+    private readonly dockerImages: DockerImageService,
+    private readonly dockerContainers: DockerContainerService,
+    private readonly dockerSystem: DockerSystemService,
   ) {}
 
   // By default only Willy-managed images are returned; `all` reveals every host image (e.g. so an
   // admin can prune dangling/system images for disk).
   async getImages(all = false): Promise<AdminImageDto[]> {
-    const images = await this.docker.listAllImages();
+    const images = await this.dockerImages.listAllImages();
 
     // The set of image tags any deployment runs — covers IMAGE-strategy external refs (nginx:1.27)
     // that aren't named willy/*.
@@ -123,11 +127,11 @@ export class AdminService {
   }
 
   async deleteImage(id: string): Promise<void> {
-    await this.docker.removeImage(id);
+    await this.dockerImages.removeImage(id);
   }
 
   async pruneImages(): Promise<PruneResultDto> {
-    const result = await this.docker.pruneDanglingImagesWithCount();
+    const result = await this.dockerImages.pruneDanglingImagesWithCount();
 
     return { spaceReclaimedBytes: result.spaceReclaimed, itemsRemoved: result.imagesDeleted };
   }
@@ -135,7 +139,7 @@ export class AdminService {
   // By default only Willy-managed containers are returned; `all` reveals every host container
   // (control plane, helpers, foreign containers) for pruning/inspection.
   async getContainers(all = false): Promise<AdminContainerDto[]> {
-    const allContainers = await this.docker.listAllContainers();
+    const allContainers = await this.dockerSystem.listAllContainers();
 
     if (allContainers.length === 0) {
       return [];
@@ -210,7 +214,7 @@ export class AdminService {
   }
 
   async pruneContainers(): Promise<PruneResultDto> {
-    const result = await this.docker.pruneStoppedContainers();
+    const result = await this.dockerContainers.pruneStoppedContainers();
 
     return {
       spaceReclaimedBytes: result.spaceReclaimed,

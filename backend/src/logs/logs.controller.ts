@@ -13,7 +13,7 @@ import { ReleasesService, isTerminalReleaseStatus } from "../build/releases.serv
 import { runtimeLogKey } from "../build/runtime-log.collector";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
 import { LogStorageService } from "./log-storage.service";
 
 interface LogEvent {
@@ -33,7 +33,7 @@ export class LogsController {
     private readonly buildLog: BuildLogStore,
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
     private readonly containers: ContainersService,
     private readonly logs: LogStorageService,
   ) {}
@@ -158,7 +158,7 @@ export class LogsController {
         let live = false;
 
         if (containerId) {
-          const info = await this.docker.inspectContainer(containerId);
+          const info = await this.dockerContainers.inspectContainer(containerId);
           key = runtimeLogKey(id, info?.service ?? null);
           live = Boolean(info?.running);
         }

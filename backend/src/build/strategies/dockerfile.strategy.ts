@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { DockerService } from "../../docker/docker.service";
+import { DockerImageService } from "../../docker/docker-image.service";
 
 export interface BuildContext {
   contextDir: string;
@@ -11,10 +11,10 @@ export interface BuildContext {
 
 @Injectable()
 export class DockerfileStrategy {
-  constructor(private readonly docker: DockerService) {}
+  constructor(private readonly dockerImages: DockerImageService) {}
 
   async build(context: BuildContext): Promise<void> {
-    await this.docker.buildImage({
+    await this.dockerImages.buildImage({
       contextDir: context.contextDir,
       imageTag: context.imageTag,
       dockerfile: context.dockerfilePath ?? "Dockerfile",

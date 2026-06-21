@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { release as kernelRelease, arch, platform } from "node:os";
 import { join } from "node:path";
 import { Injectable } from "@nestjs/common";
-import { DockerService } from "../docker/docker.service";
+import { DockerImageService } from "../docker/docker-image.service";
+import { DockerSystemService } from "../docker/docker-system.service";
 import type { HostResourcesDto } from "./dto/host-resources.dto";
 import type { PublicIpDto } from "./dto/public-ip.dto";
 import type { SystemInfoDto } from "./dto/system-info.dto";
@@ -28,7 +29,10 @@ export class SystemService {
   private cachedResources: HostResourcesDto | null = null;
   private cachedResourcesAt = 0;
 
-  constructor(private readonly docker: DockerService) {}
+  constructor(
+    private readonly dockerSystem: DockerSystemService,
+    private readonly dockerImages: DockerImageService,
+  ) {}
 
   getInfo(): SystemInfoDto {
     return this.info;
@@ -42,7 +46,7 @@ export class SystemService {
     }
 
     try {
-      this.cachedResources = await this.docker.hostInfo();
+      this.cachedResources = await this.dockerSystem.hostInfo();
       this.cachedResourcesAt = Date.now();
     } catch {
       // Keep the previous value (possibly null) on failure.
@@ -54,7 +58,7 @@ export class SystemService {
   // Tagged images present on the host, for the IMAGE-source picker.
   async getDockerImages(): Promise<string[]> {
     try {
-      return await this.docker.listLocalImageTags();
+      return await this.dockerImages.listLocalImageTags();
     } catch {
       return [];
     }

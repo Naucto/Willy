@@ -3,7 +3,7 @@ import { DeploymentsModule } from "../deployments/deployments.module";
 import { CleanupController } from "./cleanup.controller";
 import { CleanupService } from "./cleanup.service";
 
-// Scheduled + on-demand host maintenance (scoped disk cleanup). DockerService is global.
+// Scheduled + on-demand host maintenance (scoped disk cleanup). The Docker services are global.
 @Module({
   imports: [DeploymentsModule],
   controllers: [CleanupController],

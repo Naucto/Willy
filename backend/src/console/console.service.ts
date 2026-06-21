@@ -5,7 +5,7 @@ import type { RawData, WebSocket } from "ws";
 import { ReleasesService } from "../build/releases.service";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerLogService } from "../docker/docker-log.service";
 
 const TICKET_TTL_MS = 60_000;
 
@@ -64,7 +64,7 @@ export class ConsoleService {
     config: ConfigService,
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
-    private readonly docker: DockerService,
+    private readonly dockerLogs: DockerLogService,
     private readonly containers: ContainersService,
   ) {
     this.secret = config.getOrThrow<string>("JWT_SECRET");
@@ -122,10 +122,10 @@ export class ConsoleService {
       return;
     }
 
-    let session: Awaited<ReturnType<DockerService["execShell"]>>;
+    let session: Awaited<ReturnType<DockerLogService["execShell"]>>;
 
     try {
-      session = await this.docker.execShell(containerId);
+      session = await this.dockerLogs.execShell(containerId);
     } catch (error) {
       this.logger.warn(`console exec failed: ${error instanceof Error ? error.message : error}`);
       ws.close(1011, "exec failed");

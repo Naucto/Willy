@@ -9,8 +9,9 @@ import {
   imageConfig,
 } from "../deployments/deployments.service";
 import { DomainsService } from "../deployments/domains.service";
+import { DockerContainerService } from "../docker/docker-container.service";
+import { DockerImageService } from "../docker/docker-image.service";
 import type { RestartPolicyName } from "../docker/docker.service";
-import { DockerService } from "../docker/docker.service";
 import { EnvVarsService } from "../env-vars/env-vars.service";
 import { GitService } from "../git/git.service";
 import {
@@ -93,7 +94,8 @@ export class BuildOrchestrator {
     private readonly domains: DomainsService,
     private readonly releases: ReleasesService,
     private readonly git: GitService,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
+    private readonly dockerImages: DockerImageService,
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
     private readonly dockerfile: DockerfileStrategy,
@@ -208,11 +210,11 @@ export class BuildOrchestrator {
     }
 
     if (release.containerId) {
-      await this.docker.stopAndRemove(release.containerId);
+      await this.dockerContainers.stopAndRemove(release.containerId);
     }
 
     if (release.imageTag) {
-      await this.docker.removeImage(release.imageTag);
+      await this.dockerImages.removeImage(release.imageTag);
     }
 
     await this.releases.delete(releaseId);
@@ -308,7 +310,7 @@ export class BuildOrchestrator {
   // A failed background action leaves the old container running (the swap only removes it on
   // success), so reflect "still up" vs "nothing running".
   private async markActionFailed(deploymentId: string): Promise<void> {
-    const containers = await this.docker.listByLabel(OWNER_LABEL, deploymentId);
+    const containers = await this.dockerContainers.listByLabel(OWNER_LABEL, deploymentId);
     await this.deployments.setState(deploymentId, containers.length > 0 ? "DEGRADED" : "ERROR");
   }
 
@@ -322,7 +324,7 @@ export class BuildOrchestrator {
 
     await this.releases.setStatus(releaseId, "BUILDING", { imageTag });
     this.buildLog.append(releaseId, `pulling image ${imageTag}`);
-    await this.docker.ensureImage(imageTag);
+    await this.dockerImages.ensureImage(imageTag);
 
     return imageTag;
   }
@@ -595,7 +597,7 @@ export class BuildOrchestrator {
     containers: { id: string; service: string | null }[],
   ): Promise<boolean> {
     for (const container of containers) {
-      const status = await this.docker.inspectContainer(container.id);
+      const status = await this.dockerContainers.inspectContainer(container.id);
 
       if (!status?.running) {
         return false;
@@ -642,11 +644,11 @@ export class BuildOrchestrator {
     const releaseShort = release.id.slice(0, 8);
     const containerName = `willy_${deployment.name}_${releaseShort}`;
 
-    await this.docker.removeByName(containerName);
+    await this.dockerContainers.removeByName(containerName);
 
     // The fallback port for domains that don't pin one: a legacy webServicePort if still set,
     // otherwise the image's first exposed port, otherwise 80.
-    const exposed = await this.docker.imageExposedPorts(imageTag);
+    const exposed = await this.dockerImages.imageExposedPorts(imageTag);
     const defaultPort = deployment.webServicePort ?? exposed[0] ?? 80;
     let labels: Record<string, string>;
     let network: string | undefined;
@@ -671,7 +673,7 @@ export class BuildOrchestrator {
       network = undefined;
     }
 
-    const containerId = await this.docker.runContainer({
+    const containerId = await this.dockerContainers.runContainer({
       name: containerName,
       image: imageTag,
       env,
@@ -694,7 +696,7 @@ export class BuildOrchestrator {
         : await this.probeWorker(containerId);
 
     if (!healthy) {
-      await this.docker.stopAndRemove(containerId);
+      await this.dockerContainers.stopAndRemove(containerId);
 
       throw new HealthCheckError("new container did not become healthy");
     }
@@ -710,7 +712,7 @@ export class BuildOrchestrator {
     const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
-      const status = await this.docker.inspectContainer(containerId);
+      const status = await this.dockerContainers.inspectContainer(containerId);
 
       if (status?.running && (status.health === undefined || status.health === "healthy")) {
         return true;
@@ -727,7 +729,7 @@ export class BuildOrchestrator {
     const deadline = Date.now() + WORKER_HEALTH_GRACE_MS;
 
     while (Date.now() < deadline) {
-      const status = await this.docker.inspectContainer(containerId);
+      const status = await this.dockerContainers.inspectContainer(containerId);
 
       if (!status || !status.running || status.health === "unhealthy") {
         return false;
@@ -742,11 +744,11 @@ export class BuildOrchestrator {
   // Keep the most recent images for the deployment; drop the rest.
   private async cleanupImages(name: string, keepTag: string): Promise<void> {
     try {
-      const tags = await this.docker.listImageTags(`willy/${name}`);
+      const tags = await this.dockerImages.listImageTags(`willy/${name}`);
 
       for (const tag of tags.slice(KEEP_IMAGES)) {
         if (tag !== keepTag) {
-          await this.docker.removeImage(tag);
+          await this.dockerImages.removeImage(tag);
         }
       }
     } catch (error) {
@@ -755,20 +757,20 @@ export class BuildOrchestrator {
   }
 
   private async removeStaleContainers(deploymentId: string, keepId: string): Promise<void> {
-    const ids = await this.docker.listByLabel(OWNER_LABEL, deploymentId);
+    const ids = await this.dockerContainers.listByLabel(OWNER_LABEL, deploymentId);
 
     for (const id of ids) {
       if (id !== keepId) {
-        await this.docker.stopAndRemove(id);
+        await this.dockerContainers.stopAndRemove(id);
       }
     }
   }
 
   private async removeAllContainers(deploymentId: string): Promise<void> {
-    const ids = await this.docker.listByLabel(OWNER_LABEL, deploymentId);
+    const ids = await this.dockerContainers.listByLabel(OWNER_LABEL, deploymentId);
 
     for (const id of ids) {
-      await this.docker.stopAndRemove(id);
+      await this.dockerContainers.stopAndRemove(id);
     }
   }
 

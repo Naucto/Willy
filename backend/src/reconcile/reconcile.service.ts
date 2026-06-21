@@ -3,7 +3,8 @@ import { BuildOrchestrator } from "../build/build-orchestrator.service";
 import { ReleasesService } from "../build/releases.service";
 import { RuntimeLogCollector } from "../build/runtime-log.collector";
 import { DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
+import { DockerSystemService } from "../docker/docker-system.service";
 import { TasksService } from "../tasks/tasks.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 
@@ -21,14 +22,15 @@ export class ReconcileService implements OnApplicationBootstrap {
   constructor(
     private readonly deployments: DeploymentsService,
     private readonly releases: ReleasesService,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
+    private readonly dockerSystem: DockerSystemService,
     private readonly orchestrator: BuildOrchestrator,
     private readonly runtimeLog: RuntimeLogCollector,
     private readonly tasks: TasksService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    if (!(await this.docker.ping())) {
+    if (!(await this.dockerSystem.ping())) {
       this.logger.warn("docker unreachable; skipping reconciliation");
 
       return;
@@ -45,7 +47,7 @@ export class ReconcileService implements OnApplicationBootstrap {
         continue;
       }
 
-      const containers = await this.docker.listByLabel(OWNER_LABEL, deployment.id);
+      const containers = await this.dockerContainers.listByLabel(OWNER_LABEL, deployment.id);
 
       if (containers.length > 0) {
         // Already running — just re-attach runtime-log follows lost with the previous process.

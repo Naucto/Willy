@@ -1,4 +1,4 @@
-import type { DockerService } from "../../docker/docker.service";
+import type { DockerContainerService } from "../../docker/docker-container.service";
 import type { DestinationConfig, SshConfig } from "../destinations.service";
 import { type OffsiteDriver, runHelper } from "./offsite-driver";
 
@@ -10,7 +10,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
   readonly type = "SSH" as const;
 
   constructor(
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
     private readonly volume: string,
     private readonly network: string | undefined,
   ) {}
@@ -18,7 +18,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
   test(config: DestinationConfig): Promise<void> {
     const c = config as SshConfig;
 
-    return runHelper(this.docker, "SSH connection", this.network, {
+    return runHelper(this.dockerContainers, "SSH connection", this.network, {
       image: "alpine:3.20",
       entrypoint: ["sh", "-c"],
       env: this.env(c),
@@ -30,7 +30,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
     const c = config as SshConfig;
     const dir = c.path ? `/${c.path.replace(/^\/+|\/+$/g, "")}/` : "";
 
-    await runHelper(this.docker, "scp", this.network, {
+    await runHelper(this.dockerContainers, "scp", this.network, {
       image: "alpine:3.20",
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],

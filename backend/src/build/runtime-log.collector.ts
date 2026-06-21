@@ -2,7 +2,7 @@ import type { Readable } from "node:stream";
 import { Injectable, Logger } from "@nestjs/common";
 import { ContainersService } from "../containers/containers.service";
 import type { Deployment } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerLogService } from "../docker/docker-log.service";
 import { LogStorageService } from "../logs/log-storage.service";
 
 // The runtime log of a deployment's container is keyed by (deployment, compose service) — stable
@@ -25,7 +25,7 @@ export class RuntimeLogCollector {
   private readonly follows = new Map<string, { stream: Readable; key: string }>();
 
   constructor(
-    private readonly docker: DockerService,
+    private readonly dockerLogs: DockerLogService,
     private readonly containers: ContainersService,
     private readonly logs: LogStorageService,
   ) {}
@@ -73,7 +73,7 @@ export class RuntimeLogCollector {
 
   private async attach(containerId: string, key: string): Promise<void> {
     try {
-      const stream = await this.docker.getLogStream(containerId, 200);
+      const stream = await this.dockerLogs.getLogStream(containerId, 200);
       this.follows.set(containerId, { stream, key });
 
       stream.on("data", (chunk: Buffer) => {

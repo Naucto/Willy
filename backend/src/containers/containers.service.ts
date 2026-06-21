@@ -1,11 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Deployment } from "../deployments/deployments.service";
-import {
-  type ContainerNetwork,
-  type DeclaredHealthcheck,
-  DockerService,
-  type VolumeMount,
-} from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
+import type { ContainerNetwork, DeclaredHealthcheck, VolumeMount } from "../docker/docker.service";
 import { OWNER_LABEL } from "../traefik/label-generator.service";
 
 const COMPOSE_PROJECT_LABEL = "com.docker.compose.project";
@@ -31,14 +27,14 @@ export interface DeploymentContainer {
 // by their project label, everything else by Willy's owner label.
 @Injectable()
 export class ContainersService {
-  constructor(private readonly docker: DockerService) {}
+  constructor(private readonly dockerContainers: DockerContainerService) {}
 
   async listForDeployment(deployment: Deployment): Promise<DeploymentContainer[]> {
     const ids = await this.discover(deployment);
     const containers: DeploymentContainer[] = [];
 
     for (const id of ids) {
-      const info = await this.docker.inspectContainer(id);
+      const info = await this.dockerContainers.inspectContainer(id);
 
       if (info) {
         containers.push({
@@ -99,9 +95,9 @@ export class ContainersService {
 
   private discover(deployment: Deployment): Promise<string[]> {
     if (deployment.buildStrategy === "COMPOSE") {
-      return this.docker.listByLabel(COMPOSE_PROJECT_LABEL, `willy_${deployment.name}`);
+      return this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, `willy_${deployment.name}`);
     }
 
-    return this.docker.listByLabel(OWNER_LABEL, deployment.id);
+    return this.dockerContainers.listByLabel(OWNER_LABEL, deployment.id);
   }
 }

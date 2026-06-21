@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerImageService } from "../docker/docker-image.service";
 
 // Keep the newest N images per deployment (matching the orchestrator's per-deploy keep-N); the rest
 // are stale rollbacks that disk cleanup reclaims.
@@ -25,7 +25,7 @@ export class CleanupService {
 
   constructor(
     private readonly deployments: DeploymentsService,
-    private readonly docker: DockerService,
+    private readonly dockerImages: DockerImageService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
@@ -42,10 +42,10 @@ export class CleanupService {
 
     for (const deployment of deployments) {
       try {
-        const tags = await this.docker.listImageTags(`willy/${deployment.name}`);
+        const tags = await this.dockerImages.listImageTags(`willy/${deployment.name}`);
 
         for (const tag of tags.slice(KEEP_IMAGES_PER_DEPLOYMENT)) {
-          await this.docker.removeImage(tag);
+          await this.dockerImages.removeImage(tag);
           removedImageTags.push(tag);
         }
       } catch (error) {
@@ -53,7 +53,7 @@ export class CleanupService {
       }
     }
 
-    const spaceReclaimedBytes = await this.docker.pruneDanglingImages();
+    const spaceReclaimedBytes = await this.dockerImages.pruneDanglingImages();
 
     return { spaceReclaimedBytes, removedImageTags };
   }

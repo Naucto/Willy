@@ -1,4 +1,4 @@
-import type { DockerService } from "../../docker/docker.service";
+import type { DockerContainerService } from "../../docker/docker-container.service";
 import type { DestinationConfig, FileTransferConfig } from "../destinations.service";
 import { type OffsiteDriver, runHelper } from "./offsite-driver";
 
@@ -12,7 +12,7 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
   protected abstract readonly flags: string;
 
   constructor(
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
     private readonly volume: string,
     private readonly network: string | undefined,
   ) {}
@@ -20,7 +20,7 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
   test(config: DestinationConfig): Promise<void> {
     const c = config as FileTransferConfig;
 
-    return runHelper(this.docker, `${this.scheme} connection`, this.network, {
+    return runHelper(this.dockerContainers, `${this.scheme} connection`, this.network, {
       image: IMAGE,
       entrypoint: ["sh", "-c"],
       env: { WILLY_USER: c.username, WILLY_PASS: c.password },
@@ -32,7 +32,7 @@ abstract class CurlOffsiteDriver implements OffsiteDriver {
     const c = config as FileTransferConfig;
     const base = this.base(c);
 
-    await runHelper(this.docker, `${this.scheme} upload`, this.network, {
+    await runHelper(this.dockerContainers, `${this.scheme} upload`, this.network, {
       image: IMAGE,
       binds: [`${this.volume}:/backup:ro`],
       entrypoint: ["sh", "-c"],

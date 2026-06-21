@@ -10,7 +10,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { WillyError } from "../common/errors";
 import { DB, type Database } from "../db/db.module";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
-import { DockerService } from "../docker/docker.service";
+import { DockerContainerService } from "../docker/docker-container.service";
+import { DockerSystemService } from "../docker/docker-system.service";
 import { INTERNAL_LABEL } from "../traefik/label-generator.service";
 import { backups } from "../db/schema";
 import { ContainersService } from "../containers/containers.service";
@@ -52,7 +53,8 @@ export class BackupsService {
 
   constructor(
     @Inject(DB) private readonly db: Database,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
+    private readonly dockerSystem: DockerSystemService,
     private readonly queue: BackupQueue,
     private readonly deployments: DeploymentsService,
     private readonly containers: ContainersService,
@@ -66,7 +68,7 @@ export class BackupsService {
   }
 
   listVolumes(): Promise<string[]> {
-    return this.docker.listVolumes();
+    return this.dockerSystem.listVolumes();
   }
 
   list(deploymentId?: string): Promise<Backup[]> {
@@ -242,7 +244,7 @@ export class BackupsService {
       .where(eq(backups.id, id));
 
     try {
-      const result = await this.docker.runToCompletion({
+      const result = await this.dockerContainers.runToCompletion({
         image: "alpine:3.20",
         binds: [`${target}:/data:ro`, `${this.volume}:/backup`],
         command: ["sh", "-c", `tar -czf /backup/${file} -C /data .`],
@@ -316,7 +318,7 @@ export class BackupsService {
     const ids = await this.containers.containersUsingVolume(deployment, volume);
 
     for (const id of ids) {
-      await this.docker.stopContainer(id);
+      await this.dockerContainers.stopContainer(id);
     }
 
     try {
@@ -327,7 +329,7 @@ export class BackupsService {
         ? [`${volume}:/data`, `${this.volume}:/backup:ro`]
         : [`${volume}:/data`];
 
-      const result = await this.docker.runToCompletion({
+      const result = await this.dockerContainers.runToCompletion({
         image: "alpine:3.20",
         binds,
         command: ["sh", "-c", command],
@@ -343,7 +345,7 @@ export class BackupsService {
       throw error;
     } finally {
       for (const id of ids) {
-        await this.docker.startContainer(id).catch(() => undefined);
+        await this.dockerContainers.startContainer(id).catch(() => undefined);
       }
     }
   }

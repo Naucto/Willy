@@ -1,5 +1,6 @@
 import { WillyError } from "../../common/errors";
-import type { DockerService, OneShotOptions } from "../../docker/docker.service";
+import type { DockerContainerService } from "../../docker/docker-container.service";
+import type { OneShotOptions } from "../../docker/docker.service";
 import { INTERNAL_LABEL } from "../../traefik/label-generator.service";
 import type { DestinationConfig, DestinationType } from "../destinations.service";
 
@@ -20,12 +21,12 @@ export interface OffsiteDriver {
 // `network` (so destinations resolvable on a Willy network work) and is tagged internal so the
 // admin panel hides it.
 export async function runHelper(
-  docker: DockerService,
+  dockerContainers: DockerContainerService,
   label: string,
   network: string | undefined,
   options: OneShotOptions,
 ): Promise<void> {
-  const result = await docker.runToCompletion({
+  const result = await dockerContainers.runToCompletion({
     ...options,
     network,
     labels: { [INTERNAL_LABEL]: "true", ...options.labels },

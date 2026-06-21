@@ -9,7 +9,9 @@ import { type Deployment, composeConfig } from "../../deployments/deployments.se
 import { DomainsService } from "../../deployments/domains.service";
 import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
 import { EnvVarsService } from "../../env-vars/env-vars.service";
-import { DockerService } from "../../docker/docker.service";
+import { DockerContainerService } from "../../docker/docker-container.service";
+import { DockerImageService } from "../../docker/docker-image.service";
+import { DockerSystemService } from "../../docker/docker-system.service";
 import { LabelGeneratorService, groupRoutes } from "../../traefik/label-generator.service";
 
 // Willy's restart-policy enum → the strings `docker compose` understands.
@@ -158,7 +160,9 @@ export class ComposeService {
 
   constructor(
     config: ConfigService,
-    private readonly docker: DockerService,
+    private readonly dockerContainers: DockerContainerService,
+    private readonly dockerImages: DockerImageService,
+    private readonly dockerSystem: DockerSystemService,
     private readonly domains: DomainsService,
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
@@ -228,13 +232,13 @@ export class ComposeService {
   // Remove the whole stack by its compose-project label (works without the compose file).
   async down(deployment: Deployment): Promise<void> {
     const project = this.projectName(deployment);
-    const ids = await this.docker.listByLabel(COMPOSE_PROJECT_LABEL, project);
+    const ids = await this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, project);
 
     for (const id of ids) {
-      await this.docker.stopAndRemove(id);
+      await this.dockerContainers.stopAndRemove(id);
     }
 
-    await this.docker.removeNetwork(`${project}_default`);
+    await this.dockerSystem.removeNetwork(`${project}_default`);
   }
 
   // Stop (but keep) every container in the stack by its compose-project label. Used when a redeploy's
@@ -242,10 +246,10 @@ export class ComposeService {
   // they can be inspected.
   async stopAll(deployment: Deployment): Promise<void> {
     const project = this.projectName(deployment);
-    const ids = await this.docker.listByLabel(COMPOSE_PROJECT_LABEL, project);
+    const ids = await this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, project);
 
     for (const id of ids) {
-      await this.docker.stopContainer(id);
+      await this.dockerContainers.stopContainer(id);
     }
   }
 
@@ -269,7 +273,7 @@ export class ComposeService {
       // image may not be pulled yet, in which case this is empty), then 80. Mirrors the single-
       // container path and the frontend's "first exposed port" hint.
       const exposed = defaultServiceImage
-        ? await this.docker.imageExposedPorts(defaultServiceImage)
+        ? await this.dockerImages.imageExposedPorts(defaultServiceImage)
         : [];
       const defaultPort = deployment.webServicePort ?? exposed[0] ?? 80;
       const priority = PRIORITY_BASE - Date.now();
