@@ -1,7 +1,6 @@
 import { Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
 import { useSnackbar } from "notistack";
-import { QRCodeSVG } from "qrcode.react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useSystemInfo } from "../api/hooks";
@@ -10,6 +9,9 @@ import loginBg from "../assets/login-bg.jpg";
 import { useAuth } from "../auth/AuthContext";
 import { PasswordField } from "../components/PasswordField";
 import { describeError } from "../errors";
+
+// Split out so qrcode.react stays out of the login entry chunk; only loaded during TOTP enrolment.
+const QrCode = lazy(() => import("../components/QrCode").then((m) => ({ default: m.QrCode })));
 
 interface LoginForm {
   email: string;
@@ -142,7 +144,9 @@ export function LoginPage() {
                   </Typography>
                   <Box sx={{ display: "flex", justifyContent: "center" }}>
                     <Box sx={{ bgcolor: "#fff", p: 1.5, borderRadius: 1 }}>
-                      <QRCodeSVG value={step.setup.otpauthUri} size={160} />
+                      <Suspense fallback={<Box sx={{ width: 160, height: 160 }} />}>
+                        <QrCode value={step.setup.otpauthUri} size={160} />
+                      </Suspense>
                     </Box>
                   </Box>
                   <TextField

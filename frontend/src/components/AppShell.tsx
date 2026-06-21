@@ -40,7 +40,7 @@ import {
   Toolbar,
   Tooltip,
 } from "@mui/material";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, Suspense, useState } from "react";
 import { Outlet, Link as RouterLink, useLocation } from "react-router-dom";
 import { useDeployment, useDeploymentContainers } from "../api/hooks";
 import { useAuth } from "../auth/AuthContext";
@@ -49,6 +49,7 @@ import { deploymentSections } from "../deploymentSections";
 import { userSections } from "../userSections";
 import { AccountMenu } from "./AccountMenu";
 import { ActivityMenu } from "./ActivityMenu";
+import { PageLoader } from "./PageLoader";
 import { SlideFade } from "./SlideFade";
 
 const DRAWER_WIDTH = 220;
@@ -302,7 +303,9 @@ export function AppShell() {
         {/* Fade the page content in on each navigation (keyed on the route). */}
         <Fade in appear key={location.pathname}>
           <Box sx={{ p: 4 }}>
-            <Outlet />
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
           </Box>
         </Fade>
       </Box>

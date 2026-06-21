@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useSnackbar } from "notistack";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   useDeleteRelease,
@@ -32,7 +32,6 @@ import {
 } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { Console } from "../components/Console";
 import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelector";
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
@@ -43,8 +42,8 @@ import { EnvVarEditor } from "../components/EnvVarEditor";
 import { Gated } from "../components/Gated";
 import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
-import { MonitoringTab } from "../components/MonitoringTab";
 import { NetworkingTab } from "../components/NetworkingTab";
+import { PageLoader } from "../components/PageLoader";
 import { ResourcesTab } from "../components/ResourcesTab";
 import { DeploymentUtilization } from "../components/ResourceUtilization";
 import { SelectOption } from "../components/SelectOption";
@@ -54,6 +53,13 @@ import { VolumesTab } from "../components/VolumesTab";
 import { WebhookTab } from "../components/WebhookTab";
 import { describeError } from "../errors";
 import { formatRelativeTime, humanizeType } from "../format";
+
+// The console pulls in the xterm terminal and monitoring pulls in the charting lib; both are split out
+// so those heavy deps load only when their tab is opened.
+const Console = lazy(() => import("../components/Console").then((m) => ({ default: m.Console })));
+const MonitoringTab = lazy(() =>
+  import("../components/MonitoringTab").then((m) => ({ default: m.MonitoringTab })),
+);
 
 // Tabs whose content is scoped to a single container; only these show the container selector
 // (Environment is handled separately, with an extra "Everyone" entry). Volumes/Networking show all
@@ -193,31 +199,34 @@ export function DeploymentDetailPage() {
         />
       </Box>
 
-      {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
-      {active === "build" && <BuildLogsTab deploymentId={id} releaseId={releaseParam} />}
-      {active === "runs" && <CronRunsTab deploymentId={id} />}
-      {active === "runtime" && (
-        <RuntimeLogsTab deploymentId={id} deployment={deployment} container={selectedId} />
-      )}
-      {active === "console" &&
-        (!canOperate ? (
-          // The console runs commands inside the container — never connect it for a read-only role.
-          <Alert severity="warning">{ROLE_REASON.operate} to use the console.</Alert>
-        ) : isRunning(deployment) ? (
-          <Console deploymentId={id} container={selectedId} />
-        ) : (
-          <Alert severity="info">Console is available while the deployment is running.</Alert>
-        ))}
-      {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
-      {active === "volumes" && <VolumesTab deploymentId={id} />}
-      {active === "backups" && <DeploymentBackupsTab deploymentId={id} />}
-      {active === "networking" && <NetworkingTab deploymentId={id} />}
-      {active === "domains" && <DomainsManager deployment={deployment} />}
-      {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
-      {active === "monitoring" && <MonitoringTab deployment={deployment} />}
-      {active === "health" && <HealthTab deployment={deployment} container={selected} />}
-      {active === "webhook" && <WebhookTab deployment={deployment} />}
-      {active === "settings" && <SettingsTab deployment={deployment} />}
+      {/* Suspense covers the lazily-loaded Console (xterm) and Monitoring (charts) tabs. */}
+      <Suspense fallback={<PageLoader />}>
+        {active === "overview" && <OverviewTab deploymentId={id} deployment={deployment} />}
+        {active === "build" && <BuildLogsTab deploymentId={id} releaseId={releaseParam} />}
+        {active === "runs" && <CronRunsTab deploymentId={id} />}
+        {active === "runtime" && (
+          <RuntimeLogsTab deploymentId={id} deployment={deployment} container={selectedId} />
+        )}
+        {active === "console" &&
+          (!canOperate ? (
+            // The console runs commands inside the container — never connect it for a read-only role.
+            <Alert severity="warning">{ROLE_REASON.operate} to use the console.</Alert>
+          ) : isRunning(deployment) ? (
+            <Console deploymentId={id} container={selectedId} />
+          ) : (
+            <Alert severity="info">Console is available while the deployment is running.</Alert>
+          ))}
+        {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
+        {active === "volumes" && <VolumesTab deploymentId={id} />}
+        {active === "backups" && <DeploymentBackupsTab deploymentId={id} />}
+        {active === "networking" && <NetworkingTab deploymentId={id} />}
+        {active === "domains" && <DomainsManager deployment={deployment} />}
+        {active === "resources" && <ResourcesTab deployment={deployment} container={selected} />}
+        {active === "monitoring" && <MonitoringTab deployment={deployment} />}
+        {active === "health" && <HealthTab deployment={deployment} container={selected} />}
+        {active === "webhook" && <WebhookTab deployment={deployment} />}
+        {active === "settings" && <SettingsTab deployment={deployment} />}
+      </Suspense>
     </Stack>
   );
 }
