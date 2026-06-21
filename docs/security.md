@@ -19,6 +19,16 @@ into the command string — so a hostile destination value cannot break out of t
 layer, `BackupDestinationsService` rejects shell metacharacters in `host`/`path` at normalisation
 time. S3 uses argv (no shell) and is unaffected. Keep this invariant if you add a driver.
 
+## Control-plane container runs non-root
+
+`willy-server` runs as the unprivileged `node` user. Its docker CLI reaches Docker through
+socket-proxy over TCP, so no host socket mount or `docker` group is needed. Fresh `willy_backups` /
+`willy_logs` named volumes inherit the image mountpoint's `node` ownership and are writable.
+
+> Upgrade gotcha: a volume that already exists from a root-running container keeps its old root
+> ownership (Docker only seeds ownership when a volume is first created). After upgrading, run once:
+> `docker compose run --rm --user 0 willy-server chown -R node:node /var/lib/willy`.
+
 ## Dependency vulnerabilities — pending remediation
 
 `npm audit` reports advisories on transitive deps whose parents pin them to **exact** versions, so

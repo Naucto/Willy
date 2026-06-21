@@ -32,6 +32,12 @@ COPY backend/drizzle ./backend/drizzle
 # Surfaced on the login screen via /api/system/info.
 ARG GIT_COMMIT=dev
 ENV GIT_COMMIT=$GIT_COMMIT
+# Runtime write targets (the willy_backups / willy_logs volumes). chown to the non-root `node` user
+# so a freshly-created named volume — which inherits the image mountpoint's ownership — is writable.
+# The docker CLI talks to socket-proxy over TCP, so no host socket / docker group is needed.
+RUN mkdir -p /var/lib/willy/backups /var/lib/willy/logs \
+  && chown -R node:node /var/lib/willy
+USER node
 WORKDIR /app/backend
-# Apply migrations (one-shot) before starting the server.
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/main.js"]
+# Apply migrations (one-shot), then exec the server so it becomes PID 1 and receives SIGTERM directly.
+CMD ["sh", "-c", "node dist/db/migrate.js && exec node dist/main.js"]
