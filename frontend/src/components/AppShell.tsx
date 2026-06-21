@@ -50,6 +50,7 @@ import { deploymentSections } from "../deploymentSections";
 import { userSections } from "../userSections";
 import { AccountMenu } from "./AccountMenu";
 import { ActivityMenu } from "./ActivityMenu";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { PageLoader } from "./PageLoader";
 import { SlideFade } from "./SlideFade";
 
@@ -305,9 +306,12 @@ export function AppShell() {
         {/* Fade the page content in on each navigation (keyed on the route). */}
         <Fade in appear key={location.pathname}>
           <Box sx={{ p: 4 }}>
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
+            {/* Keyed on the path so navigating away from a crashed page remounts a fresh boundary. */}
+            <ErrorBoundary key={location.pathname}>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </Box>
         </Fade>
       </Box>
