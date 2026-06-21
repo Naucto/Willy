@@ -39,8 +39,14 @@ jobs:
     needs: quality
     steps:
       - uses: actions/checkout@v4
-      - name: Build images
-        run: docker compose build
+      - uses: docker/setup-buildx-action@v3
+      # bake builds the compose `build:` targets (willy-server, willy-web) with a persistent GHA
+      # layer cache, so unchanged layers are reused across runs instead of rebuilt every push.
+      - name: Build images (buildx bake + GHA layer cache)
+        run: >
+          docker buildx bake -f docker-compose.yml
+          --set "*.cache-from=type=gha"
+          --set "*.cache-to=type=gha,mode=max"
 
   # Integration (Testcontainers) and Playwright e2e jobs are added as those layers land
   # (Phase 2+ / Phase 4+). On tags, a publish job will push images to ghcr.io.

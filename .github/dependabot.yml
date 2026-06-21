@@ -8,11 +8,21 @@ updates:
       # One PR for routine dev-tooling bumps to cut noise.
       dev-dependencies:
         dependency-type: development
+      # One PR for non-breaking production bumps; majors still arrive individually for review.
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directories:
@@ -20,3 +30,7 @@ updates:
       - /frontend
     schedule:
       interval: weekly
+    groups:
+      docker:
+        patterns:
+          - "*"
