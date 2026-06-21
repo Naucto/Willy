@@ -20,7 +20,7 @@
     "@mui/icons-material": "^9.1.1",
     "@mui/material": "^9.1.1",
     "@mui/x-charts": "^9.6.0",
-    "@mui/x-data-grid": "^9.5.0",
+    "@mui/x-data-grid": "^9.6.0",
     "@mui/x-tree-view": "^9.6.0",
     "@tanstack/react-query": "^5.101.0",
     "@xterm/addon-fit": "^0.11.0",
@@ -31,8 +31,8 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-hook-form": "^7.79.0",
-    "react-router-dom": "^7.17.0",
+    "react-hook-form": "^7.80.0",
+    "react-router-dom": "^7.18.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
