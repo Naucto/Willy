@@ -15,3 +15,7 @@ export class ConfigError extends WillyError {}
 
 // An invariant about the database was violated (e.g. an insert returned no row).
 export class DatabaseError extends WillyError {}
+
+// A volume file-manager operation was rejected (bad path, escape attempt, too large) or failed
+// inside the helper container. Mapped to a 4xx/5xx by the controller layer.
+export class FileManagerError extends WillyError {}

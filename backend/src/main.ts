@@ -3,6 +3,7 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { WebSocketServer } from "ws";
 import { AppModule } from "./app.module";
@@ -11,7 +12,11 @@ import { ConsoleService } from "./console/console.service";
 const CONSOLE_PATH = /^\/api\/console\/([^/]+)$/;
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // The file manager ships file content as base64 in the JSON body, so lift the default 100kb cap to
+  // the read ceiling (~13.5MB base64 for a 10MB file) + headroom. rawBody capture is preserved.
+  app.useBodyParser("json", { limit: "16mb" });
 
   // Trust the single Traefik hop so req.ip reflects the real client (X-Forwarded-For) — required
   // for per-client rate limiting; clients can't reach the backend except through Traefik.

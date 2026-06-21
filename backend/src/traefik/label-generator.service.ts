@@ -7,6 +7,11 @@ export const OWNER_LABEL = "willy.deploymentId";
 // panel can hide it from the Images/Containers views by default.
 export const INTERNAL_LABEL = "willy.internal";
 
+// Marks a warm file-manager helper container and the volume it serves, so the reaper/boot sweep can
+// find them (`willy.fileManager=true`) and an operator can tell which volume each one is mounting.
+export const FILE_MANAGER_LABEL = "willy.fileManager";
+export const FILE_MANAGER_VOLUME_LABEL = "willy.fileManager.volume";
+
 // A domain's routing target: the compose service it points at (null = the deployment's single
 // container) and the internal port (null = fall back to the deployment's default port). hostPort,
 // when set, hard-binds this route to a dedicated host port (served on its own Traefik entrypoint

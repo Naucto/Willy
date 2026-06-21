@@ -96,6 +96,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "TWOFA_REQUIRE",
   "TWOFA_ENABLE",
   "TWOFA_DISABLE",
+  "FILE_CHANGE",
 ]);
 
 // Long-running administrative operations surfaced in the top-bar activity tracker.

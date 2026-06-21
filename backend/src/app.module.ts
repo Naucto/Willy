@@ -15,6 +15,7 @@ import { DeploymentsModule } from "./deployments/deployments.module";
 import { DnsModule } from "./dns/dns.module";
 import { DockerModule } from "./docker/docker.module";
 import { EnvVarsModule } from "./env-vars/env-vars.module";
+import { FilesModule } from "./files/files.module";
 import { GitModule } from "./git/git.module";
 import { HealthModule } from "./health/health.module";
 import { LogStorageModule } from "./logs/log-storage.module";
@@ -57,6 +58,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     OvhModule,
     DnsModule,
     BackupsModule,
+    FilesModule,
     MaintenanceModule,
     AdminModule,
     StatsModule,

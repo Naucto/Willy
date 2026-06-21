@@ -39,6 +39,7 @@
     "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.0",
+    "tar-stream": "^3.2.0",
     "ws": "^8.18.0",
     "yaml": "^2.9.0"
   },
@@ -48,6 +49,7 @@
     "@types/node": "^25.0.0",
     "@types/passport-jwt": "^4.0.0",
     "@types/pg": "^8.11.0",
+    "@types/tar-stream": "^3.1.4",
     "@types/ws": "^8.5.0",
     "drizzle-kit": "^0.31.0",
     "eslint": "^10.0.0",

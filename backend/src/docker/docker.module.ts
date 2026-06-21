@@ -4,6 +4,7 @@ import { DockerContainerService } from "./docker-container.service";
 import { DockerImageService } from "./docker-image.service";
 import { DockerLogService } from "./docker-log.service";
 import { DockerSystemService } from "./docker-system.service";
+import { VolumeHelperService } from "./volume-helper.service";
 
 @Global()
 @Module({
@@ -13,7 +14,14 @@ import { DockerSystemService } from "./docker-system.service";
     DockerContainerService,
     DockerSystemService,
     DockerLogService,
+    VolumeHelperService,
   ],
-  exports: [DockerImageService, DockerContainerService, DockerSystemService, DockerLogService],
+  exports: [
+    DockerImageService,
+    DockerContainerService,
+    DockerSystemService,
+    DockerLogService,
+    VolumeHelperService,
+  ],
 })
 export class DockerModule {}

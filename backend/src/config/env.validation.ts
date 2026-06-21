@@ -89,6 +89,24 @@ export class EnvironmentVariables {
   @IsString()
   @Matches(/^(\d+-\d+)?$/, { message: "WILLY_PORT_BIND_RANGE must be START-END, e.g. 20000-20099" })
   WILLY_PORT_BIND_RANGE?: string;
+
+  // Volume file-manager tunables. The helper image is a tiny BusyBox userland that mounts the target
+  // volume at /mnt; read/upload caps bound how much the panel will move through a JSON/multipart body.
+  @IsOptional()
+  @IsString()
+  FILE_MANAGER_IMAGE?: string;
+
+  @IsOptional()
+  @IsInt()
+  FILE_MANAGER_MAX_READ_MB?: number;
+
+  @IsOptional()
+  @IsInt()
+  FILE_MANAGER_MAX_UPLOAD_MB?: number;
+
+  @IsOptional()
+  @IsInt()
+  FILE_MANAGER_HELPER_IDLE_TTL_MS?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
