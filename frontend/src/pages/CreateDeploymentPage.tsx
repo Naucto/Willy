@@ -22,6 +22,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCreateDeployment, useHostResources } from "../api/hooks";
 import type { DeploymentType } from "../api/types";
+import { CronEditor } from "../components/CronEditor";
 import { DomainPicker } from "../components/DomainPicker";
 import { OperateButton } from "../components/OperateButton";
 import { cpuMarks, cpuMax, memoryMarks, memoryMaxMb } from "../components/resourceScale";
@@ -230,12 +231,7 @@ function BuildRunStep({
 
       {state.type === "CRON" && (
         <>
-          <TextField
-            label="Cron expression"
-            placeholder="0 3 * * *"
-            value={state.cronExpr}
-            onChange={(event) => patch({ cronExpr: event.target.value })}
-          />
+          <CronEditor value={state.cronExpr} onChange={(value) => patch({ cronExpr: value })} />
           <TextField
             label="Run command"
             value={state.runCommand}
