@@ -1,13 +1,8 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  type OnApplicationBootstrap,
-} from "@nestjs/common";
+import { Inject, Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { desc, eq } from "drizzle-orm";
+import { assertValidCron } from "../common/cron";
 import { DB, type Database } from "../db/db.module";
 import { backupSchedules } from "../db/schema";
 import { BackupError, BackupsService } from "./backups.service";
@@ -58,7 +53,7 @@ export class BackupSchedulesService implements OnApplicationBootstrap {
   }
 
   async create(input: CreateScheduleInput): Promise<BackupSchedule> {
-    this.assertValidCron(input.cron);
+    assertValidCron(input.cron);
 
     const [row] = await this.db
       .insert(backupSchedules)
@@ -146,15 +141,6 @@ export class BackupSchedulesService implements OnApplicationBootstrap {
         .where(eq(backupSchedules.id, id));
     } catch (error) {
       this.logger.warn(`scheduled backup ${id} failed: ${describeError(error)}`);
-    }
-  }
-
-  private assertValidCron(expression: string): void {
-    try {
-      // Constructing validates the expression without starting it.
-      new CronJob(expression, () => undefined);
-    } catch {
-      throw new BadRequestException(`Invalid cron expression: ${expression}`);
     }
   }
 

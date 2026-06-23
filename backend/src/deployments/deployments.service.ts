@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
+import { assertValidCron } from "../common/cron";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
@@ -155,6 +156,10 @@ export class DeploymentsService {
 
     if (!isImage && !input.gitUrl) {
       throw new DatabaseError("git-based deployments require a git URL");
+    }
+
+    if (input.cronExpr) {
+      assertValidCron(input.cronExpr);
     }
 
     const rows = await this.db
