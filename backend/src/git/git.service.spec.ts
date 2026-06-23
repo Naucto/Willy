@@ -1,6 +1,12 @@
 import type { ConfigService } from "@nestjs/config";
 import { describe, expect, it } from "vitest";
-import { GitError, GitService, parseRefs } from "./git.service";
+import {
+  GitError,
+  GitService,
+  parseRefs,
+  submoduleUpdateArgs,
+  tokenRewriteConfig,
+} from "./git.service";
 
 function makeService(): GitService {
   const config = { get: () => "/tmp/willy-builds-test" } as unknown as ConfigService;
@@ -40,5 +46,36 @@ describe("parseRefs", () => {
 
   it("returns an empty list for empty output", () => {
     expect(parseRefs("")).toEqual([]);
+  });
+});
+
+describe("submoduleUpdateArgs", () => {
+  it("tracks branch tips with --remote in track mode", () => {
+    const args = submoduleUpdateArgs("/builds/x", "track");
+
+    expect(args).toEqual([
+      "-C",
+      "/builds/x",
+      "submodule",
+      "update",
+      "--init",
+      "--recursive",
+      "--depth",
+      "1",
+      "--remote",
+    ]);
+  });
+
+  it("uses the superproject's pinned commits in pin mode (no --remote)", () => {
+    expect(submoduleUpdateArgs("/builds/x", "pin")).not.toContain("--remote");
+  });
+});
+
+describe("tokenRewriteConfig", () => {
+  it("rewrites both HTTPS and SSH GitHub remotes to a token-bearing URL", () => {
+    const { key, values } = tokenRewriteConfig("ghs_secret");
+
+    expect(key).toBe("url.https://x-access-token:ghs_secret@github.com/.insteadOf");
+    expect(values).toEqual(["https://github.com/", "git@github.com:"]);
   });
 });

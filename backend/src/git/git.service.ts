@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -17,6 +17,10 @@ export interface CloneOptions {
   url: string;
   ref: string;
   token?: string | undefined;
+  // For repos with submodules: "track" (default) checks out each submodule's configured branch tip,
+  // so a redeploy picks up new submodule commits without bumping the superproject's pointers; "pin"
+  // uses the exact commits the superproject records.
+  submodules?: "track" | "pin" | undefined;
 }
 
 export interface CloneResult {
@@ -55,15 +59,57 @@ export class GitService {
         // Fail fast instead of hanging on a credentials prompt for private repos.
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       });
+
+      if (await hasSubmodules(dir)) {
+        await this.updateSubmodules(dir, options.token, options.submodules ?? "track");
+      }
     } catch (error) {
       await this.cleanup(dir);
 
-      throw new GitError(`clone failed for ref "${options.ref}": ${describeError(error)}`);
+      // Submodule failures already carry a GitError with a precise message; don't mask them.
+      throw error instanceof GitError
+        ? error
+        : new GitError(`clone failed for ref "${options.ref}": ${describeError(error)}`);
     }
 
     const { stdout } = await exec("git", ["-C", dir, "rev-parse", "HEAD"]);
 
     return { dir, sha: stdout.trim() };
+  }
+
+  // Pulls in submodules after the superproject is cloned. Authenticates submodule fetches with the
+  // same token as the superproject by rewriting GitHub remotes (HTTPS or SSH form) to a token-bearing
+  // HTTPS URL — written to the build's local git config (cleaned up with the build dir), so the token
+  // is not passed on the argv of each child fetch.
+  private async updateSubmodules(
+    dir: string,
+    token: string | undefined,
+    mode: "track" | "pin",
+  ): Promise<void> {
+    if (token) {
+      const { key, values } = tokenRewriteConfig(token);
+
+      // First value replaces the key; the rest are appended (a multi-valued insteadOf).
+      let replace = true;
+
+      for (const value of values) {
+        const configArgs = replace
+          ? ["-C", dir, "config", key, value]
+          : ["-C", dir, "config", "--add", key, value];
+
+        await exec("git", configArgs);
+        replace = false;
+      }
+    }
+
+    try {
+      await exec("git", submoduleUpdateArgs(dir, mode), {
+        timeout: CLONE_TIMEOUT_MS,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      });
+    } catch (error) {
+      throw new GitError(`submodule update failed: ${describeError(error)}`);
+    }
   }
 
   async cleanup(dir: string): Promise<void> {
@@ -127,6 +173,37 @@ export class GitService {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function hasSubmodules(dir: string): Promise<boolean> {
+  try {
+    await stat(join(dir, ".gitmodules"));
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// `git submodule update` arguments. "track" adds `--remote` so each submodule is moved to its
+// configured branch tip instead of the commit the superproject pins.
+export function submoduleUpdateArgs(dir: string, mode: "track" | "pin"): string[] {
+  const args = ["-C", dir, "submodule", "update", "--init", "--recursive", "--depth", "1"];
+
+  if (mode === "track") {
+    args.push("--remote");
+  }
+
+  return args;
+}
+
+// Builds the `url.<tokened>.insteadOf` git-config that makes submodule fetches reuse the
+// superproject's token. Both the HTTPS and SSH GitHub remote forms are rewritten so `.gitmodules`
+// can use either.
+export function tokenRewriteConfig(token: string): { key: string; values: string[] } {
+  const tokened = `https://x-access-token:${token}@github.com/`;
+
+  return { key: `url.${tokened}.insteadOf`, values: ["https://github.com/", "git@github.com:"] };
 }
 
 // Parses `git ls-remote --heads --tags` output into a sorted, de-duplicated list of ref names
