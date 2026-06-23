@@ -4,6 +4,14 @@ import { type OffsiteDriver, runHelper } from "./offsite-driver";
 
 const SSH_OPTS = "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10";
 
+// OpenSSH/PEM keys must use LF endings and end with a newline; a key pasted into the panel that lost
+// its trailing newline (or carries CRLF) is rejected as "invalid format" and silently falls back to
+// publickey-denied. Strip trailing whitespace and normalise CRLF here — the script re-adds exactly
+// one trailing newline when it writes the file.
+export function normalizePrivateKey(key: string): string {
+  return key.replace(/\r\n/g, "\n").replace(/\s+$/, "");
+}
+
 // Real scp over SSH (git-over-ssh style): a private key when provided, else a password via sshpass.
 // Runs in an alpine helper that installs the ssh client (kept out of the willy-server image).
 export class SshOffsiteDriver implements OffsiteDriver {
@@ -55,7 +63,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
     };
 
     if (c.privateKey) {
-      env.WILLY_KEY = c.privateKey;
+      env.WILLY_KEY = normalizePrivateKey(c.privateKey);
     } else {
       env.SSHPASS = c.password ?? "";
     }
@@ -68,7 +76,7 @@ export class SshOffsiteDriver implements OffsiteDriver {
     if (c.privateKey) {
       const prepared = op.replace("%AUTH%", "-i /tmp/k");
 
-      return `apk add --no-cache openssh-client >/dev/null && printf '%s' "$WILLY_KEY" > /tmp/k && chmod 600 /tmp/k && ${prepared}`;
+      return `apk add --no-cache openssh-client >/dev/null && printf '%s\\n' "$WILLY_KEY" > /tmp/k && chmod 600 /tmp/k && ${prepared}`;
     }
 
     return `apk add --no-cache openssh-client sshpass >/dev/null && sshpass -e ${op.replace("%AUTH%", "")}`;
