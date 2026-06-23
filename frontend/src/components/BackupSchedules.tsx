@@ -14,6 +14,7 @@ import type { BackupSchedule } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
 import { BaseDialog } from "./BaseDialog";
+import { CronEditor } from "./CronEditor";
 import { Gated } from "./Gated";
 import { OperateButton, OperateIconButton } from "./OperateButton";
 
@@ -183,12 +184,7 @@ function NewScheduleDialog({
         ))}
       </TextField>
 
-      <TextField
-        label="Cron expression"
-        value={cron}
-        helperText="Standard 5-field cron, e.g. 0 3 * * * (daily at 03:00)."
-        onChange={(event) => setCron(event.target.value)}
-      />
+      <CronEditor value={cron} onChange={setCron} />
 
       <TextField
         label="Keep (most recent backups)"

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useUpdateDeployment } from "../api/hooks";
 import type { Deployment, UpdateDeploymentInput } from "../api/types";
 import { useAction } from "../useAction";
+import { CronEditor } from "./CronEditor";
 import { OperateButton } from "./OperateButton";
 import { SettingRow } from "./SettingRow";
 import { SOURCE_OPTIONS, SourceFields } from "./source/SourceFields";
@@ -128,12 +129,11 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
           <Divider />
           <SettingRow
             label="Cron schedule"
-            description="Standard 5-field cron expression (minute hour day month weekday, UTC)."
+            description="When the job runs (UTC). Pick a frequency or switch to Custom for a raw expression."
           >
-            <TextField
-              label="Cron expression"
+            <CronEditor
               value={values.cronExpr}
-              onChange={(event) => setValues((c) => ({ ...c, cronExpr: event.target.value }))}
+              onChange={(value) => setValues((c) => ({ ...c, cronExpr: value }))}
             />
           </SettingRow>
         </>
