@@ -10,16 +10,13 @@ import {
   MenuItem,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { useState } from "react";
-import {
-  useBackupDestinations,
-  useCreateDestination,
-  useDeleteDestination,
-  useTestDestination,
-} from "../api/hooks";
+import { useBackupDestinations, useCreateDestination, useDeleteDestination } from "../api/hooks";
 import type { BackupDestination, CreateBackupDestinationInput } from "../api/types";
 import { useAction } from "../useAction";
 import { OperateButton, OperateIconButton } from "./OperateButton";
@@ -103,14 +100,15 @@ export function BackupDestinations() {
 function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const run = useAction();
   const create = useCreateDestination();
-  const test = useTestDestination();
   const [type, setType] = useState<DestType>("S3");
+  const [authMethod, setAuthMethod] = useState<"key" | "password">("key");
   const [fields, setFields] = useState<Record<string, string>>({});
 
   const set = (key: string, value: string) => setFields((prev) => ({ ...prev, [key]: value }));
 
   const reset = () => {
     setType("S3");
+    setAuthMethod("key");
     setFields({});
   };
 
@@ -124,8 +122,6 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
       ...(port ? { port: Number(port) } : {}),
     } as CreateBackupDestinationInput;
   };
-
-  const onTest = () => run(() => test.mutateAsync(buildBody()), "Connection OK");
 
   const onCreate = async () => {
     // Server re-tests the connection on create, so a bad destination is never saved.
@@ -155,7 +151,11 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
     (type === "S3"
       ? Boolean(fields.bucket && fields.accessKeyId && fields.secretAccessKey)
       : type === "SSH"
-        ? Boolean(fields.host && fields.username && (fields.password || fields.privateKey))
+        ? Boolean(
+            fields.host &&
+              fields.username &&
+              (authMethod === "key" ? fields.privateKey : fields.password),
+          )
         : Boolean(fields.host && fields.username && fields.password));
 
   return (
@@ -214,24 +214,42 @@ function NewDestinationDialog({ open, onClose }: { open: boolean; onClose: () =>
               {field("port", "Port (optional, default 22)")}
               {field("username", "Username")}
               {field("path", "Remote path (optional)")}
-              <TextField
-                label="Private key (PEM)"
-                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-                value={fields.privateKey ?? ""}
-                onChange={(event) => set("privateKey", event.target.value)}
-                multiline
-                minRows={3}
-              />
-              {field("password", "Password (if no key)", true)}
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                size="small"
+                color="primary"
+                value={authMethod}
+                onChange={(_, next: "key" | "password" | null) => {
+                  if (!next) {
+                    return;
+                  }
+
+                  setAuthMethod(next);
+                  set(next === "key" ? "password" : "privateKey", "");
+                }}
+              >
+                <ToggleButton value="key">SSH key</ToggleButton>
+                <ToggleButton value="password">Password</ToggleButton>
+              </ToggleButtonGroup>
+              {authMethod === "key" ? (
+                <TextField
+                  label="Private key (PEM)"
+                  placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                  value={fields.privateKey ?? ""}
+                  onChange={(event) => set("privateKey", event.target.value)}
+                  multiline
+                  minRows={3}
+                />
+              ) : (
+                field("password", "Password", true)
+              )}
             </>
           )}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <OperateButton disabled={test.isPending || !ready} onClick={() => void onTest()}>
-          {test.isPending ? "Testing…" : "Test connection"}
-        </OperateButton>
         <OperateButton
           variant="contained"
           disabled={create.isPending || !ready}

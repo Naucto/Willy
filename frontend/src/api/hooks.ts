@@ -227,13 +227,6 @@ export function useCreateDestination() {
   });
 }
 
-export function useTestDestination() {
-  return useMutation({
-    mutationFn: async (body: CreateBackupDestinationInput) =>
-      unwrap(await api.POST("/backups/destinations/test", { body })),
-  });
-}
-
 export function useDeleteDestination() {
   const queryClient = useQueryClient();
 
