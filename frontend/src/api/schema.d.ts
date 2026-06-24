@@ -52,6 +52,22 @@ export interface paths {
     patch: operations["UsersController_setPassword"];
     trace?: never;
   };
+  "/users/{id}/disabled": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["UsersController_setDisabled"];
+    trace?: never;
+  };
   "/auth/login": {
     parameters: {
       query?: never;
@@ -1327,6 +1343,8 @@ export interface components {
       name: string | null;
       /** @enum {string} */
       role: "ADMIN" | "OPERATOR" | "VIEWER";
+      /** @description Whether sign-in is suspended for this user. */
+      disabled: boolean;
       /** @description Whether 2FA is required for this user. */
       twoFactorEnabled: boolean;
       /** @description Whether a TOTP secret has been confirmed. */
@@ -1355,6 +1373,10 @@ export interface components {
     OkResponseDto: {
       /** @example true */
       ok: boolean;
+    };
+    SetUserDisabledDto: {
+      /** @description Suspend (true) or restore (false) sign-in. */
+      disabled: boolean;
     };
     LoginDto: {
       /** Format: email */
@@ -2078,6 +2100,14 @@ export interface components {
       /** @description Configured memory limit in bytes. */
       memLimitBytes: number | null;
       swapBytes: number;
+      /** @description Cumulative network bytes received. */
+      netRxBytes: number;
+      /** @description Cumulative network bytes transmitted. */
+      netTxBytes: number;
+      /** @description Cumulative block-device bytes read. */
+      blkReadBytes: number;
+      /** @description Cumulative block-device bytes written. */
+      blkWriteBytes: number;
       /** @description Named volumes + container writable layers. */
       storageBytes: number;
       volumes: components["schemas"]["VolumeUsageDto"][];
@@ -2093,6 +2123,14 @@ export interface components {
       /** @description Configured memory limit in bytes. */
       memLimitBytes: number | null;
       swapBytes: number;
+      /** @description Network receive rate in bytes/sec. */
+      netRxBytesPerSec: number;
+      /** @description Network transmit rate in bytes/sec. */
+      netTxBytesPerSec: number;
+      /** @description Block-device read rate in bytes/sec. */
+      blkReadBytesPerSec: number;
+      /** @description Block-device write rate in bytes/sec. */
+      blkWriteBytesPerSec: number;
       /** @description Named volumes + container writable layers. */
       storageBytes: number;
     };
@@ -2114,6 +2152,14 @@ export interface components {
       cpuPercent: number;
       /** @description Sum of memory used across all running containers. */
       memUsageBytes: number;
+      /** @description Cumulative network bytes received (all containers). */
+      netRxBytes: number;
+      /** @description Cumulative network bytes transmitted (all containers). */
+      netTxBytes: number;
+      /** @description Cumulative block-device bytes read (all containers). */
+      blkReadBytes: number;
+      /** @description Cumulative block-device bytes written (all containers). */
+      blkWriteBytes: number;
       disk: components["schemas"]["DiskUsageDto"];
     };
     HostStatsSampleDto: {
@@ -2125,9 +2171,25 @@ export interface components {
       cpuPercent: number;
       /** @description Sum of memory used across all running containers. */
       memUsageBytes: number;
+      /** @description Cumulative network bytes received (all containers). */
+      netRxBytes: number;
+      /** @description Cumulative network bytes transmitted (all containers). */
+      netTxBytes: number;
+      /** @description Cumulative block-device bytes read (all containers). */
+      blkReadBytes: number;
+      /** @description Cumulative block-device bytes written (all containers). */
+      blkWriteBytes: number;
       disk: components["schemas"]["DiskUsageDto"];
       /** @description Sample time (epoch ms). */
       ts: number;
+      /** @description Network receive rate in bytes/sec. */
+      netRxBytesPerSec: number;
+      /** @description Network transmit rate in bytes/sec. */
+      netTxBytesPerSec: number;
+      /** @description Block-device read rate in bytes/sec. */
+      blkReadBytesPerSec: number;
+      /** @description Block-device write rate in bytes/sec. */
+      blkWriteBytesPerSec: number;
     };
     HostStatsHistoryDto: {
       samples: components["schemas"]["HostStatsSampleDto"][];
@@ -2299,6 +2361,31 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["SetPasswordDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  UsersController_setDisabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetUserDisabledDto"];
       };
     };
     responses: {
