@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 // Two-column settings layout used by Resources, Settings, and Webhook panels:
 // left column holds the setting name + description, right column holds the control(s).
-// Rows are separated by <Divider /> at the call site.
+// Rows are visually separated by their own vertical padding — no dividers at the call site.
 export function SettingRow({
   label,
   description,

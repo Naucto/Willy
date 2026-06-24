@@ -1,13 +1,4 @@
-import {
-  Alert,
-  Box,
-  Divider,
-  FormControlLabel,
-  Stack,
-  Switch,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, FormControlLabel, Stack, Switch, TextField, Typography } from "@mui/material";
 import { useState } from "react";
 import { useRotateWebhook, useUpdateDeployment, useWebhook } from "../api/hooks";
 import type { Deployment } from "../api/types";
@@ -66,16 +57,12 @@ export function WebhookTab({ deployment }: { deployment: Deployment }) {
         )}
       </SettingRow>
 
-      <Divider />
-
       <SettingRow
         label="Webhook URL"
         description="Paste this URL into your repository's webhook settings. Use content type application/json."
       >
         <TextField label="Payload URL" value={url} slotProps={{ input: { readOnly: true } }} />
       </SettingRow>
-
-      <Divider />
 
       <SettingRow
         label="Secret"

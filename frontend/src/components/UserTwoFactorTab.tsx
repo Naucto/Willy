@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Chip, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Switch, TextField, Typography } from "@mui/material";
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import {
@@ -11,6 +11,7 @@ import type { PanelUser, TotpSetupResponse } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { useCan } from "../auth/permissions";
 import { useAction } from "../useAction";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { SettingRow } from "./SettingRow";
 
 function StatusChip({ user }: { user: PanelUser }) {
@@ -53,6 +54,7 @@ function SelfControls({ user }: { user: PanelUser }) {
 
   const [setup, setSetup] = useState<TotpSetupResponse | null>(null);
   const [code, setCode] = useState("");
+  const [confirmingDisable, setConfirmingDisable] = useState(false);
 
   const onStart = () =>
     run(async () => {
@@ -76,63 +78,75 @@ function SelfControls({ user }: { user: PanelUser }) {
     }
   };
 
-  const onDisable = () => run(() => disable.mutateAsync(), "Two-factor authentication disabled");
+  const onDisable = async () => {
+    setConfirmingDisable(false);
+    await run(() => disable.mutateAsync(), "Two-factor authentication disabled");
+  };
 
-  if (user.twoFactorConfigured) {
-    return (
-      <Box>
-        <Button
-          color="warning"
-          variant="outlined"
-          disabled={disable.isPending}
-          onClick={() => void onDisable()}
-        >
-          Disable
-        </Button>
-      </Box>
-    );
-  }
+  // The switch reflects the server state; it only flips on once the setup flow is confirmed, and a
+  // disable goes through a confirmation modal first.
+  const onToggle = (checked: boolean) => {
+    if (checked) {
+      if (!setup) {
+        void onStart();
+      }
 
-  if (!setup) {
-    return (
-      <Box>
-        <Button variant="contained" disabled={start.isPending} onClick={() => void onStart()}>
-          Set up
-        </Button>
-      </Box>
-    );
-  }
+      return;
+    }
+
+    setConfirmingDisable(true);
+  };
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        Scan this with an authenticator app, then enter the 6-digit code to finish.
-      </Typography>
-      <Box sx={{ bgcolor: "#fff", p: 1.5, borderRadius: 1, width: "fit-content" }}>
-        <QRCodeSVG value={setup.otpauthUri} size={160} />
-      </Box>
-      <TextField
-        label="Secret"
-        value={setup.secret}
-        slotProps={{ input: { readOnly: true } }}
-        helperText="Or enter this key manually."
+      <Switch
+        checked={user.twoFactorConfigured}
+        disabled={start.isPending || disable.isPending}
+        onChange={(event) => onToggle(event.target.checked)}
       />
-      <TextField
-        label="Authentication code"
-        value={code}
-        onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-        slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }}
+
+      {setup && !user.twoFactorConfigured && (
+        <Stack spacing={2}>
+          <Typography variant="body2" color="text.secondary">
+            Scan this with an authenticator app, then enter the 6-digit code to finish.
+          </Typography>
+          <Box sx={{ bgcolor: "#fff", p: 1.5, borderRadius: 1, width: "fit-content" }}>
+            <QRCodeSVG value={setup.otpauthUri} size={160} />
+          </Box>
+          <TextField
+            label="Secret"
+            value={setup.secret}
+            slotProps={{ input: { readOnly: true } }}
+            helperText="Or enter this key manually."
+          />
+          <TextField
+            label="Authentication code"
+            value={code}
+            onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+            slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 6 } }}
+          />
+          <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+            <Button onClick={() => setSetup(null)}>Cancel</Button>
+            <Button
+              variant="contained"
+              disabled={confirm.isPending || code.length < 6}
+              onClick={() => void onConfirm()}
+            >
+              Enable
+            </Button>
+          </Box>
+        </Stack>
+      )}
+
+      <ConfirmDialog
+        open={confirmingDisable}
+        title="Disable two-factor authentication?"
+        message="Your account will no longer require a one-time code at sign-in. You can re-enable it at any time."
+        confirmLabel="Disable"
+        destructive
+        onConfirm={() => void onDisable()}
+        onCancel={() => setConfirmingDisable(false)}
       />
-      <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-        <Button onClick={() => setSetup(null)}>Cancel</Button>
-        <Button
-          variant="contained"
-          disabled={confirm.isPending || code.length < 6}
-          onClick={() => void onConfirm()}
-        >
-          Enable
-        </Button>
-      </Box>
     </Stack>
   );
 }
@@ -142,37 +156,50 @@ function AdminControls({ user }: { user: PanelUser }) {
   const require = useRequireTwoFactor(user.id);
   const disable = useDisableTwoFactor(user.id);
 
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
   const onRequire = () => run(() => require.mutateAsync(), "Two-factor authentication required");
 
-  const onReset = () => run(() => disable.mutateAsync(), "Two-factor authentication reset");
+  const onReset = async () => {
+    setConfirmingReset(false);
+    await run(() => disable.mutateAsync(), "Two-factor authentication reset");
+  };
 
-  if (!user.twoFactorEnabled) {
-    return (
-      <Box>
-        <Button variant="contained" disabled={require.isPending} onClick={() => void onRequire()}>
-          Require 2FA
-        </Button>
-      </Box>
-    );
-  }
+  const onToggle = (checked: boolean) => {
+    if (checked) {
+      void onRequire();
+
+      return;
+    }
+
+    setConfirmingReset(true);
+  };
 
   return (
     <Stack spacing={2}>
-      <Alert severity="info">
-        {user.twoFactorConfigured
-          ? "This user has an authenticator configured. Resetting lets them re-enroll if they lost access."
-          : "This user must configure an authenticator at their next sign-in."}
-      </Alert>
-      <Box>
-        <Button
-          color="warning"
-          variant="outlined"
-          disabled={disable.isPending}
-          onClick={() => void onReset()}
-        >
-          Reset 2FA
-        </Button>
-      </Box>
+      <Switch
+        checked={user.twoFactorEnabled}
+        disabled={require.isPending || disable.isPending}
+        onChange={(event) => onToggle(event.target.checked)}
+      />
+
+      {user.twoFactorEnabled && (
+        <Alert severity="info">
+          {user.twoFactorConfigured
+            ? "This user has an authenticator configured. Turning this off lets them re-enroll if they lost access."
+            : "This user must configure an authenticator at their next sign-in."}
+        </Alert>
+      )}
+
+      <ConfirmDialog
+        open={confirmingReset}
+        title="Reset this user's 2FA?"
+        message="This removes their two-factor requirement and any configured authenticator. They can re-enroll afterwards."
+        confirmLabel="Reset 2FA"
+        destructive
+        onConfirm={() => void onReset()}
+        onCancel={() => setConfirmingReset(false)}
+      />
     </Stack>
   );
 }

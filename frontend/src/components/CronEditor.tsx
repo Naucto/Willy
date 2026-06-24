@@ -7,6 +7,8 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import {
   buildCron,
@@ -39,7 +41,6 @@ const WEEKDAYS: { value: number; label: string }[] = [
   { value: 0, label: "Sun" },
 ];
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 const DAYS_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -156,37 +157,20 @@ export function CronEditor({
 
       {!custom && showsTime && (
         <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          <TextField
-            select
-            label="Hour"
-            value={preset.hour}
-            disabled={disabled}
-            sx={{ minWidth: 90 }}
-            onChange={(event) => applyPreset({ ...preset, hour: Number(event.target.value) })}
-          >
-            {HOURS.map((h) => (
-              <MenuItem key={h} value={h}>
-                {pad(h)}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Typography variant="body2" color="text.secondary">
-            :
-          </Typography>
-          <TextField
-            select
-            label="Minute"
-            value={preset.minute}
-            disabled={disabled}
-            sx={{ minWidth: 90 }}
-            onChange={(event) => applyPreset({ ...preset, minute: Number(event.target.value) })}
-          >
-            {MINUTES.map((m) => (
-              <MenuItem key={m} value={m}>
-                {pad(m)}
-              </MenuItem>
-            ))}
-          </TextField>
+          {/* Wall-clock time only — the cron expression is UTC, so no timezone conversion. */}
+          <TimePicker
+            label="Time"
+            ampm={false}
+            views={["hours", "minutes"]}
+            disabled={disabled ?? false}
+            value={dayjs().hour(preset.hour).minute(preset.minute).second(0)}
+            onChange={(next) => {
+              if (next) {
+                applyPreset({ ...preset, hour: next.hour(), minute: next.minute() });
+              }
+            }}
+            sx={{ maxWidth: 160 }}
+          />
           <Typography variant="caption" color="text.secondary">
             UTC
           </Typography>

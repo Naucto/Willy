@@ -3,7 +3,6 @@ import {
   Box,
   Chip,
   CircularProgress,
-  Divider,
   FormControlLabel,
   MenuItem,
   Stack,
@@ -226,16 +225,12 @@ function HealthForm({
         </TextField>
       </SettingRow>
 
-      <Divider sx={{ my: 1 }} />
-
       <SettingRow
         label="Declared healthcheck"
         description="The healthcheck the image or compose file defines. Read-only — managed in your source, surfaced here for reference."
       >
         <DeclaredHealthcheckView declared={declared} runtimeHealth={runtimeHealth} />
       </SettingRow>
-
-      <Divider />
 
       <SettingRow
         label="Custom healthcheck"
@@ -285,9 +280,9 @@ function HealthForm({
         )}
       </SettingRow>
 
-      <Divider sx={{ mb: 2 }} />
-
-      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, alignItems: "center" }}>
+      <Box
+        sx={{ display: "flex", justifyContent: "flex-end", gap: 2, alignItems: "center", mt: 2 }}
+      >
         <Typography variant="caption" color="text.secondary">
           Health changes apply on the next deploy or restart.
         </Typography>

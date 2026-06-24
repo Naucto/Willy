@@ -724,6 +724,23 @@ export function useUpdateDeployment(id: string) {
   });
 }
 
+// Renaming has its own endpoint (uniqueness check + the name feeds Docker resource identifiers, so
+// it only takes effect on the next deploy) rather than going through the generic PATCH.
+export function useRenameDeployment(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (name: string) =>
+      unwrap(
+        await api.POST("/deployments/{id}/rename", { params: { path: { id } }, body: { name } }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployment(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deployments });
+    },
+  });
+}
+
 export function useWebhook(id: string) {
   return useQuery({
     queryKey: queryKeys.webhook(id),

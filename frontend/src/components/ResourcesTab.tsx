@@ -4,7 +4,6 @@ import {
   Box,
   Chip,
   CircularProgress,
-  Divider,
   Slider,
   Stack,
   TextField,
@@ -200,16 +199,12 @@ function ResourceForm({
         <CapabilityPicker value={capAdd} onChange={setCapAdd} />
       </SettingRow>
 
-      <Divider />
-
       <SettingRow
         label="Drop capabilities"
         description="Linux capabilities to strip. Use ALL to start from none, then add only what's needed."
       >
         <CapabilityPicker value={capDrop} onChange={setCapDrop} />
       </SettingRow>
-
-      <Divider sx={{ my: 1 }} />
 
       <SettingRow
         label="Memory limit"
@@ -225,8 +220,6 @@ function ResourceForm({
         />
       </SettingRow>
 
-      <Divider />
-
       <SettingRow
         label="CPU limit"
         description="Hard cap on CPU usage in cores. Unset means no limit."
@@ -240,8 +233,6 @@ function ResourceForm({
           onChange={setCpuCores}
         />
       </SettingRow>
-
-      <Divider sx={{ my: 1 }} />
 
       <SettingRow
         label="Log rotation"
@@ -265,9 +256,9 @@ function ResourceForm({
         />
       </SettingRow>
 
-      <Divider sx={{ mb: 2 }} />
-
-      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, alignItems: "center" }}>
+      <Box
+        sx={{ display: "flex", justifyContent: "flex-end", gap: 2, alignItems: "center", mt: 2 }}
+      >
         <Typography variant="caption" color="text.secondary">
           Resource changes apply on the next deploy or restart.
         </Typography>

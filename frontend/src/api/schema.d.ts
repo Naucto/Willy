@@ -756,6 +756,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/rename": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DeploymentActionsController_rename"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/rollback/{releaseId}": {
     parameters: {
       query?: never;
@@ -1531,6 +1547,8 @@ export interface components {
       activeReleaseId: string | null;
       /** Format: uuid */
       gitCredentialId: string | null;
+      /** @description Whether a private-repo token is stored (write-only). */
+      hasGitToken: boolean;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -1542,6 +1560,7 @@ export interface components {
       /** @example nginx:1.27 */
       imageRef?: string;
       gitRef?: string;
+      gitToken?: string;
       /** @enum {string} */
       buildStrategy?: "DOCKERFILE" | "COMPOSE" | "IMAGE";
       dockerfilePath?: string;
@@ -1857,6 +1876,10 @@ export interface components {
       finishedAt: string | null;
       /** Format: date-time */
       createdAt: string;
+    };
+    RenameDeploymentDto: {
+      /** @example my-app */
+      name: string;
     };
     WebhookStatusDto: {
       configured: boolean;
@@ -3647,6 +3670,31 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["OkResponseDto"];
+        };
+      };
+    };
+  };
+  DeploymentActionsController_rename: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RenameDeploymentDto"];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DeploymentDto"];
         };
       };
     };

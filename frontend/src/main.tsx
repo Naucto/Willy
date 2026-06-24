@@ -1,4 +1,6 @@
 import { CssBaseline, ThemeProvider } from "@mui/material";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SnackbarProvider } from "notistack";
 import { StrictMode } from "react";
@@ -23,13 +25,15 @@ createRoot(root).render(
   <StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
-        </SnackbarProvider>
-      </QueryClientProvider>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <QueryClientProvider client={queryClient}>
+          <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </SnackbarProvider>
+        </QueryClientProvider>
+      </LocalizationProvider>
     </ThemeProvider>
   </StrictMode>,
 );
