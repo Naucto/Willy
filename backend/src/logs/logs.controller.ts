@@ -10,7 +10,7 @@ import { ApiExcludeEndpoint } from "@nestjs/swagger";
 import { Observable } from "rxjs";
 import { BuildLogStore } from "../build/build-log.store";
 import { ReleasesService, isTerminalReleaseStatus } from "../build/releases.service";
-import { runtimeLogKey } from "../build/runtime-log.collector";
+import { RuntimeLogCollector, runtimeLogKey } from "../build/runtime-log.collector";
 import { ContainersService } from "../containers/containers.service";
 import { DeploymentsService } from "../deployments/deployments.service";
 import { DockerContainerService } from "../docker/docker-container.service";
@@ -22,7 +22,12 @@ interface LogEvent {
 
 // Final frame sent before completing a build-log stream, so the client can tell a normal end
 // (build finished) from a dropped connection and never render it as an error.
-export const LOG_STREAM_EOF = "__willy_eof__";
+export const LOG_STREAM_EOF = "__willy_eof__";
+
+// Control frames for runtime logs: the collector flags a follow as stalled (frozen tail) or live
+// again, and the viewer shows/clears a banner. Not real log lines — the client filters them out.
+export const LOG_STREAM_STALLED = "__willy_stalled__";
+export const LOG_STREAM_LIVE = "__willy_live__";
 
 // SSE streams are consumed by a fetch-based reader on the client (so the bearer token can be sent),
 // not the generated OpenAPI client — hence excluded from the spec. Both endpoints replay the
@@ -36,6 +41,7 @@ export class LogsController {
     private readonly dockerContainers: DockerContainerService,
     private readonly containers: ContainersService,
     private readonly logs: LogStorageService,
+    private readonly runtimeLog: RuntimeLogCollector,
   ) {}
 
   // Build log for a release: replays persisted lines, then streams live ones while the build runs.
@@ -116,6 +122,7 @@ export class LogsController {
     return new Observable<LogEvent>((subscriber) => {
       let cancelled = false;
       let detachLine = (): void => {};
+      let detachStatus = (): void => {};
 
       void (async () => {
         const deployment = await this.deployments.findById(id);
@@ -173,6 +180,11 @@ export class LogsController {
 
         if (live) {
           detachLine = this.logs.onLine(key, (line) => subscriber.next({ data: line }));
+          // Surface follow stalls/recoveries so the viewer can flag a frozen tail. Fires immediately
+          // with the current state, so connecting mid-stall shows the banner at once.
+          detachStatus = this.runtimeLog.onStatus(key, (isStalled) =>
+            subscriber.next({ data: isStalled ? LOG_STREAM_STALLED : LOG_STREAM_LIVE }),
+          );
         } else {
           subscriber.complete();
         }
@@ -183,6 +195,7 @@ export class LogsController {
       return () => {
         cancelled = true;
         detachLine();
+        detachStatus();
       };
     });
   }
