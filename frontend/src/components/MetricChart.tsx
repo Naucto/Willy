@@ -64,6 +64,7 @@ export function MetricChart<T extends { ts: number }>({
   format,
   loading = false,
   height = 300,
+  yMax,
 }: {
   title: string;
   samples: T[];
@@ -72,6 +73,8 @@ export function MetricChart<T extends { ts: number }>({
   format: (value: number) => string;
   loading?: boolean;
   height?: number;
+  // Pin the y-axis ceiling (e.g. total/limit memory) so the area reads against full capacity.
+  yMax?: number | undefined;
 }) {
   const { times, rows } = buildGapRows(samples);
 
@@ -121,7 +124,7 @@ export function MetricChart<T extends { ts: number }>({
               valueFormatter: (value: Date) => formatTick(value),
             },
           ]}
-          yAxis={[{ min: 0, valueFormatter: (value: number) => format(value) }]}
+          yAxis={[{ min: 0, max: yMax, valueFormatter: (value: number) => format(value) }]}
           series={series.map((line) => ({
             data: rows.map((row) => (row ? line.value(row) : null)),
             label: line.label,

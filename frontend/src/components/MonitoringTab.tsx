@@ -2,8 +2,8 @@ import { Box, Stack } from "@mui/material";
 import { useState } from "react";
 import { useDeploymentStatsHistory } from "../api/hooks";
 import type { Deployment, DeploymentStatsSample, StatsWindow } from "../api/types";
-import { formatBytes, formatPercent } from "../format";
-import { CHART_COLORS, MetricChart, type MetricSeries, WindowSelector } from "./MetricChart";
+import { formatBytes, formatBytesPerSec, formatPercent } from "../format";
+import { CHART_COLORS, MetricChart, WindowSelector } from "./MetricChart";
 
 // Per-deployment resource graphs over a selectable window (aggregated across the deployment's
 // containers, like the live utilization cards).
@@ -12,17 +12,11 @@ export function MonitoringTab({ deployment }: { deployment: Deployment }) {
   const { data, isPending } = useDeploymentStatsHistory(deployment.id, window);
   const samples = data?.samples ?? [];
 
-  const memorySeries: MetricSeries<DeploymentStatsSample>[] = [
-    { label: "Used", value: (s) => s.memUsageBytes, color: CHART_COLORS[1] as string, area: true },
-  ];
-
-  if (samples.some((sample) => sample.memLimitBytes !== null)) {
-    memorySeries.push({
-      label: "Limit",
-      value: (s) => s.memLimitBytes,
-      color: CHART_COLORS[3] as string,
-    });
-  }
+  // When a memory limit is configured, pin the Memory chart to it so "Used" reads against the cap.
+  const memLimit = samples.reduce<number | undefined>(
+    (limit, sample) => sample.memLimitBytes ?? limit,
+    undefined,
+  );
 
   return (
     <Stack spacing={3}>
@@ -52,7 +46,53 @@ export function MonitoringTab({ deployment }: { deployment: Deployment }) {
         window={window}
         loading={isPending}
         format={formatBytes}
-        series={memorySeries}
+        yMax={memLimit}
+        series={[
+          {
+            label: "Used",
+            value: (s) => s.memUsageBytes,
+            color: CHART_COLORS[1] as string,
+            area: true,
+          },
+        ]}
+      />
+
+      <MetricChart<DeploymentStatsSample>
+        title="Network I/O"
+        samples={samples}
+        window={window}
+        loading={isPending}
+        format={formatBytesPerSec}
+        series={[
+          {
+            label: "RX",
+            value: (s) => s.netRxBytesPerSec,
+            color: CHART_COLORS[1] as string,
+            area: true,
+          },
+          { label: "TX", value: (s) => s.netTxBytesPerSec, color: CHART_COLORS[3] as string },
+        ]}
+      />
+
+      <MetricChart<DeploymentStatsSample>
+        title="Disk I/O"
+        samples={samples}
+        window={window}
+        loading={isPending}
+        format={formatBytesPerSec}
+        series={[
+          {
+            label: "Read",
+            value: (s) => s.blkReadBytesPerSec,
+            color: CHART_COLORS[1] as string,
+            area: true,
+          },
+          {
+            label: "Write",
+            value: (s) => s.blkWriteBytesPerSec,
+            color: CHART_COLORS[3] as string,
+          },
+        ]}
       />
 
       <MetricChart<DeploymentStatsSample>

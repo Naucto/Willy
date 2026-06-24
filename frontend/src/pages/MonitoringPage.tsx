@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useSystemStatsHistory } from "../api/hooks";
 import type { HostStatsSample, StatsWindow } from "../api/types";
 import { CHART_COLORS, MetricChart, WindowSelector } from "../components/MetricChart";
-import { formatBytes, formatPercent } from "../format";
+import { formatBytes, formatBytesPerSec, formatPercent } from "../format";
 
 // Host-wide resource graphs over a selectable time window. The compact KPI cards on the Deployments
 // page link here.
@@ -11,6 +11,9 @@ export function MonitoringPage() {
   const [window, setWindow] = useState<StatsWindow>("1h");
   const { data, isPending } = useSystemStatsHistory(window);
   const samples = data?.samples ?? [];
+
+  // Pin the Memory chart to the host's total RAM so "Used" reads against full capacity.
+  const memTotal = samples.at(-1)?.memTotalBytes;
 
   return (
     <Stack spacing={3}>
@@ -43,6 +46,7 @@ export function MonitoringPage() {
         window={window}
         loading={isPending}
         format={formatBytes}
+        yMax={memTotal}
         series={[
           {
             label: "Used",
@@ -50,7 +54,44 @@ export function MonitoringPage() {
             color: CHART_COLORS[1] as string,
             area: true,
           },
-          { label: "Total", value: (s) => s.memTotalBytes, color: CHART_COLORS[4] as string },
+        ]}
+      />
+
+      <MetricChart<HostStatsSample>
+        title="Network I/O"
+        samples={samples}
+        window={window}
+        loading={isPending}
+        format={formatBytesPerSec}
+        series={[
+          {
+            label: "RX",
+            value: (s) => s.netRxBytesPerSec,
+            color: CHART_COLORS[1] as string,
+            area: true,
+          },
+          { label: "TX", value: (s) => s.netTxBytesPerSec, color: CHART_COLORS[3] as string },
+        ]}
+      />
+
+      <MetricChart<HostStatsSample>
+        title="Disk I/O"
+        samples={samples}
+        window={window}
+        loading={isPending}
+        format={formatBytesPerSec}
+        series={[
+          {
+            label: "Read",
+            value: (s) => s.blkReadBytesPerSec,
+            color: CHART_COLORS[1] as string,
+            area: true,
+          },
+          {
+            label: "Write",
+            value: (s) => s.blkWriteBytesPerSec,
+            color: CHART_COLORS[3] as string,
+          },
         ]}
       />
 
