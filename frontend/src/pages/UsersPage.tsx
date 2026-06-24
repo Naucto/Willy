@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -62,6 +63,7 @@ export function UsersPage() {
                 <TableCell>Name</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell>Created</TableCell>
               </TableRow>
             </TableHead>
@@ -91,6 +93,13 @@ function UserRow({ user, onOpen }: { user: PanelUser; onOpen: () => void }) {
       </TableCell>
       <TableCell>{user.email}</TableCell>
       <TableCell>{humanizeRole(user.role)}</TableCell>
+      <TableCell>
+        {user.disabled ? (
+          <Chip label="Disabled" size="small" color="error" variant="outlined" />
+        ) : (
+          <Chip label="Active" size="small" color="success" variant="outlined" />
+        )}
+      </TableCell>
       <TableCell>{new Date(user.createdAt).toLocaleString()}</TableCell>
     </TableRow>
   );

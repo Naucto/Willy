@@ -370,6 +370,24 @@ export function useSetUserPassword() {
   });
 }
 
+export function useSetUserDisabled() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { id: string; disabled: boolean }) =>
+      unwrap(
+        await api.PATCH("/users/{id}/disabled", {
+          params: { path: { id: input.id } },
+          body: { disabled: input.disabled },
+        }),
+      ),
+    onSuccess: (_data, { id }) => {
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+      void queryClient.invalidateQueries({ queryKey: ["users", id] });
+    },
+  });
+}
+
 export function useDeleteUser() {
   const queryClient = useQueryClient();
 
