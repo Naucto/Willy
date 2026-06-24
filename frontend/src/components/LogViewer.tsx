@@ -1,16 +1,65 @@
-import { Box, Button, Stack } from "@mui/material";
-import { useEffect, useRef, useState } from "react";
+import { Alert, Box, Button, Stack } from "@mui/material";
+import Anser from "anser";
+import { type CSSProperties, memo, useEffect, useMemo, useRef, useState } from "react";
 import { streamSse } from "../api/sse";
 import { describeError } from "../errors";
+import { interpretLogLine } from "./logStream";
+
+// Translate one anser segment's color + decorations into inline styles. Colors come back as
+// "r, g, b" triples (use_classes: false); decorations are SGR attributes like bold/underline.
+function segmentStyle(segment: Anser.AnserJsonEntry): CSSProperties {
+  const style: CSSProperties = {};
+
+  if (segment.fg) {
+    style.color = `rgb(${segment.fg})`;
+  }
+
+  if (segment.bg) {
+    style.backgroundColor = `rgb(${segment.bg})`;
+  }
+
+  for (const decoration of segment.decorations) {
+    if (decoration === "bold") {
+      style.fontWeight = 700;
+    } else if (decoration === "dim") {
+      style.opacity = 0.7;
+    } else if (decoration === "italic") {
+      style.fontStyle = "italic";
+    } else if (decoration === "underline") {
+      style.textDecoration = "underline";
+    } else if (decoration === "strikethrough") {
+      style.textDecoration = "line-through";
+    }
+  }
+
+  return style;
+}
+
+// One rendered log line with ANSI SGR codes turned into styled spans. Memoized so the append-only
+// list only parses newly-arrived lines rather than the whole buffer on every render.
+const LogLine = memo(function LogLine({ text }: { text: string }) {
+  const segments = useMemo(
+    () => Anser.ansiToJson(text, { json: true, use_classes: false, remove_empty: true }),
+    [text],
+  );
+
+  return (
+    <div>
+      {segments.map((segment, index) => (
+        // Segments have no stable id; index within an immutable line is fine.
+        // biome-ignore lint/suspicious/noArrayIndexKey: stable within a fixed line
+        <span key={index} style={segmentStyle(segment)}>
+          {segment.content}
+        </span>
+      ))}
+    </div>
+  );
+});
 
 interface LogViewerProps {
   // SSE path relative to /api, e.g. "/releases/<id>/logs" or "/deployments/<id>/logs".
   path: string;
 }
-
-// Matches the backend's LOG_STREAM_EOF marker: the last frame of a build-log stream. Its arrival
-// means the build finished — so any subsequent connection close is expected, not an error.
-const LOG_STREAM_EOF = "__willy_eof__";
 
 // A build's last act, `docker compose up`, creates the project's bridge network and can reset the
 // in-flight SSE connection (it rides the same edge network). The durable log store replays full
@@ -25,11 +74,18 @@ export function LogViewer({ path }: LogViewerProps) {
     "connecting",
   );
   const [errorText, setErrorText] = useState<string | null>(null);
+  // The backend reports the live tail froze (and recovered); the banner reflects it until dismissed.
+  const [stalled, setStalled] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
 
   useEffect(() => {
     const controller = new AbortController();
+
+    // A new stream (path change) starts clean: any prior freeze/dismissal no longer applies.
+    setStalled(false);
+    setBannerDismissed(false);
 
     const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -48,18 +104,31 @@ export function LogViewer({ path }: LogViewerProps) {
         try {
           await streamSse(
             path,
-            (line) => {
-              // A stray non-printable byte can precede the sentinel on the wire; strip anything
-              // outside printable ASCII before matching so the marker never shows as a log line.
-              if (line.replace(/[^\x20-\x7e]/g, "").trim() === LOG_STREAM_EOF) {
+            (frame) => {
+              const { kind, text } = interpretLogLine(frame);
+
+              if (kind === "eof") {
                 endedCleanly = true;
+
+                return;
+              }
+
+              if (kind === "stalled") {
+                setStalled(true);
+                setBannerDismissed(false);
+
+                return;
+              }
+
+              if (kind === "live") {
+                setStalled(false);
 
                 return;
               }
 
               attempts = 0;
               setStatus("open");
-              setLines((prev) => [...prev, line]);
+              setLines((prev) => [...prev, text]);
             },
             controller.signal,
           );
@@ -79,6 +148,7 @@ export function LogViewer({ path }: LogViewerProps) {
           if (error instanceof Error && error.message.startsWith("log stream failed")) {
             setStatus("error");
             setErrorText(describeError(error));
+            setBannerDismissed(false);
 
             return;
           }
@@ -88,6 +158,7 @@ export function LogViewer({ path }: LogViewerProps) {
           if (attempts > MAX_RECONNECTS) {
             setStatus("error");
             setErrorText(describeError(error));
+            setBannerDismissed(false);
 
             return;
           }
@@ -117,6 +188,9 @@ export function LogViewer({ path }: LogViewerProps) {
       follow.current = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
     }
   };
+
+  const isError = status === "error";
+  const showBanner = (isError || stalled) && !bannerDismissed;
 
   return (
     <Stack spacing={1}>
@@ -150,12 +224,25 @@ export function LogViewer({ path }: LogViewerProps) {
           wordBreak: "break-word",
         }}
       >
+        {showBanner && (
+          <Alert
+            severity={isError ? "error" : "warning"}
+            variant="filled"
+            onClose={() => setBannerDismissed(true)}
+            // Stay visible while the log scrolls beneath it.
+            sx={{ position: "sticky", top: 0, zIndex: 1, mb: 1 }}
+          >
+            {isError
+              ? (errorText ?? "Log stream error.")
+              : "Live tail stalled — attempting to reconnect…"}
+          </Alert>
+        )}
+
         {lines.map((line, index) => (
           // Log lines have no stable id; index is fine for an append-only list.
           // biome-ignore lint/suspicious/noArrayIndexKey: append-only log buffer
-          <div key={index}>{line}</div>
+          <LogLine key={index} text={line} />
         ))}
-        {errorText && <Box sx={{ color: "error.main" }}>{errorText}</Box>}
       </Box>
     </Stack>
   );

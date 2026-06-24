@@ -128,7 +128,11 @@ export function ContainersPage() {
                   size="small"
                   disabled={!dep || !isRunning}
                   component={dep && isRunning ? RouterLink : "button"}
-                  to={dep ? `/deployments/${dep.id}/runtime` : undefined}
+                  to={
+                    dep && isRunning
+                      ? `/deployments/${dep.id}/runtime?container=${encodeURIComponent(params.row.id)}`
+                      : undefined
+                  }
                 >
                   <ArticleOutlinedIcon fontSize="small" />
                 </IconButton>

@@ -337,7 +337,9 @@ export function ImagesPage() {
           pageSizeOptions={[25, 50, 100]}
           initialState={{ pagination: { paginationModel: { pageSize: 25 } } }}
           getRowHeight={() => "auto"}
-          sx={{ border: 0 }}
+          // With auto row height, cells default to top-aligned; the chip cells set the row height so
+          // plain-text cells looked misaligned. Vertically center every cell against the tallest one.
+          sx={{ border: 0, "& .MuiDataGrid-cell": { display: "flex", alignItems: "center" } }}
         />
       </Box>
 
