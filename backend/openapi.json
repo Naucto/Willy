@@ -220,6 +220,51 @@
         ]
       }
     },
+    "/users/{id}/disabled": {
+      "patch": {
+        "operationId": "UsersController_setDisabled",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserDisabledDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "operationId": "AuthController_login",
@@ -4107,6 +4152,10 @@
               "VIEWER"
             ]
           },
+          "disabled": {
+            "type": "boolean",
+            "description": "Whether sign-in is suspended for this user."
+          },
           "twoFactorEnabled": {
             "type": "boolean",
             "description": "Whether 2FA is required for this user."
@@ -4125,6 +4174,7 @@
           "email",
           "name",
           "role",
+          "disabled",
           "twoFactorEnabled",
           "twoFactorConfigured",
           "createdAt"
@@ -4201,6 +4251,18 @@
         },
         "required": [
           "ok"
+        ]
+      },
+      "SetUserDisabledDto": {
+        "type": "object",
+        "properties": {
+          "disabled": {
+            "type": "boolean",
+            "description": "Suspend (true) or restore (false) sign-in."
+          }
+        },
+        "required": [
+          "disabled"
         ]
       },
       "LoginDto": {
@@ -6496,6 +6558,22 @@
           "swapBytes": {
             "type": "number"
           },
+          "netRxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes received."
+          },
+          "netTxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes transmitted."
+          },
+          "blkReadBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes read."
+          },
+          "blkWriteBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes written."
+          },
           "storageBytes": {
             "type": "number",
             "description": "Named volumes + container writable layers."
@@ -6519,6 +6597,10 @@
           "memUsageBytes",
           "memLimitBytes",
           "swapBytes",
+          "netRxBytes",
+          "netTxBytes",
+          "blkReadBytes",
+          "blkWriteBytes",
           "storageBytes",
           "volumes",
           "containers"
@@ -6550,6 +6632,22 @@
           "swapBytes": {
             "type": "number"
           },
+          "netRxBytesPerSec": {
+            "type": "number",
+            "description": "Network receive rate in bytes/sec."
+          },
+          "netTxBytesPerSec": {
+            "type": "number",
+            "description": "Network transmit rate in bytes/sec."
+          },
+          "blkReadBytesPerSec": {
+            "type": "number",
+            "description": "Block-device read rate in bytes/sec."
+          },
+          "blkWriteBytesPerSec": {
+            "type": "number",
+            "description": "Block-device write rate in bytes/sec."
+          },
           "storageBytes": {
             "type": "number",
             "description": "Named volumes + container writable layers."
@@ -6562,6 +6660,10 @@
           "memUsageBytes",
           "memLimitBytes",
           "swapBytes",
+          "netRxBytesPerSec",
+          "netTxBytesPerSec",
+          "blkReadBytesPerSec",
+          "blkWriteBytesPerSec",
           "storageBytes"
         ]
       },
@@ -6621,6 +6723,22 @@
             "type": "number",
             "description": "Sum of memory used across all running containers."
           },
+          "netRxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes received (all containers)."
+          },
+          "netTxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes transmitted (all containers)."
+          },
+          "blkReadBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes read (all containers)."
+          },
+          "blkWriteBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes written (all containers)."
+          },
           "disk": {
             "$ref": "#/components/schemas/DiskUsageDto"
           }
@@ -6630,6 +6748,10 @@
           "memTotalBytes",
           "cpuPercent",
           "memUsageBytes",
+          "netRxBytes",
+          "netTxBytes",
+          "blkReadBytes",
+          "blkWriteBytes",
           "disk"
         ]
       },
@@ -6652,12 +6774,44 @@
             "type": "number",
             "description": "Sum of memory used across all running containers."
           },
+          "netRxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes received (all containers)."
+          },
+          "netTxBytes": {
+            "type": "number",
+            "description": "Cumulative network bytes transmitted (all containers)."
+          },
+          "blkReadBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes read (all containers)."
+          },
+          "blkWriteBytes": {
+            "type": "number",
+            "description": "Cumulative block-device bytes written (all containers)."
+          },
           "disk": {
             "$ref": "#/components/schemas/DiskUsageDto"
           },
           "ts": {
             "type": "number",
             "description": "Sample time (epoch ms)."
+          },
+          "netRxBytesPerSec": {
+            "type": "number",
+            "description": "Network receive rate in bytes/sec."
+          },
+          "netTxBytesPerSec": {
+            "type": "number",
+            "description": "Network transmit rate in bytes/sec."
+          },
+          "blkReadBytesPerSec": {
+            "type": "number",
+            "description": "Block-device read rate in bytes/sec."
+          },
+          "blkWriteBytesPerSec": {
+            "type": "number",
+            "description": "Block-device write rate in bytes/sec."
           }
         },
         "required": [
@@ -6665,8 +6819,16 @@
           "memTotalBytes",
           "cpuPercent",
           "memUsageBytes",
+          "netRxBytes",
+          "netTxBytes",
+          "blkReadBytes",
+          "blkWriteBytes",
           "disk",
-          "ts"
+          "ts",
+          "netRxBytesPerSec",
+          "netTxBytesPerSec",
+          "blkReadBytesPerSec",
+          "blkWriteBytesPerSec"
         ]
       },
       "HostStatsHistoryDto": {
