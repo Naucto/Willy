@@ -99,6 +99,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "FILE_CHANGE",
   "USER_DISABLE",
   "USER_ENABLE",
+  "DEPLOYMENT_RENAME",
 ]);
 
 // Long-running administrative operations surfaced in the top-bar activity tracker.

@@ -89,6 +89,12 @@ export class DeploymentDto {
   @ApiProperty({ type: String, format: "uuid", nullable: true })
   gitCredentialId!: string | null;
 
+  @ApiProperty({
+    type: Boolean,
+    description: "Whether a private-repo token is stored (write-only).",
+  })
+  hasGitToken!: boolean;
+
   @ApiProperty({ type: String, format: "date-time" })
   createdAt!: string;
 

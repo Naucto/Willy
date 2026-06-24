@@ -176,6 +176,13 @@
       "when": 1782301997008,
       "tag": "0024_pretty_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1782322969428,
+      "tag": "0025_silly_ikaris",
+      "breakpoints": true
     }
   ]
 }

@@ -33,6 +33,13 @@ export class UpdateDeploymentDto {
   @IsString()
   gitRef?: string;
 
+  // Private-repo token: a non-empty value replaces the stored token, an empty string clears it,
+  // and omitting the field leaves it unchanged. Write-only — never returned (see hasGitToken).
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsString()
+  gitToken?: string;
+
   @ApiPropertyOptional({ enum: STRATEGIES })
   @IsOptional()
   @IsIn(STRATEGIES)

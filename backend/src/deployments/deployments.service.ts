@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { assertValidCron } from "../common/cron";
 import { DatabaseError } from "../common/errors";
 import { CryptoService } from "../crypto/crypto.service";
@@ -117,10 +117,13 @@ export interface UpdateDeploymentInput {
   healthcheck?: HealthcheckSpec | null;
   // The primary domain lives in a separate table; handled out-of-band in update().
   domain?: string;
+  // The git token lives in git_credentials; handled out-of-band in update(). Non-empty replaces,
+  // empty string clears, undefined leaves unchanged.
+  gitToken?: string;
 }
 
-// A deployment plus its primary domain, for API responses.
-export type DeploymentView = Deployment & { primaryDomain: string | null };
+// A deployment plus its primary domain and whether a private-repo token is stored, for API responses.
+export type DeploymentView = Deployment & { primaryDomain: string | null; hasGitToken: boolean };
 
 const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "gitUrl",
@@ -191,19 +194,44 @@ export class DeploymentsService {
     }
 
     if (input.gitToken) {
-      const sealed = this.crypto.encrypt(input.gitToken);
-      await this.db.insert(gitCredentials).values({
-        name: `${input.name}-token`,
-        kind: "PAT",
-        deploymentId: deployment.id,
-        cipherText: sealed.cipherText,
-        nonce: sealed.nonce,
-        authTag: sealed.authTag,
-        keyVersion: sealed.keyVersion,
-      });
+      await this.setGitToken(deployment.id, input.name, input.gitToken);
     }
 
     return deployment;
+  }
+
+  // Stores (or replaces) the encrypted private-repo token for a deployment. At most one credential
+  // row exists per deployment, so an existing row is updated in place rather than duplicated.
+  private async setGitToken(deploymentId: string, name: string, token: string): Promise<void> {
+    const sealed = this.crypto.encrypt(token);
+    const existing = await this.db
+      .select({ id: gitCredentials.id })
+      .from(gitCredentials)
+      .where(eq(gitCredentials.deploymentId, deploymentId))
+      .limit(1);
+
+    const values = {
+      kind: "PAT" as const,
+      cipherText: sealed.cipherText,
+      nonce: sealed.nonce,
+      authTag: sealed.authTag,
+      keyVersion: sealed.keyVersion,
+    };
+
+    if (existing[0]) {
+      await this.db
+        .update(gitCredentials)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(gitCredentials.deploymentId, deploymentId));
+
+      return;
+    }
+
+    await this.db.insert(gitCredentials).values({ name: `${name}-token`, deploymentId, ...values });
+  }
+
+  private async clearGitToken(deploymentId: string): Promise<void> {
+    await this.db.delete(gitCredentials).where(eq(gitCredentials.deploymentId, deploymentId));
   }
 
   findAll(): Promise<Deployment[]> {
@@ -220,6 +248,17 @@ export class DeploymentsService {
     // Domain lives in its own table; apply it separately (takes effect on next deploy/restart).
     if (input.domain !== undefined) {
       await this.domains.setPrimaryDomain(id, input.domain);
+    }
+
+    // The git token lives in git_credentials; a non-empty value replaces it, an empty string clears
+    // it. Applies on the next build.
+    if (input.gitToken !== undefined) {
+      if (input.gitToken.length > 0) {
+        const current = await this.findById(id);
+        await this.setGitToken(id, current?.name ?? id, input.gitToken);
+      } else {
+        await this.clearGitToken(id);
+      }
     }
 
     const fields: Partial<typeof deployments.$inferInsert> = { updatedAt: new Date() };
@@ -258,6 +297,29 @@ export class DeploymentsService {
       .returning();
 
     return requireRow(rows, "deployment update returned no row");
+  }
+
+  // Renames a deployment. The name is woven into Docker resource identifiers (container/image names,
+  // Traefik routers, compose project), so the change only takes effect on the next deploy — the
+  // caller is warned of this in the UI.
+  async rename(id: string, name: string): Promise<Deployment> {
+    const clash = await this.db
+      .select({ id: deployments.id })
+      .from(deployments)
+      .where(eq(deployments.name, name))
+      .limit(1);
+
+    if (clash[0] && clash[0].id !== id) {
+      throw new ConflictException(`a deployment named "${name}" already exists`);
+    }
+
+    const rows = await this.db
+      .update(deployments)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(deployments.id, id))
+      .returning();
+
+    return requireRow(rows, "deployment rename returned no row");
   }
 
   async remove(id: string): Promise<void> {
@@ -309,12 +371,17 @@ export class DeploymentsService {
     return row;
   }
 
-  // List/get enriched with the primary domain fqdn for API responses.
+  // List/get enriched with the primary domain fqdn and token presence for API responses.
   async findAllForApi(): Promise<DeploymentView[]> {
     const rows = await this.db.select().from(deployments);
     const byDeployment = await this.domains.primaryFqdns();
+    const withToken = await this.deploymentsWithToken();
 
-    return rows.map((row) => ({ ...row, primaryDomain: byDeployment.get(row.id) ?? null }));
+    return rows.map((row) => ({
+      ...row,
+      primaryDomain: byDeployment.get(row.id) ?? null,
+      hasGitToken: withToken.has(row.id),
+    }));
   }
 
   async findByIdForApi(id: string): Promise<DeploymentView | undefined> {
@@ -326,7 +393,32 @@ export class DeploymentsService {
 
     const domain = await this.domains.primaryDomain(id);
 
-    return { ...deployment, primaryDomain: domain?.fqdn ?? null };
+    return {
+      ...deployment,
+      primaryDomain: domain?.fqdn ?? null,
+      hasGitToken: await this.hasGitToken(id),
+    };
+  }
+
+  private async hasGitToken(deploymentId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: gitCredentials.id })
+      .from(gitCredentials)
+      .where(
+        and(eq(gitCredentials.deploymentId, deploymentId), isNotNull(gitCredentials.cipherText)),
+      )
+      .limit(1);
+
+    return rows.length > 0;
+  }
+
+  private async deploymentsWithToken(): Promise<Set<string>> {
+    const rows = await this.db
+      .select({ deploymentId: gitCredentials.deploymentId })
+      .from(gitCredentials)
+      .where(isNotNull(gitCredentials.cipherText));
+
+    return new Set(rows.map((row) => row.deploymentId).filter((id): id is string => id !== null));
   }
 
   async resolveGitToken(deploymentId: string): Promise<string | undefined> {

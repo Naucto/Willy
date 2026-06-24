@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -8,18 +9,20 @@ import {
   Param,
   Post,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiParam, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/jwt-payload.interface";
 import { AuditService } from "../audit/audit.service";
 import { OkResponseDto } from "../common/dto/ok.dto";
-import { DeploymentsService } from "../deployments/deployments.service";
+import { type DeploymentView, DeploymentsService } from "../deployments/deployments.service";
+import { DeploymentDto } from "../deployments/dto/deployment.dto";
 import { BuildOrchestrator } from "./build-orchestrator.service";
 import { type CronRun, CronRunsService } from "./cron-runs.service";
 import { CronService } from "./cron.service";
 import { CronRunDto } from "./dto/cron-run.dto";
 import { ReleaseDto } from "./dto/release.dto";
+import { RenameDeploymentDto } from "./dto/rename-deployment.dto";
 import { type Release, ReleasesService } from "./releases.service";
 
 function cronRunToDto(row: CronRun): CronRunDto {
@@ -146,6 +149,46 @@ export class DeploymentActionsController {
     });
 
     return { ok: true };
+  }
+
+  // The name is woven into Docker resource identifiers (container/image names, Traefik routers,
+  // compose project), so it only takes effect on the next deploy — and resources created under the
+  // old name linger until then. The caller is warned; here we just rename the record.
+  @Roles("ADMIN", "OPERATOR")
+  @HttpCode(200)
+  @ApiBody({ type: RenameDeploymentDto })
+  @ApiOkResponse({ type: DeploymentDto })
+  @Post("deployments/:id/rename")
+  async rename(
+    @Param("id") id: string,
+    @Body() dto: RenameDeploymentDto,
+    @CurrentUser() user: AuthUser,
+    @Ip() ip: string,
+  ): Promise<DeploymentView> {
+    const current = await this.deployments.findById(id);
+
+    if (!current) {
+      throw new NotFoundException("deployment not found");
+    }
+
+    await this.deployments.rename(id, dto.name);
+
+    await this.audit.record({
+      actorId: user.userId,
+      action: "DEPLOYMENT_RENAME",
+      targetType: "deployment",
+      targetId: id,
+      ip,
+      metadata: { from: current.name, to: dto.name },
+    });
+
+    const view = await this.deployments.findByIdForApi(id);
+
+    if (!view) {
+      throw new NotFoundException("deployment not found");
+    }
+
+    return view;
   }
 
   @Roles("ADMIN", "OPERATOR")
