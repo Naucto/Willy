@@ -38,6 +38,18 @@ export class DeploymentStatsDto {
   @ApiProperty({ type: Number })
   swapBytes!: number;
 
+  @ApiProperty({ type: Number, description: "Cumulative network bytes received." })
+  netRxBytes!: number;
+
+  @ApiProperty({ type: Number, description: "Cumulative network bytes transmitted." })
+  netTxBytes!: number;
+
+  @ApiProperty({ type: Number, description: "Cumulative block-device bytes read." })
+  blkReadBytes!: number;
+
+  @ApiProperty({ type: Number, description: "Cumulative block-device bytes written." })
+  blkWriteBytes!: number;
+
   @ApiProperty({ type: Number, description: "Named volumes + container writable layers." })
   storageBytes!: number;
 
@@ -75,14 +87,48 @@ export class SystemStatsDto {
   @ApiProperty({ type: Number, description: "Sum of memory used across all running containers." })
   memUsageBytes!: number;
 
+  @ApiProperty({ type: Number, description: "Cumulative network bytes received (all containers)." })
+  netRxBytes!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: "Cumulative network bytes transmitted (all containers).",
+  })
+  netTxBytes!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: "Cumulative block-device bytes read (all containers).",
+  })
+  blkReadBytes!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: "Cumulative block-device bytes written (all containers).",
+  })
+  blkWriteBytes!: number;
+
   @ApiProperty({ type: () => DiskUsageDto })
   disk!: DiskUsageDto;
 }
 
-// One recorded host snapshot. Same fields as the live SystemStatsDto plus the sample timestamp.
+// One recorded host snapshot. Same fields as the live SystemStatsDto plus the sample timestamp and
+// the derived I/O rates (the cumulative byte counters are diffed by the sampler into bytes/sec).
 export class HostStatsSampleDto extends SystemStatsDto {
   @ApiProperty({ type: Number, description: "Sample time (epoch ms)." })
   ts!: number;
+
+  @ApiProperty({ type: Number, description: "Network receive rate in bytes/sec." })
+  netRxBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Network transmit rate in bytes/sec." })
+  netTxBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Block-device read rate in bytes/sec." })
+  blkReadBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Block-device write rate in bytes/sec." })
+  blkWriteBytesPerSec!: number;
 }
 
 export class HostStatsHistoryDto {
@@ -110,6 +156,18 @@ export class DeploymentStatsSampleDto {
 
   @ApiProperty({ type: Number })
   swapBytes!: number;
+
+  @ApiProperty({ type: Number, description: "Network receive rate in bytes/sec." })
+  netRxBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Network transmit rate in bytes/sec." })
+  netTxBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Block-device read rate in bytes/sec." })
+  blkReadBytesPerSec!: number;
+
+  @ApiProperty({ type: Number, description: "Block-device write rate in bytes/sec." })
+  blkWriteBytesPerSec!: number;
 
   @ApiProperty({ type: Number, description: "Named volumes + container writable layers." })
   storageBytes!: number;

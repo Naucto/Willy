@@ -1,6 +1,14 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type Docker from "dockerode";
-import { type MemSnapshot, cpuPercent, memUsage } from "../stats/stats.util";
+import {
+  type BlkioSnapshot,
+  type MemSnapshot,
+  type NetSnapshot,
+  blkioBytes,
+  cpuPercent,
+  memUsage,
+  netBytes,
+} from "../stats/stats.util";
 import { DOCKER_CLIENT } from "./docker-client";
 import { describeError } from "./docker-helpers";
 import type { ContainerStat, DiskUsage } from "./docker.types";
@@ -51,12 +59,18 @@ export class DockerSystemService {
     try {
       const raw = await this.docker.getContainer(id).stats({ stream: false });
       const mem = memUsage(raw.memory_stats as unknown as MemSnapshot);
+      const net = netBytes(raw.networks as unknown as Record<string, NetSnapshot> | undefined);
+      const blk = blkioBytes(raw.blkio_stats as unknown as BlkioSnapshot | undefined);
 
       return {
         cpuPercent: cpuPercent(raw.cpu_stats, raw.precpu_stats),
         memUsageBytes: mem.usageBytes,
         memLimitBytes: mem.limitBytes,
         swapBytes: mem.swapBytes,
+        netRxBytes: net.rxBytes,
+        netTxBytes: net.txBytes,
+        blkReadBytes: blk.readBytes,
+        blkWriteBytes: blk.writeBytes,
       };
     } catch {
       return null;

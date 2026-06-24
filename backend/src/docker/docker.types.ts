@@ -5,6 +5,11 @@ export interface ContainerStat {
   memUsageBytes: number;
   memLimitBytes: number;
   swapBytes: number;
+  // Cumulative byte counters since the container started; rates are derived by the sampler.
+  netRxBytes: number;
+  netTxBytes: number;
+  blkReadBytes: number;
+  blkWriteBytes: number;
 }
 
 export interface VolumeUsage {

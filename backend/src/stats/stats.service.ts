@@ -7,6 +7,7 @@ import type {
   DeploymentStatsHistoryDto,
   DeploymentStatsSampleDto,
   HostStatsHistoryDto,
+  HostStatsSampleDto,
   SystemStatsDto,
 } from "./dto/stats.dto";
 import { deploymentKey, hostKey, MetricsStoreService, type Sample } from "./metrics-store.service";
@@ -23,7 +24,7 @@ export class StatsService {
 
   async systemHistory(window: StatsWindow): Promise<HostStatsHistoryDto> {
     const since = Date.now() - windowToMs(window);
-    const samples = await this.store.range<SystemStatsDto>(hostKey(), since);
+    const samples = await this.store.range<Omit<HostStatsSampleDto, "ts">>(hostKey(), since);
 
     return { samples: samples.map(withTimestamp) };
   }
@@ -64,6 +65,10 @@ export class StatsService {
     const cpuPercent = perContainer.reduce((sum, s) => sum + s.cpuPercent, 0);
     const memUsageBytes = perContainer.reduce((sum, s) => sum + s.memUsageBytes, 0);
     const swapBytes = perContainer.reduce((sum, s) => sum + s.swapBytes, 0);
+    const netRxBytes = perContainer.reduce((sum, s) => sum + s.netRxBytes, 0);
+    const netTxBytes = perContainer.reduce((sum, s) => sum + s.netTxBytes, 0);
+    const blkReadBytes = perContainer.reduce((sum, s) => sum + s.blkReadBytes, 0);
+    const blkWriteBytes = perContainer.reduce((sum, s) => sum + s.blkWriteBytes, 0);
 
     // Storage = the deployment's named volumes + its containers' writable layers.
     const volumeNames = new Set(
@@ -79,6 +84,10 @@ export class StatsService {
       memUsageBytes,
       memLimitBytes: deployment.memoryLimitMb ? deployment.memoryLimitMb * 1024 * 1024 : null,
       swapBytes,
+      netRxBytes,
+      netTxBytes,
+      blkReadBytes,
+      blkWriteBytes,
       storageBytes: volumesBytes,
       volumes,
       containers: perContainer.map((s) => ({
@@ -106,6 +115,10 @@ export class StatsService {
       memTotalBytes: host.memoryMb * 1024 * 1024,
       cpuPercent: round(live.reduce((sum, s) => sum + s.cpuPercent, 0)),
       memUsageBytes: live.reduce((sum, s) => sum + s.memUsageBytes, 0),
+      netRxBytes: live.reduce((sum, s) => sum + s.netRxBytes, 0),
+      netTxBytes: live.reduce((sum, s) => sum + s.netTxBytes, 0),
+      blkReadBytes: live.reduce((sum, s) => sum + s.blkReadBytes, 0),
+      blkWriteBytes: live.reduce((sum, s) => sum + s.blkWriteBytes, 0),
       disk: {
         imagesBytes: disk.imagesBytes,
         containersBytes: disk.containersBytes,

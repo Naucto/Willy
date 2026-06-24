@@ -44,6 +44,69 @@ export function memUsage(mem: MemSnapshot): {
   };
 }
 
+// Per-interface network counters Docker reports under `networks`; only the byte totals interest us.
+export interface NetSnapshot {
+  rx_bytes?: number;
+  tx_bytes?: number;
+}
+
+// One row of Docker's blkio recursive accounting: a device + operation (Read/Write/Sync/Async/…).
+export interface BlkioEntry {
+  op?: string;
+  value?: number;
+}
+
+export interface BlkioSnapshot {
+  io_service_bytes_recursive?: BlkioEntry[];
+}
+
+// Sum rx/tx across every attached interface. Counters are cumulative since container start.
+export function netBytes(networks: Record<string, NetSnapshot> | undefined): {
+  rxBytes: number;
+  txBytes: number;
+} {
+  let rxBytes = 0;
+  let txBytes = 0;
+
+  for (const net of Object.values(networks ?? {})) {
+    rxBytes += net.rx_bytes ?? 0;
+    txBytes += net.tx_bytes ?? 0;
+  }
+
+  return { rxBytes, txBytes };
+}
+
+// Sum read/write bytes from the recursive blkio table. May be empty under cgroup v2 — degrade to 0.
+export function blkioBytes(blkio: BlkioSnapshot | undefined): {
+  readBytes: number;
+  writeBytes: number;
+} {
+  let readBytes = 0;
+  let writeBytes = 0;
+
+  for (const entry of blkio?.io_service_bytes_recursive ?? []) {
+    const op = entry.op?.toLowerCase();
+
+    if (op === "read") {
+      readBytes += entry.value ?? 0;
+    } else if (op === "write") {
+      writeBytes += entry.value ?? 0;
+    }
+  }
+
+  return { readBytes, writeBytes };
+}
+
+// Per-second rate between two cumulative readings. Clamps negatives to 0 so a counter reset (restart
+// or a changing container set) reads as a momentary lull rather than a huge negative spike.
+export function rate(current: number, previous: number, elapsedSec: number): number {
+  if (elapsedSec <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, current - previous) / elapsedSec;
+}
+
 // Time windows the history endpoints accept, smallest (sparklines) to largest (full charts).
 export enum StatsWindow {
   FifteenMinutes = "15m",
