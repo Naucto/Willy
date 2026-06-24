@@ -122,6 +122,19 @@ export class UsersService {
     await this.db.delete(users).where(eq(users.id, id));
   }
 
+  // Suspend/restore sign-in. Disabling also clears the refresh token so an active session can't be
+  // renewed once its short-lived access token expires.
+  async setDisabled(id: string, disabled: boolean): Promise<void> {
+    await this.db
+      .update(users)
+      .set({
+        disabled,
+        ...(disabled ? { refreshTokenHash: null } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id));
+  }
+
   async setTwoFactor(
     id: string,
     input: { enabled?: boolean; secret?: string | null },

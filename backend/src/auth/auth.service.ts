@@ -51,6 +51,10 @@ export class AuthService {
       throw new UnauthorizedException("invalid credentials");
     }
 
+    if (user.disabled) {
+      throw new UnauthorizedException("account is disabled");
+    }
+
     if (!user.twoFactorEnabled) {
       return { status: "authenticated", session: await this.issueSession(user) };
     }
@@ -119,6 +123,7 @@ export class AuthService {
 
     if (
       !user ||
+      user.disabled ||
       !user.refreshTokenHash ||
       !(await argon2.verify(user.refreshTokenHash, presentedToken))
     ) {

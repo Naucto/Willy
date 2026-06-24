@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEmail, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 const ROLES = ["ADMIN", "OPERATOR", "VIEWER"] as const;
 type Role = (typeof ROLES)[number];
@@ -17,6 +25,9 @@ export class UserDto {
 
   @ApiProperty({ enum: ROLES })
   role!: string;
+
+  @ApiProperty({ type: Boolean, description: "Whether sign-in is suspended for this user." })
+  disabled!: boolean;
 
   @ApiProperty({ type: Boolean, description: "Whether 2FA is required for this user." })
   twoFactorEnabled!: boolean;
@@ -72,4 +83,10 @@ export class SetPasswordDto {
   @IsString()
   @MinLength(8)
   password!: string;
+}
+
+export class SetUserDisabledDto {
+  @ApiProperty({ type: Boolean, description: "Suspend (true) or restore (false) sign-in." })
+  @IsBoolean()
+  disabled!: boolean;
 }

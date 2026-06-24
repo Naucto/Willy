@@ -9,6 +9,7 @@ const baseUser: User = {
   name: null,
   passwordHash: "",
   role: "VIEWER",
+  disabled: false,
   twoFactorEnabled: false,
   twoFactorSecret: null,
   refreshTokenHash: null,

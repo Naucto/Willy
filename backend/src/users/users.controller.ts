@@ -19,7 +19,13 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/jwt-payload.interface";
 import { OkResponseDto } from "../common/dto/ok.dto";
-import { CreateUserDto, SetPasswordDto, UpdateUserDto, UserDto } from "./dto/user.dto";
+import {
+  CreateUserDto,
+  SetPasswordDto,
+  SetUserDisabledDto,
+  UpdateUserDto,
+  UserDto,
+} from "./dto/user.dto";
 import { type User, UsersService } from "./users.service";
 
 function toDto(user: User): UserDto {
@@ -28,6 +34,7 @@ function toDto(user: User): UserDto {
     email: user.email,
     name: user.name,
     role: user.role,
+    disabled: user.disabled,
     twoFactorEnabled: user.twoFactorEnabled,
     twoFactorConfigured: user.twoFactorSecret !== null,
     createdAt: user.createdAt.toISOString(),
@@ -176,6 +183,40 @@ export class UsersController {
     await this.audit.record({
       actorId: actor.userId,
       action: "USER_PASSWORD_RESET",
+      targetType: "user",
+      targetId: id,
+      ip,
+    });
+
+    return { ok: true };
+  }
+
+  @Roles("ADMIN")
+  @HttpCode(200)
+  @ApiParam({ name: "id", type: String })
+  @ApiBody({ type: SetUserDisabledDto })
+  @ApiOkResponse({ type: OkResponseDto })
+  @Patch(":id/disabled")
+  async setDisabled(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: SetUserDisabledDto,
+    @CurrentUser() actor: AuthUser,
+    @Ip() ip: string,
+  ): Promise<{ ok: true }> {
+    if (id === actor.userId) {
+      throw new BadRequestException("you cannot disable your own account");
+    }
+
+    const target = await this.users.findById(id);
+
+    if (!target) {
+      throw new NotFoundException("user not found");
+    }
+
+    await this.users.setDisabled(id, dto.disabled);
+    await this.audit.record({
+      actorId: actor.userId,
+      action: dto.disabled ? "USER_DISABLE" : "USER_ENABLE",
       targetType: "user",
       targetId: id,
       ip,

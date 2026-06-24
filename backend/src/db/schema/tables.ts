@@ -43,6 +43,8 @@ export const users = pgTable("users", {
   name: text("name"),
   passwordHash: text("password_hash").notNull(),
   role: roleEnum("role").notNull().default("VIEWER"),
+  // Suspends sign-in without deleting the account; enforced on every authenticated request.
+  disabled: boolean("disabled").notNull().default(false),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   // JSON-serialized SealedSecret (crypto.service) once confirmed; null while off/pending.
   twoFactorSecret: text("two_factor_secret"),

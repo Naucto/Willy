@@ -13,6 +13,7 @@ const baseUser: User = {
   name: null,
   passwordHash: "",
   role: "ADMIN",
+  disabled: false,
   twoFactorEnabled: false,
   twoFactorSecret: null,
   refreshTokenHash: null,

@@ -169,6 +169,13 @@
       "when": 1782078757515,
       "tag": "0023_aspiring_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1782301997008,
+      "tag": "0024_pretty_red_ghost",
+      "breakpoints": true
     }
   ]
 }
