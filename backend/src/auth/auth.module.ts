@@ -11,6 +11,7 @@ import { RolesGuard } from "./guards/roles.guard";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
 import { TwoFactorController } from "./two-factor.controller";
+import { TwoFactorLockoutService } from "./two-factor-lockout.service";
 import { TwoFactorService } from "./two-factor.service";
 
 @Module({
@@ -20,6 +21,7 @@ import { TwoFactorService } from "./two-factor.service";
     AuthService,
     AdminSeedService,
     TwoFactorService,
+    TwoFactorLockoutService,
     JwtStrategy,
     JwtRefreshStrategy,
     // Global auth: every route requires a valid access token unless marked @Public,

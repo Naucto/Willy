@@ -19,16 +19,28 @@ function sign(secret: string, payload: string): string {
   return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-// Pure ticket helpers (HMAC over the panel's JWT secret) — unit-tested.
-export function issueStreamTicket(secret: string, userId: string, now = Date.now()): string {
-  const payload = Buffer.from(JSON.stringify({ sub: userId, exp: now + TICKET_TTL_MS })).toString(
-    "base64url",
-  );
+// Pure ticket helpers (HMAC over the panel's JWT secret) — unit-tested. A ticket is bound to one
+// deployment: it's only valid for the console of the deployment it was issued for, so a ticket minted
+// for deployment A can't be replayed against deployment B's console (the upgrade passes the URL's id).
+export function issueStreamTicket(
+  secret: string,
+  userId: string,
+  deploymentId: string,
+  now = Date.now(),
+): string {
+  const payload = Buffer.from(
+    JSON.stringify({ sub: userId, dep: deploymentId, exp: now + TICKET_TTL_MS }),
+  ).toString("base64url");
 
   return `${payload}.${sign(secret, payload)}`;
 }
 
-export function verifyStreamTicket(secret: string, token: string, now = Date.now()): boolean {
+export function verifyStreamTicket(
+  secret: string,
+  token: string,
+  deploymentId: string,
+  now = Date.now(),
+): boolean {
   const [payload, signature] = token.split(".");
 
   if (!payload || !signature) {
@@ -44,9 +56,12 @@ export function verifyStreamTicket(secret: string, token: string, now = Date.now
   }
 
   try {
-    const { exp } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { exp: number };
+    const { exp, dep } = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+      exp: number;
+      dep?: string;
+    };
 
-    return typeof exp === "number" && now < exp;
+    return typeof exp === "number" && now < exp && dep === deploymentId;
   } catch {
     return false;
   }
@@ -70,12 +85,12 @@ export class ConsoleService {
     this.secret = config.getOrThrow<string>("JWT_SECRET");
   }
 
-  issueTicket(userId: string): string {
-    return issueStreamTicket(this.secret, userId);
+  issueTicket(userId: string, deploymentId: string): string {
+    return issueStreamTicket(this.secret, userId, deploymentId);
   }
 
-  verifyTicket(token: string): boolean {
-    return verifyStreamTicket(this.secret, token);
+  verifyTicket(token: string, deploymentId: string): boolean {
+    return verifyStreamTicket(this.secret, token, deploymentId);
   }
 
   // Bridges a browser terminal to an interactive shell in one of the deployment's containers. With

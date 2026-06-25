@@ -6,6 +6,7 @@ import { parseDurationSeconds } from "../common/duration";
 import { User, UsersService } from "../users/users.service";
 import { JwtPayload } from "./jwt-payload.interface";
 import { type Capability, capabilitiesForRole } from "./permissions";
+import { TwoFactorLockoutService } from "./two-factor-lockout.service";
 import { TwoFactorService } from "./two-factor.service";
 
 export interface SessionResult {
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly twoFactor: TwoFactorService,
+    private readonly lockout: TwoFactorLockoutService,
   ) {}
 
   hashPassword(password: string): Promise<string> {
@@ -76,12 +78,19 @@ export class AuthService {
   // Second login step when 2FA is active: verify the TOTP code against the stored secret.
   async verifyTotpLogin(challengeToken: string, code: string): Promise<SessionResult> {
     const userId = await this.twoFactor.verifyChallengeToken(challengeToken, "verify");
+
+    await this.lockout.assertNotLockedOut(userId);
+
     const user = await this.users.findById(userId);
     const secret = user ? this.twoFactor.decryptSecret(user) : null;
 
     if (!user || !secret || !this.twoFactor.verifyCode(secret, code)) {
+      await this.lockout.recordFailure(userId);
+
       throw new UnauthorizedException("invalid 2FA code");
     }
+
+    await this.lockout.clear(userId);
 
     return this.issueSession(user);
   }
@@ -104,10 +113,15 @@ export class AuthService {
   async confirmTotpSetup(setupToken: string, code: string): Promise<SessionResult> {
     const { userId, secret } = await this.twoFactor.verifySetupToken(setupToken);
 
+    await this.lockout.assertNotLockedOut(userId);
+
     if (!this.twoFactor.verifyCode(secret, code)) {
+      await this.lockout.recordFailure(userId);
+
       throw new UnauthorizedException("invalid 2FA code");
     }
 
+    await this.lockout.clear(userId);
     await this.twoFactor.enable(userId, secret);
     const user = await this.users.findById(userId);
 

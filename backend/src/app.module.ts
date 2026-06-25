@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { APP_FILTER } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerModule } from "@nestjs/throttler";
 import { AdminModule } from "./admin/admin.module";
@@ -7,6 +8,7 @@ import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { BackupsModule } from "./backups/backups.module";
 import { BuildModule } from "./build/build.module";
+import { AllExceptionsFilter } from "./common/all-exceptions.filter";
 import { validateEnv } from "./config/env.validation";
 import { ConsoleModule } from "./console/console.module";
 import { CryptoModule } from "./crypto/crypto.module";
@@ -65,5 +67,6 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     TasksModule,
     AuditModule,
   ],
+  providers: [{ provide: APP_FILTER, useClass: AllExceptionsFilter }],
 })
 export class AppModule {}

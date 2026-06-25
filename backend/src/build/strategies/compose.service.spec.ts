@@ -86,4 +86,52 @@ describe("sanitizeComposeYaml", () => {
       healthchecks: {},
     });
   });
+
+  it("injects no-new-privileges into every service", () => {
+    const raw = ["services:", "  web:", "    image: nginx", "  worker:", "    image: busybox"].join(
+      "\n",
+    );
+
+    const parsed = parse(sanitizeComposeYaml(raw).yaml) as {
+      services: Record<string, { security_opt?: string[] }>;
+    };
+
+    expect(parsed.services.web?.security_opt).toEqual(["no-new-privileges:true"]);
+    expect(parsed.services.worker?.security_opt).toEqual(["no-new-privileges:true"]);
+  });
+
+  it("appends no-new-privileges without clobbering a user's security_opt", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "    security_opt:",
+      "      - seccomp:unconfined",
+    ].join("\n");
+
+    const parsed = parse(sanitizeComposeYaml(raw).yaml) as {
+      services: Record<string, { security_opt?: string[] }>;
+    };
+
+    expect(parsed.services.web?.security_opt).toEqual([
+      "seccomp:unconfined",
+      "no-new-privileges:true",
+    ]);
+  });
+
+  it("does not duplicate an existing no-new-privileges entry", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "    security_opt:",
+      "      - no-new-privileges:true",
+    ].join("\n");
+
+    const parsed = parse(sanitizeComposeYaml(raw).yaml) as {
+      services: Record<string, { security_opt?: string[] }>;
+    };
+
+    expect(parsed.services.web?.security_opt).toEqual(["no-new-privileges:true"]);
+  });
 });

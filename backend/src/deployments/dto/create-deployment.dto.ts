@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from "class-validator";
+import { AreCapabilitiesSafe } from "../capabilities";
 import type { Deployment, DeploymentType } from "../deployments.service";
 
 const TYPES: DeploymentType[] = ["WEB", "WORKER", "CRON"];
@@ -110,10 +111,11 @@ export class CreateDeploymentDto {
   @Min(0)
   nanoCpus?: number;
 
-  @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
+  @ApiPropertyOptional({ type: [String], example: ["NET_BIND_SERVICE"] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @AreCapabilitiesSafe()
   capAdd?: string[];
 
   @ApiPropertyOptional({ type: [String], example: ["ALL"] })

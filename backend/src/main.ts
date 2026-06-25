@@ -62,7 +62,10 @@ function attachConsoleWebsocket(app: Awaited<ReturnType<typeof NestFactory.creat
       return;
     }
 
-    if (!consoleService.verifyTicket(url.searchParams.get("ticket") ?? "")) {
+    const deploymentId = match[1] as string;
+
+    // The ticket is bound to this deployment — a ticket for another deployment's console is rejected.
+    if (!consoleService.verifyTicket(url.searchParams.get("ticket") ?? "", deploymentId)) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
 
@@ -72,7 +75,7 @@ function attachConsoleWebsocket(app: Awaited<ReturnType<typeof NestFactory.creat
     const container = url.searchParams.get("container") ?? undefined;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
-      void consoleService.attach(ws, match[1] as string, container);
+      void consoleService.attach(ws, deploymentId, container);
     });
   });
 }

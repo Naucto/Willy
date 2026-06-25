@@ -101,6 +101,21 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+// Baseline hardening: every compose service gets `no-new-privileges` so a deployed app can't gain
+// capabilities via setuid binaries (mirrors the single-container path). Appends to — never replaces —
+// any security_opt the user already declared (e.g. a seccomp/apparmor profile).
+function withNoNewPrivileges(existing: unknown): string[] {
+  const opts = Array.isArray(existing)
+    ? existing.filter((o): o is string => typeof o === "string")
+    : [];
+
+  if (opts.some((o) => o.replace(/\s+/g, "").startsWith("no-new-privileges"))) {
+    return opts;
+  }
+
+  return [...opts, "no-new-privileges:true"];
+}
+
 // Rewrites a user's compose file so two deployments from the same source don't collide. A hardcoded
 // `container_name` overrides Docker's project prefix (and an override file can't *delete* a key), so
 // two stacks would fight over one fixed name ("name already in use"); we strip it from every service
@@ -127,6 +142,8 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const service = { ...(value as Record<string, unknown>) };
       delete service.container_name;
+
+      service.security_opt = withNoNewPrivileges(service.security_opt);
 
       if (service.ports !== undefined) {
         delete service.ports;

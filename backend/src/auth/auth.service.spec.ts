@@ -5,6 +5,7 @@ import * as argon2 from "argon2";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { User, UsersService } from "../users/users.service";
 import { AuthService } from "./auth.service";
+import { TwoFactorLockoutService } from "./two-factor-lockout.service";
 import { TwoFactorService } from "./two-factor.service";
 
 const baseUser: User = {
@@ -38,8 +39,13 @@ describe("AuthService.login", () => {
     const twoFactor = {
       mintChallengeToken: vi.fn().mockResolvedValue("challenge"),
     } as unknown as TwoFactorService;
+    const lockout = {
+      assertNotLockedOut: vi.fn().mockResolvedValue(undefined),
+      recordFailure: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined),
+    } as unknown as TwoFactorLockoutService;
 
-    return { service: new AuthService(users, jwt, config, twoFactor), users };
+    return { service: new AuthService(users, jwt, config, twoFactor, lockout), users };
   }
 
   it("issues a session for valid credentials and stores a refresh hash", async () => {

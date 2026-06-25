@@ -2649,10 +2649,19 @@
         ]
       }
     },
-    "/streams/ticket": {
+    "/streams/ticket/{deploymentId}": {
       "post": {
         "operationId": "ConsoleController_ticket",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "deploymentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -4599,7 +4608,7 @@
           },
           "capAdd": {
             "example": [
-              "NET_ADMIN"
+              "NET_BIND_SERVICE"
             ],
             "type": "array",
             "items": {
@@ -4894,7 +4903,7 @@
           },
           "capAdd": {
             "example": [
-              "NET_ADMIN"
+              "NET_BIND_SERVICE"
             ],
             "type": "array",
             "items": {
@@ -5130,7 +5139,7 @@
           },
           "capAdd": {
             "example": [
-              "NET_ADMIN"
+              "NET_BIND_SERVICE"
             ],
             "type": "array",
             "items": {

@@ -75,6 +75,10 @@ export class DockerContainerService {
         NanoCpus: options.nanoCpus,
         CapAdd: options.capAdd && options.capAdd.length > 0 ? options.capAdd : undefined,
         CapDrop: options.capDrop && options.capDrop.length > 0 ? options.capDrop : undefined,
+        // Block privilege escalation via setuid/setgid binaries — a deployed app should never be able
+        // to gain capabilities it wasn't started with. Docker's default cap set is otherwise kept so
+        // ordinary images (which need CHOWN/SETUID/NET_BIND_SERVICE at startup) still work.
+        SecurityOpt: ["no-new-privileges:true"],
         LogConfig: this.resolveLogConfig(options.logMaxSizeMb, options.logMaxFiles),
       },
     });

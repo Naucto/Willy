@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { CryptoService } from "../crypto/crypto.service";
 import { DB, type Database } from "../db/db.module";
 import { envVars } from "../db/schema";
+import { assertValidEnvKey, assertValidEnvValue } from "./env-var-validation";
 
 export type EnvScope = (typeof envVars.$inferSelect)["scope"];
 export type InjectionPhase = "BUILD" | "RUNTIME";
@@ -44,6 +45,9 @@ export class EnvVarsService {
     value: string,
     input: SetEnvVarInput = {},
   ): Promise<void> {
+    assertValidEnvKey(key);
+    assertValidEnvValue(value);
+
     const sealed = this.crypto.encrypt(value);
     const targetService = input.targetService ?? "";
     const fields = {

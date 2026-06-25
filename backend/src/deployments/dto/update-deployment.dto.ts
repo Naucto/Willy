@@ -10,6 +10,7 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
+import { AreCapabilitiesSafe } from "../capabilities";
 import type { Deployment } from "../deployments.service";
 import { HealthcheckDto } from "./resource-limits.dto";
 
@@ -96,10 +97,11 @@ export class UpdateDeploymentDto {
   @Min(0)
   nanoCpus?: number | null;
 
-  @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
+  @ApiPropertyOptional({ type: [String], example: ["NET_BIND_SERVICE"] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @AreCapabilitiesSafe()
   capAdd?: string[];
 
   @ApiPropertyOptional({ type: [String], example: ["ALL"] })

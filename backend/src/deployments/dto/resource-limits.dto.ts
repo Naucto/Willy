@@ -10,6 +10,7 @@ import {
   Min,
   ValidateNested,
 } from "class-validator";
+import { AreCapabilitiesSafe } from "../capabilities";
 import type { RestartPolicyName } from "../resource-limits";
 
 const RESTART: RestartPolicyName[] = ["NO", "ON_FAILURE", "ALWAYS", "UNLESS_STOPPED"];
@@ -59,10 +60,11 @@ export class ResourceLimitsDto {
   @Min(0)
   nanoCpus?: number | null;
 
-  @ApiPropertyOptional({ type: [String], example: ["NET_ADMIN"] })
+  @ApiPropertyOptional({ type: [String], example: ["NET_BIND_SERVICE"] })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @AreCapabilitiesSafe()
   capAdd?: string[];
 
   @ApiPropertyOptional({ type: [String], example: ["ALL"] })

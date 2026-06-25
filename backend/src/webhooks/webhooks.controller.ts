@@ -47,12 +47,14 @@ export class WebhooksController {
     @Req() req: RawBodyRequest<Request>,
     @Headers("x-hub-signature-256") signature: string | undefined,
     @Headers("x-github-event") event: string | undefined,
+    @Headers("x-github-delivery") delivery: string | undefined,
   ): Promise<WebhookOutcome> {
     return this.webhooks.handlePush(
       id,
       signature ?? "",
       event ?? "",
       req.rawBody ?? Buffer.alloc(0),
+      delivery,
     );
   }
 
