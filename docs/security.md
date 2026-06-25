@@ -55,3 +55,9 @@ Then run `npm install` to regenerate `package-lock.json` and commit both, and ve
 > left for a standard npm environment so `main` is not pushed with an unverifiable lockfile.
 > Re-check `monaco-editor`/`dompurify` on each bump: the editor is only fed trusted content here, so
 > the residual is low-risk, but prefer the override once it is verified to keep the editor working.
+>
+> Re-verified 2026-06-25 (security audit, finding H1): npm 11.16.0 still ignores the root `overrides`
+> for the workspace-nested `multer`/`esbuild` (it does not even record an `overrides` block in the
+> regenerated lockfile). `multer` currently resolves to 2.1.1 — this already fixes CVE-2026-3520 but
+> **not** CVE-2026-5038 / CVE-2026-5079, which need 2.2.0. Apply the block above and run `npm install`
+> in a standard npm environment, then commit the regenerated lockfile.
