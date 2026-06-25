@@ -34,7 +34,11 @@ export function Console({
     };
 
     const start = async () => {
-      const { ticket } = unwrap(await api.POST("/streams/ticket"));
+      const { ticket } = unwrap(
+        await api.POST("/streams/ticket/{deploymentId}", {
+          params: { path: { deploymentId } },
+        }),
+      );
 
       if (disposed || !mountRef.current) {
         return;

@@ -852,7 +852,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/streams/ticket": {
+  "/streams/ticket/{deploymentId}": {
     parameters: {
       query?: never;
       header?: never;
@@ -1488,7 +1488,7 @@ export interface components {
       nanoCpus?: number;
       /**
        * @example [
-       *       "NET_ADMIN"
+       *       "NET_BIND_SERVICE"
        *     ]
        */
       capAdd?: string[];
@@ -1576,7 +1576,7 @@ export interface components {
       nanoCpus?: number | null;
       /**
        * @example [
-       *       "NET_ADMIN"
+       *       "NET_BIND_SERVICE"
        *     ]
        */
       capAdd?: string[];
@@ -1665,7 +1665,7 @@ export interface components {
       nanoCpus?: number | null;
       /**
        * @example [
-       *       "NET_ADMIN"
+       *       "NET_BIND_SERVICE"
        *     ]
        */
       capAdd?: string[];
@@ -3831,7 +3831,9 @@ export interface operations {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        deploymentId: string;
+      };
       cookie?: never;
     };
     requestBody?: never;
