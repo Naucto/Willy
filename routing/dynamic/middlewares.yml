@@ -23,12 +23,15 @@ http:
         referrerPolicy: "strict-origin-when-cross-origin"
         contentSecurityPolicy: >-
           default-src 'self';
+          script-src 'self';
           img-src 'self' data:;
           style-src 'self' 'unsafe-inline';
           font-src 'self' data:;
           connect-src 'self';
+          worker-src 'self' blob:;
           frame-ancestors 'none';
           base-uri 'self';
+          form-action 'self';
           object-src 'none'
     # No blanket rate-limit middleware: it isn't wired to any router, and a global cap would throttle
     # the high-connection WebRTC tenant apps Willy fronts. Add a scoped limiter per-app if ever needed.
