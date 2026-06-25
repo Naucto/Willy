@@ -48,13 +48,16 @@ export class GitService {
 
   async clone(options: CloneOptions): Promise<CloneResult> {
     this.assertSafeUrl(options.url);
+    assertSafeRef(options.ref);
 
     await mkdir(this.buildsRoot, { recursive: true });
     const dir = await mkdtemp(join(this.buildsRoot, "build-"));
     const url = this.applyToken(options.url, options.token);
 
     try {
-      await exec("git", ["clone", "--depth", "1", "--branch", options.ref, url, dir], {
+      // `--` ends option parsing so a crafted URL/ref can never be read as a git flag (e.g.
+      // `--upload-pack=…`, the classic argument-injection sink); the ref is also pre-validated.
+      await exec("git", ["clone", "--depth", "1", "--branch", options.ref, "--", url, dir], {
         timeout: CLONE_TIMEOUT_MS,
         // Fail fast instead of hanging on a credentials prompt for private repos.
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
@@ -124,7 +127,8 @@ export class GitService {
     const remote = this.applyToken(url, token);
 
     try {
-      const { stdout } = await exec("git", ["ls-remote", "--heads", "--tags", remote], {
+      // `--` ends option parsing so the remote can't be interpreted as a git flag (argument injection).
+      const { stdout } = await exec("git", ["ls-remote", "--heads", "--tags", "--", remote], {
         timeout: LS_REMOTE_TIMEOUT_MS,
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       });
@@ -173,6 +177,16 @@ export class GitService {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// A branch/tag is passed as the value of `git --branch`; reject anything that could be read as an
+// option or smuggle a second argument. The allowlist (word chars plus `./-`) covers every real-world
+// branch/tag name while excluding whitespace, control chars, git-illegal punctuation, an option-leading
+// `-`, and `..` ref escapes. Exported for unit testing.
+export function assertSafeRef(ref: string): void {
+  if (ref.length === 0 || ref.startsWith("-") || ref.includes("..") || !/^[\w./-]+$/.test(ref)) {
+    throw new GitError(`invalid git ref: ${JSON.stringify(ref)}`);
+  }
 }
 
 async function hasSubmodules(dir: string): Promise<boolean> {

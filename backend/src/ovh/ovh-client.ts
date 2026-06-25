@@ -23,6 +23,8 @@ export interface OvhCredentials {
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 // OVH signs requests as "$1$" + sha1(appSecret+consumerKey+method+url+body+timestamp).
+// The SHA-1 is mandated by OVH's API auth protocol — it's a request signature we cannot change, not a
+// security-sensitive digest of our own (CodeQL js/weak-cryptographic-algorithm is a won't-fix here).
 // Pure + exported for unit testing.
 export function signRequest(
   creds: OvhCredentials,

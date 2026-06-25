@@ -56,8 +56,18 @@ Then run `npm install` to regenerate `package-lock.json` and commit both, and ve
 > Re-check `monaco-editor`/`dompurify` on each bump: the editor is only fed trusted content here, so
 > the residual is low-risk, but prefer the override once it is verified to keep the editor working.
 >
-> Re-verified 2026-06-25 (security audit, finding H1): npm 11.16.0 still ignores the root `overrides`
-> for the workspace-nested `multer`/`esbuild` (it does not even record an `overrides` block in the
-> regenerated lockfile). `multer` currently resolves to 2.1.1 — this already fixes CVE-2026-3520 but
-> **not** CVE-2026-5038 / CVE-2026-5079, which need 2.2.0. Apply the block above and run `npm install`
-> in a standard npm environment, then commit the regenerated lockfile.
+> Update 2026-06-25 (security audit, finding H1): this is **not** a sandbox quirk — it reproduces on a
+> normal npm 11.16.0. Confirmed exhaustively: flat override, parent-scoped override
+> (`"@nestjs/platform-express": { "multer": ... }`), `--package-lock-only`, and a full clean
+> install (lockfile deleted) all leave `multer` at **2.1.1**, and npm never records an `overrides`
+> block in the lockfile at all. Root cause: npm does not apply root `overrides` to dependencies nested
+> under a *workspace* package, and `@nestjs/platform-express` pins `multer` to exactly `2.1.1` (so a
+> direct dep won't dedupe it either). `multer` 2.1.1 already fixes CVE-2026-3520 but **not**
+> CVE-2026-5038 / CVE-2026-5079 (DoS). The override block above is therefore not currently effective.
+> Viable paths, in order of preference:
+> 1. Wait for an `@nestjs/platform-express` release that depends on `multer >= 2.2.0`, then plain-bump.
+> 2. `patch-package` the multer copy if the DoS becomes a real concern before then.
+> 3. Accept the residual: the only reachable sink is the authenticated file-upload endpoint on a
+>    single-team panel, so the DoS exposure is low.
+> The `dompurify` advisory (GHSA-v2wj-7wpq-c8vv) is XSS via Monaco, which is only ever fed trusted
+> content here — also low residual.

@@ -59,7 +59,12 @@ Severities reflect the threat model above.
 - `esbuild` dev-server request smuggling (dev-only, via `drizzle-kit`).
 *Refs:* [Vulnerable Dependency Management](https://cheatsheetseries.owasp.org/cheatsheets/Vulnerable_Dependency_Management_Cheat_Sheet.html),
 [Node.js Security](https://cheatsheetseries.owasp.org/cheatsheets/Nodejs_Security_Cheat_Sheet.html).
-**Fix:** apply the `overrides`, regenerate the lockfile, confirm `npm audit` clean + frontend builds.
+**Status — blocked by an npm limitation (not fixed).** Confirmed exhaustively that npm 11.16.0 does not
+apply root `overrides` to deps nested under a *workspace* package, and `@nestjs/platform-express` pins
+`multer` to exactly `2.1.1` (so a direct dep won't dedupe). `multer` 2.1.1 fixes CVE-2026-3520 but not
+the two DoS CVEs. The DoS sink is the authenticated file-upload endpoint on a single-team panel — low
+residual. See `docs/security.md` for the full reproduction and the viable paths (wait for an upstream
+`@nestjs/platform-express` multer bump; `patch-package`; or accept the residual).
 
 ### MEDIUM
 
@@ -145,6 +150,25 @@ within their TTL — a 6-digit TOTP is brute-forceable across rotating IPs. *Ref
 All findings (H1 → L4) are being remediated in the same change set, each with tests, per the repo's
 "tests ship with the change" rule. I1 is documented as an accepted risk with CSP as the compensating
 control.
+
+## Addendum — CodeQL alerts (2026-06-25)
+
+The CodeQL workflow (now live on `main`) surfaced two `high` alerts that the manual review missed:
+
+- **C1 — `js/second-order-command-line-injection`** (`git/git.service.ts`). A user-controlled repo
+  URL/ref flows into `git` argv; git reads a leading-`-` argument as an option (e.g. `--upload-pack=…`),
+  the classic argument-injection sink. **Fixed:** `--` end-of-options separators before the positional
+  URL in `clone` and `ls-remote`, plus a new `assertSafeRef` allowlisting branch/tag names (rejects
+  leading `-`, `..`, whitespace, and git-illegal punctuation). Tests added. CodeQL will auto-close it on
+  the next scan.
+- **C2 — `js/weak-cryptographic-algorithm`** (`ovh/ovh-client.ts`). SHA-1 in `signRequest`. **Won't-fix /
+  false positive:** the SHA-1 is mandated by OVH's API auth protocol (`$1$ + sha1(...)`) — a request
+  signature we don't control, not a security digest of our own. Documented in-code; **dismiss this alert
+  in the Security tab as "won't fix"** (left open — dismissing wasn't in scope for an automated change).
+
+CodeQL on `main` reported **no other open alerts**. GitHub **Dependabot _security_ alerts appear
+disabled** (0 open despite `npm audit` findings) — only Dependabot version-update PRs are on. Worth
+enabling Dependabot alerts in repo Settings → Code security.
 
 ## Sources
 

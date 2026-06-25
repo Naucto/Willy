@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   GitError,
   GitService,
+  assertSafeRef,
   parseRefs,
   submoduleUpdateArgs,
   tokenRewriteConfig,
@@ -27,6 +28,32 @@ describe("GitService SSRF guard", () => {
     "not-a-url",
   ])("rejects %s", async (url) => {
     await expect(makeService().clone({ url, ref: "main" })).rejects.toBeInstanceOf(GitError);
+  });
+});
+
+describe("assertSafeRef", () => {
+  it.each(["main", "master", "v1.2.0", "release/1.2", "feature/JIRA-123_thing", "a.b.c"])(
+    "accepts %s",
+    (ref) => {
+      expect(() => assertSafeRef(ref)).not.toThrow();
+    },
+  );
+
+  it.each([
+    "",
+    "-rf",
+    "--upload-pack=touch /tmp/x",
+    "--output=/etc/passwd",
+    "main branch",
+    "a..b",
+    "ref~1",
+    "a:b",
+    "a?b",
+    "a*b",
+    "a[b",
+    "a\\b",
+  ])("rejects %j", (ref) => {
+    expect(() => assertSafeRef(ref)).toThrow(GitError);
   });
 });
 
