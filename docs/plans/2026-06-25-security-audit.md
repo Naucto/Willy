@@ -166,9 +166,11 @@ The CodeQL workflow (now live on `main`) surfaced two `high` alerts that the man
   signature we don't control, not a security digest of our own. Documented in-code; **dismiss this alert
   in the Security tab as "won't fix"** (left open — dismissing wasn't in scope for an automated change).
 
-CodeQL on `main` reported **no other open alerts**. GitHub **Dependabot _security_ alerts appear
-disabled** (0 open despite `npm audit` findings) — only Dependabot version-update PRs are on. Worth
-enabling Dependabot alerts in repo Settings → Code security.
+CodeQL on `main` reported **no other open alerts**. GitHub **Dependabot security alerts are enabled**
+(confirmed via the `vulnerability-alerts` API) and currently report **0 open alerts** — including for the
+H1 multer/dompurify advisories that local `npm audit` flags. The discrepancy is npm's registry advisory
+DB vs GitHub's GHSA range-matching; GitHub's authoritative scanner does not flag the resolved versions,
+which further lowers H1's real-world urgency.
 
 ## Sources
 
