@@ -26,6 +26,8 @@ interface FormValues {
   source: SourceValue;
   runCommand: string;
   cronExpr: string;
+  // Empty string = "use the operator default"; otherwise a seconds value.
+  healthTimeoutSec: string;
 }
 
 function trimmed(value: string): string | undefined {
@@ -47,6 +49,8 @@ function initialValues(deployment: Deployment): FormValues {
     },
     runCommand: deployment.runCommand ?? "",
     cronExpr: deployment.cronExpr ?? "",
+    healthTimeoutSec:
+      deployment.healthTimeoutSec != null ? String(deployment.healthTimeoutSec) : "",
   };
 }
 
@@ -98,6 +102,13 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
     set("composeFilePath", trimmed(source.composeFilePath));
     set("runCommand", trimmed(values.runCommand));
     set("cronExpr", trimmed(values.cronExpr));
+
+    if (deployment.type === "WEB") {
+      // Empty clears back to the operator default (null); a number sets the per-deployment budget.
+      const raw = values.healthTimeoutSec.trim();
+
+      set("healthTimeoutSec", raw === "" ? null : Number(raw));
+    }
 
     // A non-empty value replaces the token; an empty value clears it. Only sent when the toggle is on.
     if (editToken && isGitStrategy(source.buildStrategy)) {
@@ -215,6 +226,23 @@ export function SettingsTab({ deployment }: { deployment: Deployment }) {
                   : "No token stored."
             }
             onChange={(event) => setTokenValue(event.target.value)}
+          />
+        </SettingRow>
+      )}
+
+      {deployment.type === "WEB" && (
+        <SettingRow
+          label="Health-check timeout"
+          description="How long a deploy waits for the app to become healthy and reachable on its routed port before failing the release. Leave blank to use the operator default. Raise it for slow-booting apps."
+        >
+          <TextField
+            label="Timeout (seconds)"
+            type="number"
+            value={values.healthTimeoutSec}
+            placeholder="default"
+            slotProps={{ htmlInput: { min: 5, max: 3600, step: 5 } }}
+            helperText="Between 5 and 3600 seconds. Blank = operator default."
+            onChange={(event) => setValues((c) => ({ ...c, healthTimeoutSec: event.target.value }))}
           />
         </SettingRow>
       )}

@@ -1540,6 +1540,7 @@ export interface components {
       capDrop: string[] | null;
       logMaxSizeMb: number | null;
       logMaxFiles: number | null;
+      healthTimeoutSec: number | null;
       healthcheck: components["schemas"]["HealthcheckDto"] | null;
       /** @enum {string} */
       state: "CREATED" | "DEPLOYING" | "RUNNING" | "DEGRADED" | "STOPPED" | "ERROR";
@@ -1590,6 +1591,8 @@ export interface components {
       logMaxSizeMb?: number | null;
       /** @example 3 */
       logMaxFiles?: number | null;
+      /** @description Health-check/reachability wait budget in seconds. Null uses the operator default (WILLY_HEALTH_TIMEOUT_SEC) or 90s. */
+      healthTimeoutSec?: number | null;
       healthcheck?: components["schemas"]["HealthcheckDto"] | null;
       /** @example app.example.com */
       domain?: string;
