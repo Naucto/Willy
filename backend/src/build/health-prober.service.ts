@@ -1,18 +1,18 @@
 import { Socket } from "node:net";
 import { Injectable } from "@nestjs/common";
-import { ContainersService } from "../containers/containers.service";
+import { ConfigService } from "@nestjs/config";
+import { ContainersService, type DeploymentContainer } from "../containers/containers.service";
 import type { Deployment } from "../deployments/deployments.service";
 import { DomainsService } from "../deployments/domains.service";
 import { DockerContainerService } from "../docker/docker-container.service";
 
 const EDGE_NETWORK = "willy_edge";
-const WEB_HEALTH_TIMEOUT_MS = 90_000;
 const WORKER_HEALTH_GRACE_MS = 6_000;
 const HEALTH_INTERVAL_MS = 2_000;
 
-// After the stack is healthy, how long to keep trying to actually reach the app on its routed port
-// before declaring the deployment unreachable (a port misconfiguration that would otherwise 502).
-const REACHABILITY_TIMEOUT_MS = 15_000;
+// Fallback health/reachability wait budget when neither the deployment nor the operator sets one. Some
+// apps (migrations, JIT warmup) take a while to bind their port; this is generous on purpose.
+const DEFAULT_HEALTH_TIMEOUT_SEC = 90;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,14 +45,26 @@ export class HealthProber {
     private readonly dockerContainers: DockerContainerService,
     private readonly containers: ContainersService,
     private readonly domains: DomainsService,
+    private readonly config: ConfigService,
   ) {}
+
+  // Resolve the health/reachability wait budget (ms) for a deployment: explicit per-deployment value,
+  // else the operator-wide default, else the built-in fallback.
+  private resolveTimeoutMs(deployment: Deployment): number {
+    const seconds =
+      deployment.healthTimeoutSec ??
+      this.config.get<number>("HEALTHCHECK_TIMEOUT") ??
+      DEFAULT_HEALTH_TIMEOUT_SEC;
+
+    return seconds * 1000;
+  }
 
   // WEB: healthy once the container is running. If it declares a healthcheck (image HEALTHCHECK or a
   // Willy-injected custom one) also wait until it reports "healthy" — Traefik refuses to route a
   // "starting"/"unhealthy" container, so cutting over before then would briefly drop traffic. A
   // container with no healthcheck is considered ready as soon as it's running.
-  async probeWeb(containerId: string): Promise<boolean> {
-    const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
+  async probeWeb(deployment: Deployment, containerId: string): Promise<boolean> {
+    const deadline = Date.now() + this.resolveTimeoutMs(deployment);
 
     while (Date.now() < deadline) {
       const status = await this.dockerContainers.inspectContainer(containerId);
@@ -87,11 +99,13 @@ export class HealthProber {
   // Compose health gate: wait until every project container is up to its bar. A service that
   // declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a service
   // with no healthcheck passes as soon as it's running. Returns false if the deadline passes first.
-  async composeHealthy(deployment: Deployment): Promise<boolean> {
-    const deadline = Date.now() + WEB_HEALTH_TIMEOUT_MS;
+  async composeHealthy(deployment: Deployment, targets?: DeploymentContainer[]): Promise<boolean> {
+    const deadline = Date.now() + this.resolveTimeoutMs(deployment);
 
     while (Date.now() < deadline) {
-      const containers = await this.containers.listForDeployment(deployment);
+      // A fixed target set (the green cutover set) is re-inspected by id each pass, so health status is
+      // still polled live; without one, fall back to the deployment's current containers.
+      const containers = targets ?? (await this.containers.listForDeployment(deployment));
 
       if (containers.length > 0 && (await this.allContainersHealthy(containers))) {
         return true;
@@ -127,11 +141,16 @@ export class HealthProber {
   // a human-readable reason for the first unreachable route, or null when everything is reachable (or
   // can't be safely determined). Conservative: only probes a route when its target container is
   // unambiguous, so it never fails a healthy deploy on missing information.
-  async firstUnreachableRoute(deployment: Deployment): Promise<string | null> {
+  async firstUnreachableRoute(
+    deployment: Deployment,
+    targets?: DeploymentContainer[],
+  ): Promise<string | null> {
     const [containers, routes] = await Promise.all([
-      this.containers.listForDeployment(deployment),
+      targets ?? this.containers.listForDeployment(deployment),
       this.domains.domainRoutes(deployment.id),
     ]);
+
+    const timeoutMs = this.resolveTimeoutMs(deployment);
 
     for (const route of routes) {
       const container = route.targetService
@@ -147,7 +166,7 @@ export class HealthProber {
       }
 
       const port = route.targetPort ?? deployment.webServicePort ?? container.exposedPorts[0] ?? 80;
-      const deadline = Date.now() + REACHABILITY_TIMEOUT_MS;
+      const deadline = Date.now() + timeoutMs;
       let reachable = false;
 
       while (Date.now() < deadline) {

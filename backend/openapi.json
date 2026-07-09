@@ -4764,6 +4764,10 @@
             "type": "number",
             "nullable": true
           },
+          "healthTimeoutSec": {
+            "type": "number",
+            "nullable": true
+          },
           "healthcheck": {
             "nullable": true,
             "type": "object",
@@ -4830,6 +4834,7 @@
           "capDrop",
           "logMaxSizeMb",
           "logMaxFiles",
+          "healthTimeoutSec",
           "healthcheck",
           "state",
           "activeReleaseId",
@@ -4928,6 +4933,13 @@
             "type": "number",
             "example": 3,
             "nullable": true
+          },
+          "healthTimeoutSec": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 3600,
+            "nullable": true,
+            "description": "Health-check/reachability wait budget in seconds. Null uses the operator default (WILLY_HEALTH_TIMEOUT_SEC) or 90s."
           },
           "healthcheck": {
             "nullable": true,

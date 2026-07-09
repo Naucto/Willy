@@ -7,6 +7,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from "class-validator";
@@ -121,6 +122,20 @@ export class UpdateDeploymentDto {
   @IsInt()
   @Min(1)
   logMaxFiles?: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 5,
+    maximum: 3600,
+    nullable: true,
+    description:
+      "Health-check/reachability wait budget in seconds. Null uses the operator default (WILLY_HEALTH_TIMEOUT_SEC) or 90s.",
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(3600)
+  healthTimeoutSec?: number | null;
 
   // Single-container custom healthcheck; null clears it. Compose healthchecks are per-service.
   @ApiPropertyOptional({ type: HealthcheckDto, nullable: true })
