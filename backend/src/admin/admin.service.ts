@@ -153,6 +153,13 @@ export class AdminService {
           .filter((p): p is string => Boolean(p)),
       ),
     ];
+    // A blue-green compose deployment spans a base project plus a release-scoped project; the release
+    // row records only one of them, so attribute by the owner label too — every container carries it.
+    const ownerIds = [
+      ...new Set(
+        allContainers.map((c) => c.Labels?.[OWNER_LABEL]).filter((id): id is string => Boolean(id)),
+      ),
+    ];
 
     const conditions = [
       inArray(releases.containerId, containerIds),
@@ -170,8 +177,19 @@ export class AdminService {
       .innerJoin(deployments, eq(releases.deploymentId, deployments.id))
       .where(or(...conditions));
 
+    const ownerRows =
+      ownerIds.length > 0
+        ? await this.db
+            .select({ id: deployments.id, name: deployments.name })
+            .from(deployments)
+            .where(inArray(deployments.id, ownerIds))
+        : [];
+
     const byContainerId = new Map<string, DeploymentRefDto>();
     const byComposeProject = new Map<string, DeploymentRefDto>();
+    const byOwnerLabel = new Map<string, DeploymentRefDto>(
+      ownerRows.map((row) => [row.id, { id: row.id, name: row.name }]),
+    );
 
     for (const row of releaseRows) {
       const ref: DeploymentRefDto = { id: row.deploymentId, name: row.deploymentName };
@@ -189,9 +207,10 @@ export class AdminService {
 
     for (const container of allContainers) {
       const composeProject = container.Labels?.["com.docker.compose.project"];
-      const deployment =
-        byContainerId.get(container.Id) ??
-        (composeProject ? (byComposeProject.get(composeProject) ?? null) : null);
+      const ownerId = container.Labels?.[OWNER_LABEL];
+      const byOwner = ownerId ? byOwnerLabel.get(ownerId) : undefined;
+      const byProject = composeProject ? byComposeProject.get(composeProject) : undefined;
+      const deployment = byContainerId.get(container.Id) ?? byOwner ?? byProject ?? null;
       const managed = isManagedContainer(container.Labels, deployment);
 
       if (!all && !managed) {

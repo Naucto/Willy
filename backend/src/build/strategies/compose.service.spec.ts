@@ -1,6 +1,18 @@
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
-import { sanitizeComposeYaml } from "./compose.service";
+import {
+  classifyComposeServices,
+  sanitizeComposeYaml,
+  splitComposeConfig,
+} from "./compose.service";
+
+type ComposeDoc = {
+  services: Record<string, Record<string, unknown>>;
+  networks?: Record<string, unknown>;
+  volumes?: Record<string, unknown>;
+};
+
+const classify = (raw: string) => classifyComposeServices(parse(raw) as Record<string, unknown>);
 
 describe("sanitizeComposeYaml", () => {
   it("strips container_name from every service and the obsolete top-level version", () => {
@@ -133,5 +145,172 @@ describe("sanitizeComposeYaml", () => {
     };
 
     expect(parsed.services.web?.security_opt).toEqual(["no-new-privileges:true"]);
+  });
+});
+
+describe("classifyComposeServices", () => {
+  it("pins a service with a writable named volume, keeps a stateless one eligible", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "  db:",
+      "    image: postgres",
+      "    volumes:",
+      "      - pgdata:/var/lib/postgresql/data",
+      "volumes:",
+      "  pgdata:",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["web"], pinned: ["db"] });
+  });
+
+  it("treats a read-only named volume and an anonymous volume as safe", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "    volumes:",
+      "      - assets:/usr/share/nginx/html:ro",
+      "  cache:",
+      "    image: redis",
+      "    volumes:",
+      "      - /data",
+      "volumes:",
+      "  assets:",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["web", "cache"], pinned: [] });
+  });
+
+  it("pins a writable host bind but not a read-only one", () => {
+    const raw = [
+      "services:",
+      "  rw:",
+      "    image: a",
+      "    volumes:",
+      "      - ./data:/data",
+      "  ro:",
+      "    image: b",
+      "    volumes:",
+      "      - ./cfg:/cfg:ro",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["ro"], pinned: ["rw"] });
+  });
+
+  it("reads long-form volume mounts (read_only flag decides)", () => {
+    const raw = [
+      "services:",
+      "  rw:",
+      "    image: a",
+      "    volumes:",
+      "      - { type: volume, source: pgdata, target: /var/lib }",
+      "  ro:",
+      "    image: b",
+      "    volumes:",
+      "      - { type: volume, source: assets, target: /assets, read_only: true }",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["ro"], pinned: ["rw"] });
+  });
+
+  it("pins services holding exclusive host resources", () => {
+    const raw = [
+      "services:",
+      "  hostnet: { image: a, network_mode: host }",
+      "  priv: { image: b, privileged: true }",
+      "  dev: { image: c, devices: ['/dev/snd:/dev/snd'] }",
+      "  plain: { image: d }",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["plain"], pinned: ["hostnet", "priv", "dev"] });
+  });
+
+  it("pins any service on a non-default network (v1 rule)", () => {
+    const raw = [
+      "services:",
+      "  app: { image: a, networks: [backend] }",
+      "  plain: { image: b }",
+      "networks:",
+      "  backend: {}",
+    ].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["plain"], pinned: ["app"] });
+  });
+
+  it("defaults a non-object service value to pinned", () => {
+    const raw = ["services:", "  broken: null", "  ok: { image: a }"].join("\n");
+
+    expect(classify(raw)).toEqual({ eligible: ["ok"], pinned: ["broken"] });
+  });
+});
+
+describe("splitComposeConfig", () => {
+  const webDb = [
+    "services:",
+    "  web:",
+    "    image: nginx",
+    "    depends_on: [db]",
+    "  db:",
+    "    image: postgres",
+    "    volumes:",
+    "      - pgdata:/var/lib/postgresql/data",
+    "volumes:",
+    "  pgdata:",
+  ].join("\n");
+
+  it("puts pinned services + volumes in base and eligible services in release", () => {
+    const split = splitComposeConfig(webDb, "blog");
+
+    expect(split).toMatchObject({ eligible: ["web"], pinned: ["db"] });
+
+    const base = parse(split.baseYaml) as ComposeDoc;
+    expect(Object.keys(base.services)).toEqual(["db"]);
+    expect(base.volumes).toHaveProperty("pgdata");
+
+    const release = parse(split.releaseYaml) as ComposeDoc;
+    expect(Object.keys(release.services)).toEqual(["web"]);
+    // depends_on on a pinned service is pruned away (db lives in the base project).
+    expect(release.services.web).not.toHaveProperty("depends_on");
+    expect(release.services.web?.networks).toEqual(["default", "willy_base", "willy_edge"]);
+    expect(release.networks).toMatchObject({
+      willy_edge: { external: true },
+      willy_base: { external: true, name: "willy_blog_default" },
+    });
+  });
+
+  it("omits the base network link when there are no pinned services", () => {
+    const raw = ["services:", "  web: { image: nginx }", "  worker: { image: busybox }"].join("\n");
+
+    const split = splitComposeConfig(raw, "site");
+
+    expect(split.pinned).toEqual([]);
+    const release = parse(split.releaseYaml) as ComposeDoc;
+    expect(release.services.web?.networks).toEqual(["default", "willy_edge"]);
+    expect(release.networks).not.toHaveProperty("willy_base");
+  });
+
+  it("pins a read-only named volume on an eligible service to the base-created volume", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "    volumes:",
+      "      - shared:/assets:ro",
+      "  db:",
+      "    image: postgres",
+      "    volumes:",
+      "      - pgdata:/data",
+      "volumes:",
+      "  shared:",
+      "  pgdata:",
+    ].join("\n");
+
+    const release = parse(splitComposeConfig(raw, "blog").releaseYaml) as ComposeDoc;
+
+    expect(release.volumes).toMatchObject({
+      shared: { external: true, name: "willy_blog_shared" },
+    });
   });
 });

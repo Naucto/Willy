@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ContainersService } from "../containers/containers.service";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerContainerService } from "../docker/docker-container.service";
 import { describeError } from "../docker/docker-helpers";
@@ -12,7 +13,7 @@ import { HealthProber } from "./health-prober.service";
 import { ImageBuilder } from "./image-builder.service";
 import { ReleasesService } from "./releases.service";
 import { RuntimeLogCollector } from "./runtime-log.collector";
-import { ComposeService } from "./strategies/compose.service";
+import { type ComposePlan, ComposeService } from "./strategies/compose.service";
 
 // Runs the background lifecycle work for a release: the git clone -> image build -> health-checked
 // container swap, plus relaunch/rollback/stop. BuildOrchestrator validates and enqueues; these
@@ -33,6 +34,7 @@ export class ReleaseRunner {
     private readonly imageBuilder: ImageBuilder,
     private readonly containerOps: ContainerOps,
     private readonly health: HealthProber,
+    private readonly containers: ContainersService,
   ) {}
 
   // After a container-bearing deployment goes live, (re)attach runtime-log follows to its current
@@ -208,10 +210,17 @@ export class ReleaseRunner {
     }
   }
 
-  // Compose path: `docker compose up -d --build` recreates the stack in place (brief
-  // interruption), then the web service is health-checked. No health-checked swap.
+  // Compose path (blue-green): pinned singletons (volumes/host ports) are recreated in place under the
+  // stable base project; the eligible tier is brought up under a release-scoped project alongside the
+  // currently-serving one, health-checked, then cut over by tearing down the prior release. A failed
+  // gate tears down only the new release, leaving the previous version serving — never destructive.
   private async runComposeRelease(deployment: Deployment, releaseId: string): Promise<void> {
     const priorActiveReleaseId = deployment.activeReleaseId;
+    const prior = priorActiveReleaseId
+      ? await this.releases.findById(priorActiveReleaseId)
+      : undefined;
+    const baseProject = this.compose.baseProject(deployment);
+    const priorReleaseProject = prior?.composeProject ?? null;
 
     try {
       const release = await this.releases.findById(releaseId);
@@ -220,7 +229,9 @@ export class ReleaseRunner {
         throw new NotFoundException("release not found");
       }
 
-      this.buildLog.append(releaseId, `deploying ${deployment.name} (compose)`);
+      const releaseShort = releaseId.slice(0, 8);
+
+      this.buildLog.append(releaseId, `deploying ${deployment.name} (compose, blue-green)`);
       await this.releases.setStatus(releaseId, "CLONING");
 
       const token = await this.deployments.resolveGitToken(deployment.id);
@@ -231,46 +242,81 @@ export class ReleaseRunner {
       });
 
       await this.releases.setStatus(releaseId, "BUILDING", { gitSha: sha });
-      this.buildLog.append(releaseId, "docker compose up -d --build");
 
-      let project: string;
+      let plan: ComposePlan;
+      let releaseProject: string | null = null;
 
       try {
-        ({ project } = await this.compose.up(deployment, dir, (line) =>
+        plan = await this.compose.prepare(deployment, dir, (line) =>
           this.buildLog.append(releaseId, line),
-        ));
+        );
+
+        if (plan.split.pinned.length > 0) {
+          this.buildLog.append(
+            releaseId,
+            `recreating pinned services: ${plan.split.pinned.join(", ")}`,
+          );
+          await this.compose.upBase(deployment, dir, plan, (line) =>
+            this.buildLog.append(releaseId, line),
+          );
+        }
+
+        if (plan.split.eligible.length > 0) {
+          this.buildLog.append(
+            releaseId,
+            `starting release services: ${plan.split.eligible.join(", ")}`,
+          );
+          ({ project: releaseProject } = await this.compose.upRelease(
+            deployment,
+            dir,
+            plan,
+            releaseShort,
+            (line) => this.buildLog.append(releaseId, line),
+          ));
+        }
       } finally {
         await this.git.cleanup(dir);
       }
 
-      // No single container anchors a compose release — it's tracked by its project label.
-      await this.releases.setStatus(releaseId, "HEALTHCHECKING", { composeProject: project });
-      this.buildLog.append(releaseId, "health-checking stack");
+      // Track by the release project (or the base project when the whole stack is pinned).
+      const composeProject = releaseProject ?? baseProject;
+      await this.releases.setStatus(releaseId, "HEALTHCHECKING", { composeProject });
+      this.buildLog.append(releaseId, "health-checking new containers");
 
-      if (!(await this.health.composeHealthy(deployment))) {
-        // Compose recreates the stack in place, so an unhealthy result has no prior version to fall
-        // back to — stop the brought-up containers so they aren't left serving while unhealthy.
-        this.buildLog.append(releaseId, "stack unhealthy — stopping containers");
-        await this.compose.stopAll(deployment);
+      // Gate on the green set only — base pinned services plus this release's eligible containers —
+      // never the prior (blue) release, which keeps serving until cutover.
+      const green = [
+        ...(plan.split.pinned.length > 0 ? await this.containers.listForProject(baseProject) : []),
+        ...(releaseProject ? await this.containers.listForProject(releaseProject) : []),
+      ];
 
-        throw new HealthCheckError("compose stack did not become healthy");
+      if (!(await this.health.composeHealthy(deployment, green))) {
+        await this.failGate(releaseId, releaseProject, "compose stack did not become healthy");
       }
 
-      // Healthy containers can still 502 if the app listens on a different port than Traefik routes
-      // to. Probe the routed port so a port mismatch fails loudly instead of silently 502-ing.
-      const unreachable = await this.health.firstUnreachableRoute(deployment);
+      const unreachable = await this.health.firstUnreachableRoute(deployment, green);
 
       if (unreachable) {
-        this.buildLog.append(releaseId, unreachable);
-        await this.compose.stopAll(deployment);
-
-        throw new HealthCheckError(unreachable);
+        await this.failGate(releaseId, releaseProject, unreachable);
       }
 
-      await this.releases.setStatus(releaseId, "LIVE", { composeProject: project });
+      // Cutover: green's release-scoped router already exists at lower priority; removing the prior
+      // release lets Traefik route to green. The base project is never touched.
+      await this.releases.setStatus(releaseId, "LIVE", { composeProject });
       await this.deployments.setActiveRelease(deployment.id, releaseId);
       await this.deployments.setState(deployment.id, "RUNNING");
       await this.syncRuntimeLogs(deployment);
+
+      // Tear down only the superseded (blue) release project. Guard against the base project (a
+      // pre-split prior release recorded the base project) and the just-deployed green one.
+      if (
+        priorReleaseProject &&
+        priorReleaseProject !== baseProject &&
+        priorReleaseProject !== releaseProject
+      ) {
+        this.buildLog.append(releaseId, `removing superseded release ${priorReleaseProject}`);
+        await this.compose.downRelease(priorReleaseProject);
+      }
 
       if (priorActiveReleaseId && priorActiveReleaseId !== releaseId) {
         await this.releases.setStatus(priorActiveReleaseId, "SUPERSEDED");
@@ -282,16 +328,30 @@ export class ReleaseRunner {
       this.logger.warn(`compose release ${releaseId} failed: ${message}`);
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
-      // A failed healthcheck stops the in-place-recreated stack, so nothing is serving → ERROR.
-      // Other failures (e.g. clone) leave the prior stack untouched and still serving → DEGRADED.
-      const stoppedStack = error instanceof HealthCheckError;
-      await this.deployments.setState(
-        deployment.id,
-        !stoppedStack && priorActiveReleaseId ? "DEGRADED" : "ERROR",
-      );
+      // Non-destructive: a failed gate removed only the green release project, so blue + base keep
+      // serving (DEGRADED). ERROR only when there was no prior release to fall back to.
+      await this.deployments.setState(deployment.id, priorActiveReleaseId ? "DEGRADED" : "ERROR");
     } finally {
       this.buildLog.finish(releaseId);
     }
+  }
+
+  // A failed health/reachability gate: tear down the new (green) release project so blue + base keep
+  // serving, then abort. An all-pinned deploy has no release project — its recreated stack is left
+  // running (in-place, non-destructive) rather than forcibly stopped.
+  private async failGate(
+    releaseId: string,
+    releaseProject: string | null,
+    reason: string,
+  ): Promise<never> {
+    this.buildLog.append(releaseId, reason);
+
+    if (releaseProject) {
+      this.buildLog.append(releaseId, `removing failed release ${releaseProject}`);
+      await this.compose.downRelease(releaseProject);
+    }
+
+    throw new HealthCheckError(reason);
   }
 
   private async requireDeployment(deploymentId: string): Promise<Deployment> {

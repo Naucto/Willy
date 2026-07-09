@@ -30,7 +30,16 @@ export class ContainersService {
   constructor(private readonly dockerContainers: DockerContainerService) {}
 
   async listForDeployment(deployment: Deployment): Promise<DeploymentContainer[]> {
-    const ids = await this.discover(deployment);
+    return this.hydrate(await this.discover(deployment));
+  }
+
+  // Containers of one compose project (base or a release-scoped project). Used to health-check exactly
+  // the green set during a blue-green cutover, without the currently-serving (blue) release.
+  async listForProject(project: string): Promise<DeploymentContainer[]> {
+    return this.hydrate(await this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, project));
+  }
+
+  private async hydrate(ids: string[]): Promise<DeploymentContainer[]> {
     const containers: DeploymentContainer[] = [];
 
     for (const id of ids) {
@@ -93,9 +102,17 @@ export class ContainersService {
       .map((container) => container.id);
   }
 
-  private discover(deployment: Deployment): Promise<string[]> {
+  private async discover(deployment: Deployment): Promise<string[]> {
     if (deployment.buildStrategy === "COMPOSE") {
-      return this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, `willy_${deployment.name}`);
+      // A blue-green compose deployment spans a base project plus a release-scoped project, all tagged
+      // with the owner label. Union that with the legacy base-project label so containers created
+      // before owner-label injection are still found. Dedupe.
+      const [owned, legacy] = await Promise.all([
+        this.dockerContainers.listByLabel(OWNER_LABEL, deployment.id),
+        this.dockerContainers.listByLabel(COMPOSE_PROJECT_LABEL, `willy_${deployment.name}`),
+      ]);
+
+      return [...new Set([...owned, ...legacy])];
     }
 
     return this.dockerContainers.listByLabel(OWNER_LABEL, deployment.id);

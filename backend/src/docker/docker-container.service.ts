@@ -156,6 +156,7 @@ export class DockerContainerService {
         ip: ip || undefined,
         mounts,
         service: info.Config?.Labels?.["com.docker.compose.service"] || undefined,
+        composeProject: info.Config?.Labels?.["com.docker.compose.project"] || undefined,
         networks,
         exposedPorts,
         declaredHealthcheck,

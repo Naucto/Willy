@@ -76,6 +76,8 @@ export interface ContainerStatus {
   mounts: VolumeMount[];
   // Compose service name (com.docker.compose.service label), when part of a stack.
   service: string | undefined;
+  // Compose project name (com.docker.compose.project label), when part of a stack.
+  composeProject: string | undefined;
   // Networks the container is attached to, with its IP on each.
   networks: ContainerNetwork[];
   // TCP ports the image declares via EXPOSE, ascending; drives the domain port picker.
