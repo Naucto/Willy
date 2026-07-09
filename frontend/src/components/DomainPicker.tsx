@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { DataGrid, type GridColDef, GridToolbarQuickFilter, Toolbar } from "@mui/x-data-grid";
 import { useState } from "react";
-import { useDnsZones } from "../api/hooks";
+import { useBaseDomain, useDnsZones } from "../api/hooks";
 
 interface ZoneRow {
   zone: string;
@@ -47,6 +47,7 @@ export function DomainPicker({
 }) {
   const { data, error } = useDnsZones();
   const zones = data?.zones ?? [];
+  const baseDomain = useBaseDomain();
 
   const [open, setOpen] = useState(false);
   const [subDomain, setSubDomain] = useState("");
@@ -185,7 +186,7 @@ export function DomainPicker({
             <TextField
               label="Resulting domain"
               value={result}
-              placeholder="app.example.com"
+              placeholder={`app.${baseDomain}`}
               onChange={(event) => setResult(event.target.value)}
             />
           </Stack>

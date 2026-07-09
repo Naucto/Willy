@@ -27,6 +27,7 @@ import {
   useAddBinding,
   useAddDomain,
   useAppSettings,
+  useBaseDomain,
   useDeploymentContainers,
   useDeploymentDomains,
   useMakeDomainPrimary,
@@ -60,6 +61,7 @@ import { RunningChip, SelectOption } from "./SelectOption";
 export function DomainsManager({ deployment }: { deployment: Deployment }) {
   const run = useAction();
   const canOperate = useCan("operate");
+  const baseDomain = useBaseDomain();
   const { data: domains } = useDeploymentDomains(deployment.id);
   const { data: containers } = useDeploymentContainers(deployment.id);
   const { data: settings } = useAppSettings();
@@ -251,7 +253,7 @@ export function DomainsManager({ deployment }: { deployment: Deployment }) {
       {isCompose && (
         <Box sx={{ fontSize: 12, color: "text.secondary" }}>
           Service/port pin a route to one compose service and port (e.g.{" "}
-          <code>api.example.com → backend:4000</code>). Default routes to the web service.
+          <code>api.{baseDomain} → backend:4000</code>). Default routes to the web service.
         </Box>
       )}
 
@@ -315,6 +317,7 @@ function RouteDialog({
   onClose: () => void;
 }) {
   const { enqueueSnackbar } = useSnackbar();
+  const baseDomain = useBaseDomain();
   const addDomain = useAddDomain(deploymentId);
   const updateTarget = useUpdateDomainTarget(deploymentId);
   const addBinding = useAddBinding(deploymentId);
@@ -351,7 +354,7 @@ function RouteDialog({
     const fq = fqdn.trim();
 
     if (!edit && !isValidFqdn(fq)) {
-      enqueueSnackbar("Enter a valid domain (e.g. app.example.com)", { variant: "warning" });
+      enqueueSnackbar(`Enter a valid domain (e.g. app.${baseDomain})`, { variant: "warning" });
 
       return;
     }
@@ -454,7 +457,7 @@ function RouteDialog({
               <DomainPicker value={fqdn} onChange={setFqdn} />
               {fqdnInvalid && (
                 <Typography variant="caption" color="error" sx={{ ml: 1.75, display: "block" }}>
-                  Enter a valid domain, e.g. app.example.com
+                  Enter a valid domain, e.g. app.{baseDomain}
                 </Typography>
               )}
               {domains.length > 0 && (

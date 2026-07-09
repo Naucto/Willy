@@ -121,6 +121,12 @@ export function useSystemInfo() {
   });
 }
 
+// The panel's base domain, for suggesting domains the active cert actually covers (e.g.
+// willy.localhost locally). Falls back to a neutral placeholder before /system/info resolves.
+export function useBaseDomain(): string {
+  return useSystemInfo().data?.baseDomain || "your-domain.com";
+}
+
 // Host CPU/memory capacity, for sizing the resource-limit sliders to the real machine.
 export function useHostResources() {
   return useQuery({

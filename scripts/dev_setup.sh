@@ -75,6 +75,13 @@ elif ! openssl x509 -in routing/certs/local-cert.pem -noout -text 2>/dev/null \
   | grep -qF "*.willy.localhost"; then
   echo "Local TLS cert is missing *.willy.localhost — regenerating."
   needs_cert=1
+elif command -v mkcert >/dev/null 2>&1 \
+  && ! openssl verify -CAfile "$(mkcert -CAROOT)/rootCA.pem" routing/certs/local-cert.pem \
+    >/dev/null 2>&1; then
+  # mkcert is available but the on-disk cert doesn't chain to its CA — it's a stale self-signed
+  # fallback the browser won't trust. Replace it with a real mkcert cert.
+  echo "Local TLS cert is not issued by the mkcert CA (browser won't trust it) — regenerating."
+  needs_cert=1
 fi
 
 if [ "${needs_cert}" -eq 1 ]; then

@@ -81,6 +81,19 @@ describe("LabelGeneratorService", () => {
     expect(labels["traefik.http.routers.shop-app-80.tls.certresolver"]).toBe("ovh");
   });
 
+  it("never stamps a resolver locally (.localhost base has no ACME) even for off-base domains", () => {
+    const labels = make("willy.localhost").forWebRoutes({
+      deploymentId: "dep-1",
+      routerPrefix: "shop",
+      network: "willy_edge",
+      priority: 1000,
+      groups: [{ service: null, port: 80, hosts: ["shop.acme.com"], hostPort: null }],
+    });
+
+    expect(labels["traefik.http.routers.shop-app-80.tls"]).toBe("true");
+    expect(labels["traefik.http.routers.shop-app-80.tls.certresolver"]).toBeUndefined();
+  });
+
   it("treats deeper labels under the base domain as not wildcard-covered", () => {
     const labels = make("willy.naucto.net").forWebRoutes({
       deploymentId: "dep-1",

@@ -5325,6 +5325,9 @@
           },
           "node": {
             "type": "string"
+          },
+          "baseDomain": {
+            "type": "string"
           }
         },
         "required": [
@@ -5333,7 +5336,8 @@
           "kernel",
           "platform",
           "arch",
-          "node"
+          "node",
+          "baseDomain"
         ]
       },
       "HostResourcesDto": {

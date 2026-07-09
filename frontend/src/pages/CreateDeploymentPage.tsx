@@ -20,7 +20,7 @@ import {
 import { useSnackbar } from "notistack";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCreateDeployment, useHostResources } from "../api/hooks";
+import { useBaseDomain, useCreateDeployment, useHostResources } from "../api/hooks";
 import type { DeploymentType } from "../api/types";
 import { CronEditor } from "../components/CronEditor";
 import { DomainPicker } from "../components/DomainPicker";
@@ -49,6 +49,7 @@ export function CreateDeploymentPage() {
   const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
   const createDeployment = useCreateDeployment();
+  const baseDomain = useBaseDomain();
   const { data: host } = useHostResources();
   const [step, setStep] = useState(0);
   const [state, setState] = useState<WizardState>(INITIAL_WIZARD_STATE);
@@ -64,7 +65,7 @@ export function CreateDeploymentPage() {
   const current = steps[stepIndex];
   const currentKey = current?.key ?? "review";
 
-  const error = stepError(currentKey, state);
+  const error = stepError(currentKey, state, baseDomain);
   const isLast = stepIndex === steps.length - 1;
 
   const onCreate = async () => {

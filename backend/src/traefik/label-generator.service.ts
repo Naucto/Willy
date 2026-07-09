@@ -53,6 +53,13 @@ function sanitize(value: string): string {
   return value.replace(/[^a-zA-Z0-9-]/g, "-");
 }
 
+// The local dev stack (`.localhost` base domain) runs Traefik with no ACME resolver — routers there
+// serve the mkcert default cert. Stamping the `ovh` resolver would point at a resolver that doesn't
+// exist, so off-base domains must fall back to the default cert instead of requesting issuance.
+function hasAcmeResolver(baseDomain: string): boolean {
+  return baseDomain !== "localhost" && !baseDomain.endsWith(".localhost");
+}
+
 // A `*.BASE_DOMAIN` wildcard (obtained once on the panel's own router) covers exactly one label
 // under the base domain. Hosts it covers don't need their own per-domain ACME issuance.
 function coveredByWildcard(host: string, baseDomain: string): boolean {
@@ -127,8 +134,12 @@ export class LabelGeneratorService {
       labels[`traefik.http.routers.${router}.tls`] = "true";
 
       // Base-domain subdomains are served by the panel's `*.BASE_DOMAIN` wildcard, so they need no
-      // resolver. Anything outside the base domain (a custom external domain) gets its own cert.
-      if (!group.hosts.every((host) => coveredByWildcard(host, baseDomain))) {
+      // resolver. Anything outside the base domain (a custom external domain) gets its own cert —
+      // but only when an ACME resolver actually exists (never locally, where there's no ACME).
+      if (
+        hasAcmeResolver(baseDomain) &&
+        !group.hosts.every((host) => coveredByWildcard(host, baseDomain))
+      ) {
         labels[`traefik.http.routers.${router}.tls.certresolver`] = "ovh";
       }
 

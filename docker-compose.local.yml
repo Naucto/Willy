@@ -18,6 +18,14 @@ services:
     environment:
       NODE_ENV: development
 
+  willy-web:
+    # No ACME locally: blank the panel router's `ovh` resolver (Traefik treats an empty resolver as
+    # unset, so no "nonexistent certificate resolver" error) — it's served by the mkcert default cert
+    # like willy-api already is. The base file's `tls.domains` wildcard-request labels stay but are
+    # inert without a resolver. Prod keeps the base file's `ovh` issuance.
+    labels:
+      traefik.http.routers.willy-web.tls.certresolver: ""
+
   postgres:
     # Bind to localhost on a non-default port to avoid clashing with a host Postgres.
     ports:

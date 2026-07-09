@@ -20,4 +20,9 @@ export class SystemInfoDto {
 
   @ApiProperty({ type: String })
   node!: string;
+
+  // The panel's base domain (e.g. willy.localhost in dev). Lets the UI suggest domains that the
+  // active cert actually covers instead of a hardcoded placeholder.
+  @ApiProperty({ type: String })
+  baseDomain!: string;
 }

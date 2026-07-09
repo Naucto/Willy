@@ -70,7 +70,11 @@ function trimmed(value: string): string | undefined {
 }
 
 // The blocking validation error for a step, or null if it's complete. Gates the Next/Create button.
-export function stepError(key: StepKey, state: WizardState): string | null {
+export function stepError(
+  key: StepKey,
+  state: WizardState,
+  baseDomain = "your-domain.com",
+): string | null {
   if (key === "type") {
     if (!state.name.trim()) {
       return "Name is required";
@@ -97,7 +101,7 @@ export function stepError(key: StepKey, state: WizardState): string | null {
     state.domain.trim() &&
     !isValidFqdn(state.domain)
   ) {
-    return "Enter a valid domain, e.g. app.example.com";
+    return `Enter a valid domain, e.g. app.${baseDomain}`;
   }
 
   return null;

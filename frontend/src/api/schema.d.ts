@@ -1723,6 +1723,7 @@ export interface components {
       platform: string;
       arch: string;
       node: string;
+      baseDomain: string;
     };
     HostResourcesDto: {
       /** @description Logical CPU count reported by the Docker daemon. */

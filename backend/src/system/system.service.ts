@@ -22,6 +22,7 @@ export class SystemService {
     platform: platform(),
     arch: arch(),
     node: process.version,
+    baseDomain: process.env.BASE_DOMAIN ?? "",
   };
 
   private cachedIp: string | null = null;
