@@ -114,6 +114,7 @@ export interface UpdateDeploymentInput {
   capDrop?: string[] | null;
   logMaxSizeMb?: number | null;
   logMaxFiles?: number | null;
+  healthTimeoutSec?: number | null;
   healthcheck?: HealthcheckSpec | null;
   // The primary domain lives in a separate table; handled out-of-band in update().
   domain?: string;
@@ -139,6 +140,7 @@ const EDITABLE_FIELDS: (keyof UpdateDeploymentInput)[] = [
   "capDrop",
   "logMaxSizeMb",
   "logMaxFiles",
+  "healthTimeoutSec",
   "healthcheck",
 ];
 

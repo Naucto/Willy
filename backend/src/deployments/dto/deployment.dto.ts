@@ -77,6 +77,9 @@ export class DeploymentDto {
   @ApiProperty({ type: Number, nullable: true })
   logMaxFiles!: number | null;
 
+  @ApiProperty({ type: Number, nullable: true })
+  healthTimeoutSec!: number | null;
+
   @ApiProperty({ type: HealthcheckDto, nullable: true })
   healthcheck!: HealthcheckDto | null;
 

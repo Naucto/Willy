@@ -183,6 +183,13 @@
       "when": 1782322969428,
       "tag": "0025_silly_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1783620431719,
+      "tag": "0026_nasty_king_bedlam",
+      "breakpoints": true
     }
   ]
 }

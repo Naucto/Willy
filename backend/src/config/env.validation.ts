@@ -107,6 +107,12 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   FILE_MANAGER_HELPER_IDLE_TTL_MS?: number;
+
+  // Operator-wide default deploy health-check/reachability wait budget (seconds) for deploys that don't
+  // set their own healthTimeoutSec. Absent = built-in 90s.
+  @IsOptional()
+  @IsInt()
+  HEALTHCHECK_TIMEOUT?: number;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

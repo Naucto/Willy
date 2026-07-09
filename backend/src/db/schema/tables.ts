@@ -76,6 +76,10 @@ export const deployments = pgTable("deployments", {
   // Per-container log rotation for single-container deployments (json-file driver).
   logMaxSizeMb: integer("log_max_size_mb"),
   logMaxFiles: integer("log_max_files"),
+  // How long a deploy waits for the app to become healthy and reachable before failing, in seconds.
+  // Null = the operator-wide default (WILLY_HEALTH_TIMEOUT_SEC) or the built-in 90s. Governs both the
+  // healthy-wait and the routed-port reachability probe.
+  healthTimeoutSec: integer("health_timeout_sec"),
   // Custom healthcheck for single-container deployments, injected at container creation. Compose
   // deployments store theirs per service in serviceResources instead.
   healthcheck: jsonb("healthcheck").$type<HealthcheckSpec>(),

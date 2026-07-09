@@ -102,7 +102,7 @@ export class ContainerOps {
 
     const healthy =
       deployment.type === "WEB"
-        ? await this.health.probeWeb(containerId)
+        ? await this.health.probeWeb(deployment, containerId)
         : await this.health.probeWorker(containerId);
 
     if (!healthy) {

@@ -1,0 +1,1 @@
+ALTER TABLE "deployments" ADD COLUMN "health_timeout_sec" integer;
