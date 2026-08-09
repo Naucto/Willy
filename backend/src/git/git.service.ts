@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { WillyError } from "../common/errors";
+import { scrubSecrets } from "../common/redact";
 
 const exec = promisify(execFile);
 const CLONE_TIMEOUT_MS = 120_000;
@@ -70,9 +71,16 @@ export class GitService {
       await this.cleanup(dir);
 
       // Submodule failures already carry a GitError with a precise message; don't mask them.
+      // The child-process error echoes the argv, which includes the tokened URL — scrub before it
+      // reaches the error object (and from there logs + the releases.error_message column).
       throw error instanceof GitError
         ? error
-        : new GitError(`clone failed for ref "${options.ref}": ${describeError(error)}`);
+        : new GitError(
+            scrubSecrets(
+              `clone failed for ref "${options.ref}": ${describeError(error)}`,
+              options.token ? [options.token] : [],
+            ),
+          );
     }
 
     const { stdout } = await exec("git", ["-C", dir, "rev-parse", "HEAD"]);
@@ -111,7 +119,9 @@ export class GitService {
         env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
       });
     } catch (error) {
-      throw new GitError(`submodule update failed: ${describeError(error)}`);
+      throw new GitError(
+        scrubSecrets(`submodule update failed: ${describeError(error)}`, token ? [token] : []),
+      );
     }
   }
 
@@ -135,7 +145,9 @@ export class GitService {
 
       return parseRefs(stdout);
     } catch (error) {
-      throw new GitError(`could not list branches: ${describeError(error)}`);
+      throw new GitError(
+        scrubSecrets(`could not list branches: ${describeError(error)}`, token ? [token] : []),
+      );
     }
   }
 

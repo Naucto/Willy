@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { scrubSecrets } from "../common/redact";
 import { LogStorageService } from "../logs/log-storage.service";
 
 // Build logs, addressed by release id, on top of the durable LogStorageService. Keeping this thin
@@ -8,8 +9,10 @@ import { LogStorageService } from "../logs/log-storage.service";
 export class BuildLogStore {
   constructor(private readonly logs: LogStorageService) {}
 
+  // Scrub every line as a last line of defense: build steps stream raw subprocess output (git, docker
+  // compose) that can echo a tokened remote URL, so redaction here catches leaks the callers miss.
   append(releaseId: string, line: string): void {
-    this.logs.append(this.key(releaseId), line);
+    this.logs.append(this.key(releaseId), scrubSecrets(line));
   }
 
   finish(releaseId: string): void {

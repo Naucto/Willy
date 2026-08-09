@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ContainersService } from "../containers/containers.service";
+import { scrubSecrets } from "../common/redact";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerContainerService } from "../docker/docker-container.service";
 import { describeError } from "../docker/docker-helpers";
@@ -199,7 +200,9 @@ export class ReleaseRunner {
       await this.imageBuilder.cleanupImages(deployment.name, imageTag);
       this.buildLog.append(releaseId, "deployment live");
     } catch (error) {
-      const message = describeError(error);
+      // Scrub before the message reaches the logger or the releases.error_message column: a failed
+      // authenticated clone carries the tokened remote URL in its error.
+      const message = scrubSecrets(describeError(error));
       this.logger.warn(`release ${releaseId} failed: ${message}`);
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
@@ -324,7 +327,7 @@ export class ReleaseRunner {
 
       this.buildLog.append(releaseId, "deployment live");
     } catch (error) {
-      const message = describeError(error);
+      const message = scrubSecrets(describeError(error));
       this.logger.warn(`compose release ${releaseId} failed: ${message}`);
       this.buildLog.append(releaseId, `error: ${message}`);
       await this.releases.setStatus(releaseId, "FAILED", { errorMessage: message });
