@@ -87,14 +87,22 @@ describe("submoduleUpdateArgs", () => {
       "update",
       "--init",
       "--recursive",
-      "--depth",
-      "1",
       "--remote",
     ]);
   });
 
+  it("does not ask a tracked submodule for a depth it cannot honour", () => {
+    // A shallow submodule fetches its default branch only, so --remote can never resolve any other
+    // branch: tracking appeared to work purely because .gitmodules usually names the default one.
+    expect(submoduleUpdateArgs("/builds/x", "track")).not.toContain("--depth");
+  });
+
   it("uses the superproject's pinned commits in pin mode (no --remote)", () => {
-    expect(submoduleUpdateArgs("/builds/x", "pin")).not.toContain("--remote");
+    const args = submoduleUpdateArgs("/builds/x", "pin");
+
+    expect(args).not.toContain("--remote");
+    // A pinned commit is reachable from the tip it was pinned at, so depth still pays there.
+    expect(args).toContain("--depth");
   });
 });
 

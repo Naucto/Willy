@@ -214,10 +214,16 @@ async function hasSubmodules(dir: string): Promise<boolean> {
 // `git submodule update` arguments. "track" adds `--remote` so each submodule is moved to its
 // configured branch tip instead of the commit the superproject pins.
 export function submoduleUpdateArgs(dir: string, mode: "track" | "pin"): string[] {
-  const args = ["-C", dir, "submodule", "update", "--init", "--recursive", "--depth", "1"];
+  const args = ["-C", dir, "submodule", "update", "--init", "--recursive"];
 
   if (mode === "track") {
+    // No `--depth 1` here, and the two are not merely a slow pair: a submodule cloned shallow
+    // fetches its default branch and nothing else, so `--remote` has no `origin/<branch>` to
+    // resolve and the update dies with "unable to find refs/remotes/origin/<branch>". Tracking
+    // worked only where .gitmodules happened to name the default branch.
     args.push("--remote");
+  } else {
+    args.push("--depth", "1");
   }
 
   return args;
