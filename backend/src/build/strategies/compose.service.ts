@@ -184,6 +184,9 @@ export function sanitizeComposeYaml(raw: string): SanitizedCompose {
 export interface ServiceSplit {
   eligible: string[];
   pinned: string[];
+  // Services whose own compose file sets `restart:`. Willy's override must leave those alone —
+  // the override file wins the merge, so writing into it would silently replace what was asked for.
+  declaresRestart: string[];
 }
 
 // A mount that two live copies would fight over (or that would silently diverge). Read-only mounts and
@@ -286,12 +289,17 @@ export function classifyComposeServices(doc: Record<string, unknown>): ServiceSp
   const services = asRecord(doc.services);
   const eligible: string[] = [];
   const pinned: string[] = [];
+  const declaresRestart: string[] = [];
 
   for (const [name, service] of Object.entries(services)) {
     (servicePins(service) ? pinned : eligible).push(name);
+
+    if (asRecord(service).restart !== undefined) {
+      declaresRestart.push(name);
+    }
   }
 
-  return { eligible, pinned };
+  return { eligible, pinned, declaresRestart };
 }
 
 // Prune a service's `depends_on` (list or condition-map form) to the services that live in the same
@@ -346,6 +354,7 @@ export interface SplitCompose {
   sanitized: SanitizedCompose;
   eligible: string[];
   pinned: string[];
+  declaresRestart: string[];
   baseYaml: string;
   releaseYaml: string;
 }
@@ -353,12 +362,12 @@ export interface SplitCompose {
 export function splitComposeConfig(raw: string, deploymentName: string): SplitCompose {
   const sanitized = sanitizeComposeYaml(raw);
   const doc = asRecord(parseYaml(sanitized.yaml));
-  const { eligible, pinned } = classifyComposeServices(doc);
+  const { eligible, pinned, declaresRestart } = classifyComposeServices(doc);
 
   const baseYaml = buildBaseYaml(doc, pinned);
   const releaseYaml = buildReleaseYaml(doc, eligible, pinned.length > 0, deploymentName);
 
-  return { sanitized, eligible, pinned, baseYaml, releaseYaml };
+  return { sanitized, eligible, pinned, declaresRestart, baseYaml, releaseYaml };
 }
 
 // Pinned services only, keeping top-level volumes/networks so their named volumes stay
@@ -568,6 +577,7 @@ export class ComposeService {
       dir,
       filename: files.baseOverride,
       serviceNames: plan.split.pinned,
+      declaresRestart: plan.split.declaresRestart,
       routerPrefix: deployment.name,
       defaultService: plan.defaultService,
       defaultServiceImage: plan.defaultServiceImage,
@@ -614,6 +624,7 @@ export class ComposeService {
       dir,
       filename: files.releaseOverride,
       serviceNames: plan.split.eligible,
+      declaresRestart: plan.split.declaresRestart,
       routerPrefix: `${deployment.name}-${releaseShort}`,
       defaultService: plan.defaultService,
       defaultServiceImage: plan.defaultServiceImage,
@@ -704,6 +715,7 @@ export class ComposeService {
     dir: string;
     filename: string;
     serviceNames: string[];
+    declaresRestart: string[];
     routerPrefix: string;
     defaultService: string | null;
     defaultServiceImage: string | null;
@@ -711,6 +723,7 @@ export class ComposeService {
   }): Promise<void> {
     const { deployment, dir, filename, serviceNames, routerPrefix, attachEdge } = opts;
     const inScope = new Set(serviceNames);
+    const ownRestart = new Set(opts.declaresRestart);
     const services: Record<string, Record<string, unknown>> = {};
     const networks: Record<string, unknown> = {};
 
@@ -766,7 +779,23 @@ export class ComposeService {
       }
     }
 
-    // Per-service resource limits, restricted to the services this project owns.
+    // The deployment's own restart policy, for every service this project owns. Without it a
+    // compose deployment came up with Docker's default of `no`, so a host that rebooted brought
+    // Willy back and left everything Willy deploys stopped — and the deployment still read as
+    // RUNNING, because nothing had asked Docker.
+    for (const name of inScope) {
+      if (ownRestart.has(name)) {
+        continue;
+      }
+
+      services[name] = {
+        restart: RESTART_COMPOSE[deployment.restartPolicy],
+        ...(services[name] ?? {}),
+      };
+    }
+
+    // Per-service resource limits, restricted to the services this project owns. A service that
+    // names its own policy overrides the deployment's.
     for (const [name, limits] of Object.entries(deployment.serviceResources ?? {})) {
       if (!inScope.has(name)) {
         continue;
