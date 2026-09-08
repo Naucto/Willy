@@ -9,7 +9,11 @@ import { WillyError } from "../common/errors";
 import { scrubSecrets } from "../common/redact";
 
 const exec = promisify(execFile);
-const CLONE_TIMEOUT_MS = 120_000;
+// Sized for a *tracked* submodule, which is the expensive case: following a branch rules out a
+// shallow clone, so each deploy fetches whole histories rather than one commit each. A repository
+// of a few hundred megabytes is minutes, not seconds, and the budget has to cover the slowest of
+// them plus whatever the forge is throttling that day.
+const CLONE_TIMEOUT_MS = 600_000;
 const LS_REMOTE_TIMEOUT_MS = 15_000;
 
 export class GitError extends WillyError {}
