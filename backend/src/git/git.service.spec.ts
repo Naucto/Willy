@@ -108,9 +108,22 @@ describe("submoduleUpdateArgs", () => {
 
 describe("tokenRewriteConfig", () => {
   it("rewrites both HTTPS and SSH GitHub remotes to a token-bearing URL", () => {
-    const { key, values } = tokenRewriteConfig("ghs_secret");
+    const env = tokenRewriteConfig("ghs_secret");
+    const key = "url.https://x-access-token:ghs_secret@github.com/.insteadOf";
 
-    expect(key).toBe("url.https://x-access-token:ghs_secret@github.com/.insteadOf");
-    expect(values).toEqual(["https://github.com/", "git@github.com:"]);
+    expect(env["GIT_CONFIG_COUNT"]).toBe("2");
+    expect(env["GIT_CONFIG_KEY_0"]).toBe(key);
+    expect(env["GIT_CONFIG_VALUE_0"]).toBe("https://github.com/");
+    expect(env["GIT_CONFIG_KEY_1"]).toBe(key);
+    expect(env["GIT_CONFIG_VALUE_1"]).toBe("git@github.com:");
+  });
+
+  it("carries the rewrite in the environment, which a nested submodule inherits", () => {
+    // A rewrite written into the superproject's own config is read by its submodule clones and by
+    // nothing deeper, so a submodule of a submodule declared as `git@github.com:…` reached for SSH
+    // and died on `cannot run ssh`. Environment is the form every descendant sees.
+    expect(
+      Object.keys(tokenRewriteConfig("ghs_secret")).every((k) => k.startsWith("GIT_CONFIG_")),
+    ).toBe(true);
   });
 });
