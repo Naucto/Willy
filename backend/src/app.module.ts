@@ -37,8 +37,12 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     ScheduleModule.forRoot(),
-    // Baseline rate limit; auth endpoints tighten it further (see AuthController).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // Baseline rate limit; auth endpoints tighten it further (see AuthController). Sized for the
+    // panel rather than for a single call: opening Monitoring polls stats, containers and
+    // deployments together, and two minutes of that against a per-minute budget of 120 spends it
+    // on ordinary use — a limit an operator reaches by looking at their own machine is measuring
+    // the wrong thing.
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     DbModule,
     RedisModule,
     CryptoModule,
