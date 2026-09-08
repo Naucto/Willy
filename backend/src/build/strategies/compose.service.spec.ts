@@ -13,7 +13,16 @@ type ComposeDoc = {
   secrets?: Record<string, unknown>;
 };
 
-const classify = (raw: string) => classifyComposeServices(parse(raw) as Record<string, unknown>);
+const classifyFull = (raw: string) =>
+  classifyComposeServices(parse(raw) as Record<string, unknown>);
+
+// The pinning tests below are about pinning; drop the restart survey so their expectations stay
+// about the one thing they exercise.
+const classify = (raw: string) => {
+  const { eligible, pinned } = classifyFull(raw);
+
+  return { eligible, pinned };
+};
 
 describe("sanitizeComposeYaml", () => {
   it("strips container_name from every service and the obsolete top-level version", () => {
@@ -244,6 +253,22 @@ describe("classifyComposeServices", () => {
     const raw = ["services:", "  broken: null", "  ok: { image: a }"].join("\n");
 
     expect(classify(raw)).toEqual({ eligible: ["ok"], pinned: ["broken"] });
+  });
+
+  it("reports the services that set their own restart policy, and only those", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "  worker:",
+      "    image: busybox",
+      "    restart: always",
+      "  once:",
+      "    image: busybox",
+      '    restart: "no"',
+    ].join("\n");
+
+    expect(classifyFull(raw).declaresRestart).toEqual(["worker", "once"]);
   });
 });
 
