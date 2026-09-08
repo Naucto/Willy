@@ -427,6 +427,17 @@ function buildReleaseYaml(
 
   const release: Record<string, unknown> = { services, networks };
 
+  // Networks and volumes are rewritten above because they are what the two tiers must not share.
+  // Everything else the file declared at the top level still belongs to these services: a
+  // `build.secrets` entry resolves against the project's own `secrets:`, and rebuilding the release
+  // file from scratch left it pointing at a declaration that was no longer in the project —
+  // `service "x" refers to undefined build secret y`.
+  for (const key of ["secrets", "configs"]) {
+    if (doc[key] !== undefined) {
+      release[key] = doc[key];
+    }
+  }
+
   if (Object.keys(externalVolumes).length > 0) {
     release.volumes = externalVolumes;
   }
