@@ -88,35 +88,26 @@ export class GitService {
     return { dir, sha: stdout.trim() };
   }
 
-  // Pulls in submodules after the superproject is cloned. Authenticates submodule fetches with the
-  // same token as the superproject by rewriting GitHub remotes (HTTPS or SSH form) to a token-bearing
-  // HTTPS URL — written to the build's local git config (cleaned up with the build dir), so the token
-  // is not passed on the argv of each child fetch.
+  // Pulls in submodules after the superproject is cloned. Authenticates every fetch with the same
+  // token as the superproject by rewriting GitHub remotes (HTTPS or SSH form) to a token-bearing
+  // HTTPS URL, carried in the environment so it reaches submodules at any depth.
+  //
+  // The SSH form matters even where no key exists: a `.gitmodules` may name `git@github.com:…`,
+  // and the image has no ssh binary, so without the rewrite the clone dies on `cannot run ssh`
+  // rather than on anything to do with credentials.
   private async updateSubmodules(
     dir: string,
     token: string | undefined,
     mode: "track" | "pin",
   ): Promise<void> {
-    if (token) {
-      const { key, values } = tokenRewriteConfig(token);
-
-      // First value replaces the key; the rest are appended (a multi-valued insteadOf).
-      let replace = true;
-
-      for (const value of values) {
-        const configArgs = replace
-          ? ["-C", dir, "config", key, value]
-          : ["-C", dir, "config", "--add", key, value];
-
-        await exec("git", configArgs);
-        replace = false;
-      }
-    }
-
     try {
       await exec("git", submoduleUpdateArgs(dir, mode), {
         timeout: CLONE_TIMEOUT_MS,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        env: {
+          ...process.env,
+          GIT_TERMINAL_PROMPT: "0",
+          ...(token ? tokenRewriteConfig(token) : {}),
+        },
       });
     } catch (error) {
       throw new GitError(
@@ -232,10 +223,23 @@ export function submoduleUpdateArgs(dir: string, mode: "track" | "pin"): string[
 // Builds the `url.<tokened>.insteadOf` git-config that makes submodule fetches reuse the
 // superproject's token. Both the HTTPS and SSH GitHub remote forms are rewritten so `.gitmodules`
 // can use either.
-export function tokenRewriteConfig(token: string): { key: string; values: string[] } {
-  const tokened = `https://x-access-token:${token}@github.com/`;
+export function tokenRewriteConfig(token: string): Record<string, string> {
+  const key = `url.https://x-access-token:${token}@github.com/.insteadOf`;
+  const values = ["https://github.com/", "git@github.com:"];
 
-  return { key: `url.${tokened}.insteadOf`, values: ["https://github.com/", "git@github.com:"] };
+  // `GIT_CONFIG_COUNT` rather than `git config` or `-c`, because each of the three puts the token
+  // somewhere different: the first writes it into the build's config file, the second onto the
+  // argv of every git process, and this one into an environment git already inherits. It is also
+  // the only one a *nested* submodule sees — a rewrite living in the superproject's config is read
+  // by its own submodule clones and by nothing deeper, which is why a submodule of a submodule
+  // still reached for SSH.
+  return Object.fromEntries([
+    ["GIT_CONFIG_COUNT", String(values.length)],
+    ...values.flatMap((value, i) => [
+      [`GIT_CONFIG_KEY_${String(i)}`, key],
+      [`GIT_CONFIG_VALUE_${String(i)}`, value],
+    ]),
+  ]);
 }
 
 // Parses `git ls-remote --heads --tags` output into a sorted, de-duplicated list of ref names
