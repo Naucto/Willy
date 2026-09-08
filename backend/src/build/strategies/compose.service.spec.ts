@@ -10,6 +10,7 @@ type ComposeDoc = {
   services: Record<string, Record<string, unknown>>;
   networks?: Record<string, unknown>;
   volumes?: Record<string, unknown>;
+  secrets?: Record<string, unknown>;
 };
 
 const classify = (raw: string) => classifyComposeServices(parse(raw) as Record<string, unknown>);
@@ -278,6 +279,32 @@ describe("splitComposeConfig", () => {
       willy_edge: { external: true },
       willy_base: { external: true, name: "willy_blog_default" },
     });
+  });
+
+  it("keeps a build secret's declaration with the service that builds it", () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    build:",
+      "      context: .",
+      "      secrets: [npm_token]",
+      "  db:",
+      "    image: postgres",
+      "    volumes: [pgdata:/var/lib/postgresql/data]",
+      "volumes:",
+      "  pgdata:",
+      "secrets:",
+      "  npm_token:",
+      "    environment: NPM_TOKEN",
+    ].join("\n");
+
+    // The release file is rebuilt from scratch, so a top-level declaration the eligible service
+    // still points at has to travel with it — compose otherwise refuses the whole project with
+    // "refers to undefined build secret".
+    const release = parse(splitComposeConfig(raw, "site").releaseYaml) as ComposeDoc;
+
+    expect(Object.keys(release.services)).toEqual(["web"]);
+    expect(release.secrets).toMatchObject({ npm_token: { environment: "NPM_TOKEN" } });
   });
 
   it("omits the base network link when there are no pinned services", () => {
