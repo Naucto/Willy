@@ -31,3 +31,28 @@ export function envSaveBlocked(args: {
 }): boolean {
   return args.editing && args.existingIsSecret && !args.nextIsSecret && args.value === "";
 }
+
+// The Environment tab's scope is a compose service name, "" meaning the variables shared by every
+// service. A name no service answers to any more (renamed, or dropped from the compose file) would
+// show an empty list with no way back, so an unknown name falls back to the shared scope.
+export function resolveEnvScope(requested: string | null, services: readonly string[]): string {
+  if (requested === null || !services.includes(requested)) {
+    return "";
+  }
+
+  return requested;
+}
+
+// How a scope names itself in the selector.
+export function envScopeLabel(service: string): string {
+  return service === "" ? "Everyone (all services)" : service;
+}
+
+// What the add/edit dialog states about where the variable lands. A variable written while a service
+// is focused is invisible from the shared scope and absent from `${…}` interpolation in the compose
+// file, so the destination is never left implicit.
+export function envScopeSubtitle(service: string): string {
+  return service === ""
+    ? "Applies to every service in this deployment."
+    : `Applies to the ${service} service only.`;
+}

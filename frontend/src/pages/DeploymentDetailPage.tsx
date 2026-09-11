@@ -33,13 +33,15 @@ import {
 } from "../api/hooks";
 import type { Deployment, Release } from "../api/types";
 import { ROLE_REASON, useCan } from "../auth/permissions";
-import { ALL_CONTAINERS, ContainerSelector } from "../components/ContainerSelector";
+import { ContainerSelector } from "../components/ContainerSelector";
 import { CopyButton } from "../components/CopyButton";
 import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
 import { DeploymentBackupsTab } from "../components/DeploymentBackupsTab";
 import { DomainsManager } from "../components/DomainsManager";
+import { EnvScopeSelector } from "../components/EnvScopeSelector";
 import { EnvVarEditor } from "../components/EnvVarEditor";
+import { resolveEnvScope } from "../components/envVarEditing";
 import { HealthTab } from "../components/HealthTab";
 import { LogViewer } from "../components/LogViewer";
 import { NetworkingTab } from "../components/NetworkingTab";
@@ -68,9 +70,10 @@ const FilesTab = lazy(() =>
   import("../components/files/FilesTab").then((m) => ({ default: m.FilesTab })),
 );
 
-// Tabs whose content is scoped to a single container; only these show the container selector
-// (Environment is handled separately, with an extra "Everyone" entry). Volumes/Networking show all
-// containers at once (so the mapping is visible), so they're deliberately not here.
+// Tabs whose content is scoped to a single container; only these show the container selector.
+// Environment is deliberately absent: it is scoped to a compose *service*, and has its own selector
+// and its own URL param. Volumes/Networking show all containers at once (so the mapping is
+// visible), so they're not here either.
 const CONTAINER_SCOPED = new Set(["runtime", "console", "resources", "health"]);
 
 function isRunning(deployment: Deployment): boolean {
@@ -131,16 +134,40 @@ export function DeploymentDetailPage() {
   const selected = matched ?? containers?.[0];
   const selectedId = selected?.id;
 
-  // The Environment tab reuses the same selector but adds an "Everyone" entry (shared vars); its
-  // value can be the ALL sentinel rather than a container id, and it defaults to Everyone.
-  const isEnv = active === "env";
-  const isCompose = deployment?.buildStrategy === "COMPOSE";
-  const envValue = requested === ALL_CONTAINERS ? ALL_CONTAINERS : (matched?.id ?? ALL_CONTAINERS);
-  const envService = envValue === ALL_CONTAINERS ? "" : (matched?.service ?? "");
-
   const selectContainer = (value: string) => {
     const next = new URLSearchParams(searchParams);
     next.set("container", value);
+    setSearchParams(next, { replace: true });
+  };
+
+  // The Environment tab is scoped to a compose service (or to the shared "everyone" scope), and owns
+  // its own URL param: ?container= holds a container id, which the container-scoped tabs overwrite
+  // and which changes on every deploy — reusing it silently re-scoped this tab, hiding the shared
+  // variables behind whichever container was last focused elsewhere.
+  const isEnv = active === "env";
+  const isCompose = deployment?.buildStrategy === "COMPOSE";
+  const envServices = useMemo(() => {
+    const names = new Set<string>();
+
+    for (const container of containers ?? []) {
+      if (container.service) {
+        names.add(container.service);
+      }
+    }
+
+    return [...names].sort();
+  }, [containers]);
+
+  const envService = resolveEnvScope(searchParams.get("scope"), envServices);
+  const selectEnvScope = (service: string) => {
+    const next = new URLSearchParams(searchParams);
+
+    if (service === "") {
+      next.delete("scope");
+    } else {
+      next.set("scope", service);
+    }
+
     setSearchParams(next, { replace: true });
   };
 
@@ -190,14 +217,14 @@ export function DeploymentDetailPage() {
     return <Alert severity="error">{error ? describeError(error) : "Deployment not found"}</Alert>;
   }
 
-  // The container dropdown is a persistent part of the deployment bar. On Environment it shows for
-  // any compose stack (Everyone + each service); on the genuinely container-scoped tabs it shows
-  // only when there's more than one container to focus. It is hidden everywhere else (Overview,
+  // Both dropdowns are a persistent part of the deployment bar. The container one shows on the
+  // genuinely container-scoped tabs, and only when there's more than one container to focus; the
+  // scope one shows on Environment for any compose stack. Neither appears elsewhere (Overview,
   // Build — build logs are per-release, not per-container — Runs, Domains, Webhook, Settings).
   const containerCount = containers?.length ?? 0;
-  const showSelector = isEnv
-    ? isCompose && containerCount >= 1
-    : CONTAINER_SCOPED.has(active) && containerCount > 1 && Boolean(selectedId);
+  const showContainerSelector =
+    CONTAINER_SCOPED.has(active) && containerCount > 1 && Boolean(selectedId);
+  const showScopeSelector = isEnv && isCompose && envServices.length > 0;
 
   return (
     <Stack spacing={3}>
@@ -212,13 +239,15 @@ export function DeploymentDetailPage() {
         <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>
           {humanizeType(deployment.type)}
         </Typography>
-        {showSelector && containers && (
+        {showContainerSelector && containers && (
           <ContainerSelector
             containers={containers}
-            value={isEnv ? envValue : (selectedId ?? "")}
+            value={selectedId ?? ""}
             onChange={selectContainer}
-            allowAll={isEnv}
           />
+        )}
+        {showScopeSelector && (
+          <EnvScopeSelector services={envServices} value={envService} onChange={selectEnvScope} />
         )}
         {active === "build" && (
           <ReleaseSelector deploymentId={id} value={releaseParam} onChange={selectRelease} />
