@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { MaskedEnvVar } from "../api/types";
-import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
+import {
+  envSaveBlocked,
+  envSaveMode,
+  envScopeLabel,
+  envScopeSubtitle,
+  envValueDisplay,
+  resolveEnvScope,
+} from "./envVarEditing";
 
 const regular: MaskedEnvVar = { key: "PORT", scope: "RUNTIME", isSecret: false, value: "3000" };
 const secret: MaskedEnvVar = { key: "TOKEN", scope: "RUNTIME", isSecret: true, value: null };
@@ -50,5 +57,43 @@ describe("envSaveBlocked", () => {
     expect(
       envSaveBlocked({ editing: true, existingIsSecret: true, nextIsSecret: true, value: "" }),
     ).toBe(false);
+  });
+});
+
+describe("resolveEnvScope", () => {
+  it("keeps a service the deployment still has", () => {
+    expect(resolveEnvScope("backend", ["backend", "frontend"])).toBe("backend");
+  });
+
+  it("defaults to the shared scope when the URL carries no scope", () => {
+    expect(resolveEnvScope(null, ["backend"])).toBe("");
+  });
+
+  it("falls back to shared for a service that no longer exists", () => {
+    expect(resolveEnvScope("worker", ["backend", "frontend"])).toBe("");
+  });
+
+  it("does not take a container id for a service name", () => {
+    expect(resolveEnvScope("a1b2c3d4e5f6", ["backend"])).toBe("");
+  });
+});
+
+describe("envScopeLabel", () => {
+  it("names the shared scope", () => {
+    expect(envScopeLabel("")).toBe("Everyone (all services)");
+  });
+
+  it("names a service by itself", () => {
+    expect(envScopeLabel("backend")).toBe("backend");
+  });
+});
+
+describe("envScopeSubtitle", () => {
+  it("says the shared scope reaches every service", () => {
+    expect(envScopeSubtitle("")).toBe("Applies to every service in this deployment.");
+  });
+
+  it("names the single service a scoped variable reaches", () => {
+    expect(envScopeSubtitle("backend")).toBe("Applies to the backend service only.");
   });
 });

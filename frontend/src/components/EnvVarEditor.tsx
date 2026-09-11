@@ -20,7 +20,7 @@ import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
 import { BaseDialog } from "./BaseDialog";
-import { envSaveBlocked, envSaveMode, envValueDisplay } from "./envVarEditing";
+import { envSaveBlocked, envSaveMode, envScopeSubtitle, envValueDisplay } from "./envVarEditing";
 import { OperateButton, OperateIconButton } from "./OperateButton";
 import { PasswordField } from "./PasswordField";
 
@@ -215,6 +215,9 @@ function EnvVarDialog({
       onConfirm={() => void save()}
       confirmDisabled={setEnvVar.isPending || updateMeta.isPending || blocked}
     >
+      <Alert severity="info" icon={false}>
+        {envScopeSubtitle(service)}
+      </Alert>
       <TextField
         label="Key"
         value={key}
