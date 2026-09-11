@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MaskedEnvVar } from "../api/types";
 import {
+  envRowOrigin,
   envSaveBlocked,
   envSaveMode,
   envScopeLabel,
@@ -9,8 +10,16 @@ import {
   resolveEnvScope,
 } from "./envVarEditing";
 
-const regular: MaskedEnvVar = { key: "PORT", scope: "RUNTIME", isSecret: false, value: "3000" };
-const secret: MaskedEnvVar = { key: "TOKEN", scope: "RUNTIME", isSecret: true, value: null };
+const regular: MaskedEnvVar = {
+  key: "PORT",
+  scope: "RUNTIME",
+  isSecret: false,
+  targetService: "",
+  overridden: false,
+  value: "3000",
+};
+
+const secret: MaskedEnvVar = { ...regular, key: "TOKEN", isSecret: true, value: null };
 
 describe("envValueDisplay", () => {
   it("shows a regular var's value", () => {
@@ -95,5 +104,23 @@ describe("envScopeSubtitle", () => {
 
   it("names the single service a scoped variable reaches", () => {
     expect(envScopeSubtitle("backend")).toBe("Applies to the backend service only.");
+  });
+});
+
+describe("envRowOrigin", () => {
+  it("calls every row its own in the shared scope", () => {
+    expect(envRowOrigin(regular, "")).toBe("own");
+  });
+
+  it("calls a service's own row its own", () => {
+    expect(envRowOrigin({ ...regular, targetService: "backend" }, "backend")).toBe("own");
+  });
+
+  it("marks a shared row listed under a service as inherited", () => {
+    expect(envRowOrigin(regular, "backend")).toBe("inherited");
+  });
+
+  it("marks a shared row the service redefines as shadowed", () => {
+    expect(envRowOrigin({ ...regular, overridden: true }, "backend")).toBe("shadowed");
   });
 });

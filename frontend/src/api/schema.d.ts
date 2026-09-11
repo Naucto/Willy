@@ -612,6 +612,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/deployments/{id}/env/scopes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["EnvVarsController_scopes"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/deployments/{id}/env": {
     parameters: {
       query?: never;
@@ -1811,6 +1827,10 @@ export interface components {
       /** @enum {string} */
       scope: "BUILD" | "RUNTIME" | "BOTH";
       isSecret: boolean;
+      /** @description Scope the variable is stored in; "" = shared across every service. */
+      targetService: string;
+      /** @description Shared variable the listed service redefines; that service gets its own value. */
+      overridden: boolean;
       /** @description Plaintext value, or null for secrets. */
       value: string | null;
     };
@@ -3428,6 +3448,27 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AppSettingsDto"];
+        };
+      };
+    };
+  };
+  EnvVarsController_scopes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": string[];
         };
       };
     };

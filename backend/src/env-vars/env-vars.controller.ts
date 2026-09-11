@@ -55,6 +55,15 @@ export class EnvVarsController {
     });
   }
 
+  // The scopes that hold variables, which is not the same set as the deployment's containers: a
+  // service that was renamed, removed from the compose file, or is simply down still has its
+  // variables, and without this they would have no entry in the UI at all.
+  @ApiOkResponse({ type: [String] })
+  @Get("scopes")
+  scopes(@Param("id") deploymentId: string): Promise<string[]> {
+    return this.envVars.servicesWithEnv(deploymentId);
+  }
+
   @ApiOkResponse({ type: [MaskedEnvVarDto] })
   @ApiQuery({ name: "service", required: false, type: String })
   @Get()

@@ -32,7 +32,12 @@ export const queryKeys = {
   deployment: (id: string) => ["deployments", id] as const,
   releases: (id: string) => ["deployments", id, "releases"] as const,
   release: (id: string) => ["releases", id] as const,
+  // Every env query of a deployment sits under `env`, so one write can invalidate the lot: a
+  // service's listing carries the shared variables it inherits, and a first variable on a service
+  // creates a scope, so a write in one scope changes what the others answer.
   env: (id: string) => ["deployments", id, "env"] as const,
+  envVars: (id: string, service: string) => ["deployments", id, "env", "vars", service] as const,
+  envScopes: (id: string) => ["deployments", id, "env", "scopes"] as const,
   webhook: (id: string) => ["deployments", id, "webhook"] as const,
   systemInfo: ["system", "info"] as const,
 };
@@ -695,9 +700,21 @@ export function useRunCron(id: string) {
   });
 }
 
+// The compose services that hold variables of their own — not the same set as the deployment's
+// containers: a service that was renamed, dropped from the compose file, or is simply down still
+// has its variables, and the selector must keep offering them.
+export function useEnvScopes(id: string) {
+  return useQuery({
+    queryKey: queryKeys.envScopes(id),
+    queryFn: async () =>
+      unwrap(await api.GET("/deployments/{id}/env/scopes", { params: { path: { id } } })),
+    enabled: id.length > 0,
+  });
+}
+
 export function useEnvVars(id: string, service = "") {
   return useQuery({
-    queryKey: [...queryKeys.env(id), service],
+    queryKey: queryKeys.envVars(id, service),
     queryFn: async () =>
       unwrap(
         await api.GET("/deployments/{id}/env", {
@@ -903,7 +920,7 @@ export function useSetEnvVar(id: string, service = "") {
           body: input.body,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.env(id) }),
   });
 }
 
@@ -918,7 +935,7 @@ export function useUpdateEnvVarMeta(id: string, service = "") {
           body: input.body,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.env(id) }),
   });
 }
 
@@ -932,7 +949,7 @@ export function useDeleteEnvVar(id: string, service = "") {
           params: { path: { id, key }, query: { service } },
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...queryKeys.env(id), service] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.env(id) }),
   });
 }
 
