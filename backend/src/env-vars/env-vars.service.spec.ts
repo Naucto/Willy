@@ -1,5 +1,13 @@
+import { BadRequestException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
-import { type MaskedEnvVar, maskedEnvValue, mergeInheritedEnv } from "./env-vars.service";
+import type { CryptoService } from "../crypto/crypto.service";
+import type { Database } from "../db/db.module";
+import {
+  EnvVarsService,
+  type MaskedEnvVar,
+  maskedEnvValue,
+  mergeInheritedEnv,
+} from "./env-vars.service";
 
 describe("maskedEnvValue", () => {
   it("returns the plaintext for a regular var", () => {
@@ -58,5 +66,75 @@ describe("mergeInheritedEnv", () => {
     expect(mergeInheritedEnv([], [own("DB_URL", "postgres://")])).toEqual([
       own("DB_URL", "postgres://"),
     ]);
+  });
+});
+
+// A Drizzle-ish stub in the shape this service uses: `select().from().where()` resolves to `rows`,
+// and `insert().values().onConflictDoUpdate()` records what the conflict branch would write.
+function makeDb(rows: unknown[], captured: { conflictSet?: Record<string, unknown> }): Database {
+  return {
+    select: () => ({ from: () => ({ where: () => Promise.resolve(rows) }) }),
+    insert: () => ({
+      values: () => ({
+        onConflictDoUpdate: (args: { set: Record<string, unknown> }) => {
+          captured.conflictSet = args.set;
+
+          return Promise.resolve(undefined);
+        },
+      }),
+    }),
+  } as unknown as Database;
+}
+
+const crypto = {
+  encrypt: () => ({ cipherText: "c", nonce: "n", authTag: "a", keyVersion: 1 }),
+} as unknown as CryptoService;
+
+describe("EnvVarsService.set", () => {
+  it("refuses to replace a stored secret with an empty value", async () => {
+    const service = new EnvVarsService(makeDb([{ isSecret: true }], {}), crypto);
+
+    await expect(service.set("dep-1", "TOKEN", "")).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("allows an empty value on a regular variable", async () => {
+    const service = new EnvVarsService(makeDb([{ isSecret: false }], {}), crypto);
+
+    await expect(service.set("dep-1", "DEBUG", "")).resolves.toBeUndefined();
+  });
+
+  it("allows an empty value on a variable that does not exist yet", async () => {
+    const service = new EnvVarsService(makeDb([], {}), crypto);
+
+    await expect(service.set("dep-1", "DEBUG", "")).resolves.toBeUndefined();
+  });
+
+  it("leaves scope and secrecy alone on a value-only write", async () => {
+    const captured: { conflictSet?: Record<string, unknown> } = {};
+    const service = new EnvVarsService(makeDb([{ isSecret: false }], captured), crypto);
+
+    await service.set("dep-1", "PORT", "3000");
+
+    expect(captured.conflictSet).not.toHaveProperty("scope");
+    expect(captured.conflictSet).not.toHaveProperty("isSecret");
+  });
+
+  it("rewrites scope and secrecy when the caller states them", async () => {
+    const captured: { conflictSet?: Record<string, unknown> } = {};
+    const service = new EnvVarsService(makeDb([{ isSecret: false }], captured), crypto);
+
+    await service.set("dep-1", "PORT", "3000", { scope: "BOTH", isSecret: false });
+
+    expect(captured.conflictSet).toMatchObject({ scope: "BOTH", isSecret: false });
+  });
+});
+
+describe("EnvVarsService.updateMeta", () => {
+  it("rejects a variable that is not stored", async () => {
+    const service = new EnvVarsService(makeDb([], {}), crypto);
+
+    await expect(service.updateMeta("dep-1", "PORT", "", { scope: "BOTH" })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });
