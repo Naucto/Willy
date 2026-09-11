@@ -54,6 +54,27 @@ export class EnvVarsService {
     private readonly crypto: CryptoService,
   ) {}
 
+  // Whether the stored variable is a secret, or null when there is none. Both writes need it before
+  // deciding what they are allowed to do to an existing value.
+  private async storedIsSecret(
+    deploymentId: string,
+    targetService: string,
+    key: string,
+  ): Promise<boolean | null> {
+    const [row] = await this.db
+      .select({ isSecret: envVars.isSecret })
+      .from(envVars)
+      .where(
+        and(
+          eq(envVars.deploymentId, deploymentId),
+          eq(envVars.targetService, targetService),
+          eq(envVars.key, key),
+        ),
+      );
+
+    return row?.isSecret ?? null;
+  }
+
   async set(
     deploymentId: string,
     key: string,
@@ -63,23 +84,44 @@ export class EnvVarsService {
     assertValidEnvKey(key);
     assertValidEnvValue(value);
 
-    const sealed = this.crypto.encrypt(value);
     const targetService = input.targetService ?? "";
-    const fields = {
+
+    // An empty value is legitimate for a regular variable, and destroys a secret: the stored one is
+    // never shown, so the blank is the form's initial state rather than an intent to erase. The
+    // panel routes that case to `updateMeta`; anything else reaching here is refused, so no call can
+    // silently replace a secret with nothing.
+    if (value === "" && (await this.storedIsSecret(deploymentId, targetService, key))) {
+      throw new BadRequestException("Changing a secret requires a new value");
+    }
+
+    const sealed = this.crypto.encrypt(value);
+    const cipher = {
       cipherText: sealed.cipherText,
       nonce: sealed.nonce,
       authTag: sealed.authTag,
       keyVersion: sealed.keyVersion,
-      scope: input.scope ?? "RUNTIME",
-      isSecret: input.isSecret ?? true,
+    };
+
+    // Scope and secrecy are only rewritten when the caller stated them: spreading the defaults into
+    // the conflict branch reset an existing variable to RUNTIME/secret on any value-only write.
+    const meta = {
+      ...(input.scope !== undefined ? { scope: input.scope } : {}),
+      ...(input.isSecret !== undefined ? { isSecret: input.isSecret } : {}),
     };
 
     await this.db
       .insert(envVars)
-      .values({ deploymentId, key, targetService, ...fields })
+      .values({
+        deploymentId,
+        key,
+        targetService,
+        ...cipher,
+        scope: input.scope ?? "RUNTIME",
+        isSecret: input.isSecret ?? true,
+      })
       .onConflictDoUpdate({
         target: [envVars.deploymentId, envVars.targetService, envVars.key],
-        set: { ...fields, updatedAt: new Date() },
+        set: { ...cipher, ...meta, updatedAt: new Date() },
       });
   }
 
@@ -145,22 +187,13 @@ export class EnvVarsService {
     targetService: string,
     input: UpdateEnvVarMetaInput,
   ): Promise<void> {
-    const [row] = await this.db
-      .select({ isSecret: envVars.isSecret })
-      .from(envVars)
-      .where(
-        and(
-          eq(envVars.deploymentId, deploymentId),
-          eq(envVars.targetService, targetService),
-          eq(envVars.key, key),
-        ),
-      );
+    const isSecret = await this.storedIsSecret(deploymentId, targetService, key);
 
-    if (!row) {
+    if (isSecret === null) {
       throw new BadRequestException("Variable not found");
     }
 
-    if (row.isSecret && input.isSecret === false) {
+    if (isSecret && input.isSecret === false) {
       throw new BadRequestException(
         "Converting a secret to a regular variable requires a new value",
       );
