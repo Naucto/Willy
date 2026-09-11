@@ -56,3 +56,16 @@ export function envScopeSubtitle(service: string): string {
     ? "Applies to every service in this deployment."
     : `Applies to the ${service} service only.`;
 }
+
+// How a listed row relates to the focused scope: the scope's own, inherited from the shared scope,
+// or a shared row this service redefines. The last is listed rather than dropped so a value that
+// differs from the shared one has a visible reason.
+export type EnvRowOrigin = "own" | "inherited" | "shadowed";
+
+export function envRowOrigin(row: MaskedEnvVar, service: string): EnvRowOrigin {
+  if (service === "" || row.targetService === service) {
+    return "own";
+  }
+
+  return row.overridden ? "shadowed" : "inherited";
+}

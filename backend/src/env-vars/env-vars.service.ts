@@ -12,6 +12,11 @@ export interface MaskedEnvVar {
   key: string;
   scope: EnvScope;
   isSecret: boolean;
+  // Scope the variable is stored in; "" = shared across every service.
+  targetService: string;
+  // A shared variable the listed service redefines: it is still listed, but that service gets the
+  // service-scoped value instead of this one.
+  overridden: boolean;
   // Plaintext for regular vars; null for secrets (never returned in plaintext).
   value: string | null;
 }
@@ -30,6 +35,16 @@ export interface UpdateEnvVarMetaInput {
 // A secret's value is never exposed; a regular var shows its value. Pure for unit-testing.
 export function maskedEnvValue(isSecret: boolean, value: string): string | null {
   return isSecret ? null : value;
+}
+
+// What a service's containers actually receive: the shared variables it inherits plus its own, in
+// the precedence `resolveForInjection` applies at injection time. A shared variable the service
+// redefines stays in the list, marked, so a value that differs from the shared one has a visible
+// reason instead of silently missing.
+export function mergeInheritedEnv(shared: MaskedEnvVar[], own: MaskedEnvVar[]): MaskedEnvVar[] {
+  const ownKeys = new Set(own.map((row) => row.key));
+
+  return [...shared.map((row) => ({ ...row, overridden: ownKeys.has(row.key) })), ...own];
 }
 
 @Injectable()
@@ -80,9 +95,9 @@ export class EnvVarsService {
       );
   }
 
-  // Lists vars for a service ("" = deployment-wide/shared). Regular vars carry their plaintext
-  // value; secrets are returned with value === null.
-  async listMasked(deploymentId: string, targetService = ""): Promise<MaskedEnvVar[]> {
+  // One scope's own rows, in storage order. Regular vars carry their plaintext value; secrets are
+  // returned with value === null.
+  private async readScope(deploymentId: string, targetService: string): Promise<MaskedEnvVar[]> {
     const rows = await this.db
       .select()
       .from(envVars)
@@ -92,6 +107,8 @@ export class EnvVarsService {
       key: row.key,
       scope: row.scope,
       isSecret: row.isSecret,
+      targetService: row.targetService,
+      overridden: false,
       value: maskedEnvValue(
         row.isSecret,
         row.isSecret
@@ -104,6 +121,19 @@ export class EnvVarsService {
             }),
       ),
     }));
+  }
+
+  // Lists what a scope's containers see ("" = deployment-wide/shared): the scope's own variables,
+  // plus, for a service, the shared ones it inherits. Listing a service scope on its own would hide
+  // every shared variable from a view the reader takes for that service's environment.
+  async listMasked(deploymentId: string, targetService = ""): Promise<MaskedEnvVar[]> {
+    const own = await this.readScope(deploymentId, targetService);
+
+    if (targetService === "") {
+      return own;
+    }
+
+    return mergeInheritedEnv(await this.readScope(deploymentId, ""), own);
   }
 
   // Changes a var's scope and/or type without re-supplying the value. Converting a secret to a

@@ -28,6 +28,7 @@ import {
   useDeployment,
   useDeploymentContainers,
   useDeploymentTransition,
+  useEnvScopes,
   useReleases,
   useRollback,
 } from "../api/hooks";
@@ -39,7 +40,7 @@ import { CronRunsTab } from "../components/CronRunsTab";
 import { DeployActions } from "../components/DeployActions";
 import { DeploymentBackupsTab } from "../components/DeploymentBackupsTab";
 import { DomainsManager } from "../components/DomainsManager";
-import { EnvScopeSelector } from "../components/EnvScopeSelector";
+import { type EnvScopeOption, EnvScopeSelector } from "../components/EnvScopeSelector";
 import { EnvVarEditor } from "../components/EnvVarEditor";
 import { resolveEnvScope } from "../components/envVarEditing";
 import { HealthTab } from "../components/HealthTab";
@@ -121,6 +122,7 @@ export function DeploymentDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: deployment, isLoading, error } = useDeployment(id);
   const { data: containers } = useDeploymentContainers(id);
+  const { data: scopesWithVars } = useEnvScopes(id);
   const transition = useDeploymentTransition(id);
   const canOperate = useCan("operate");
 
@@ -144,21 +146,29 @@ export function DeploymentDetailPage() {
   // its own URL param: ?container= holds a container id, which the container-scoped tabs overwrite
   // and which changes on every deploy — reusing it silently re-scoped this tab, hiding the shared
   // variables behind whichever container was last focused elsewhere.
+  // The scopes offered are the deployment's services *and* the ones that hold variables: a service
+  // that was renamed or dropped from the compose file keeps its variables, and offering only the
+  // running containers would leave them with no entry in the UI at all.
   const isEnv = active === "env";
   const isCompose = deployment?.buildStrategy === "COMPOSE";
-  const envServices = useMemo(() => {
-    const names = new Set<string>();
+  const envServices = useMemo<EnvScopeOption[]>(() => {
+    const running = new Set<string>();
 
     for (const container of containers ?? []) {
       if (container.service) {
-        names.add(container.service);
+        running.add(container.service);
       }
     }
 
-    return [...names].sort();
-  }, [containers]);
+    return [...new Set([...running, ...(scopesWithVars ?? [])])]
+      .sort()
+      .map((service) => ({ service, orphan: !running.has(service) }));
+  }, [containers, scopesWithVars]);
 
-  const envService = resolveEnvScope(searchParams.get("scope"), envServices);
+  const envService = resolveEnvScope(
+    searchParams.get("scope"),
+    envServices.map((option) => option.service),
+  );
   const selectEnvScope = (service: string) => {
     const next = new URLSearchParams(searchParams);
 
@@ -287,7 +297,13 @@ export function DeploymentDetailPage() {
           ) : (
             <Alert severity="info">Console is available while the deployment is running.</Alert>
           ))}
-        {active === "env" && <EnvVarEditor deployment={deployment} service={envService} />}
+        {active === "env" && (
+          <EnvVarEditor
+            deployment={deployment}
+            service={envService}
+            orphan={envServices.some((option) => option.service === envService && option.orphan)}
+          />
+        )}
         {active === "volumes" && <VolumesTab deploymentId={id} />}
         {active === "files" && (
           <FilesTab deploymentId={id} volume={volume} refreshNonce={filesRefresh} />

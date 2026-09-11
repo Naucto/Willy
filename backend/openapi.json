@@ -1934,6 +1934,44 @@
         ]
       }
     },
+    "/deployments/{id}/env/scopes": {
+      "get": {
+        "operationId": "EnvVarsController_scopes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "env"
+        ]
+      }
+    },
     "/deployments/{id}/env": {
       "get": {
         "operationId": "EnvVarsController_list",
@@ -5621,6 +5659,14 @@
           "isSecret": {
             "type": "boolean"
           },
+          "targetService": {
+            "type": "string",
+            "description": "Scope the variable is stored in; \"\" = shared across every service."
+          },
+          "overridden": {
+            "type": "boolean",
+            "description": "Shared variable the listed service redefines; that service gets its own value."
+          },
           "value": {
             "type": "string",
             "nullable": true,
@@ -5631,6 +5677,8 @@
           "key",
           "scope",
           "isSecret",
+          "targetService",
+          "overridden",
           "value"
         ]
       },

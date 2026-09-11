@@ -4,6 +4,7 @@ import EditIcon from "@mui/icons-material/EditOutlined";
 import {
   Alert,
   Box,
+  Chip,
   FormControlLabel,
   MenuItem,
   Stack,
@@ -20,7 +21,13 @@ import type { Deployment, EnvScope, MaskedEnvVar } from "../api/types";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
 import { BaseDialog } from "./BaseDialog";
-import { envSaveBlocked, envSaveMode, envScopeSubtitle, envValueDisplay } from "./envVarEditing";
+import {
+  envRowOrigin,
+  envSaveBlocked,
+  envSaveMode,
+  envScopeSubtitle,
+  envValueDisplay,
+} from "./envVarEditing";
 import { OperateButton, OperateIconButton } from "./OperateButton";
 import { PasswordField } from "./PasswordField";
 
@@ -42,14 +49,17 @@ const SCOPE_OPTIONS: { value: EnvScope; label: string; description: string }[] =
   },
 ];
 
-// `service` is the focused compose service ("" = shared/everyone, or the single container) — driven
-// by the deployment bar's container selector.
+// `service` is the focused compose service ("" = shared/everyone, or the single container), driven
+// by the deployment bar's scope selector. `orphan` says no container answers to that service, so
+// nothing receives what is listed here.
 export function EnvVarEditor({
   deployment,
   service = "",
+  orphan = false,
 }: {
   deployment: Deployment;
   service?: string;
+  orphan?: boolean;
 }) {
   const run = useAction();
   const deploymentId = deployment.id;
@@ -64,7 +74,22 @@ export function EnvVarEditor({
     run(() => deleteEnvVar.mutateAsync(envKey), `Removed ${envKey}`);
 
   const columns: GridColDef<MaskedEnvVar>[] = [
-    { field: "key", headerName: "Key", flex: 1, minWidth: 180, cellClassName: "willy-mono" },
+    {
+      field: "key",
+      headerName: "Key",
+      flex: 1,
+      minWidth: 220,
+      renderCell: (params) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+          <Box className="willy-mono" sx={{ minWidth: 0 }}>
+            {params.row.key}
+          </Box>
+          {envRowOrigin(params.row, service) !== "own" && (
+            <Chip label="shared" size="small" variant="outlined" />
+          )}
+        </Box>
+      ),
+    },
     { field: "scope", headerName: "Scope", width: 120 },
     {
       field: "value",
@@ -73,14 +98,22 @@ export function EnvVarEditor({
       minWidth: 180,
       sortable: false,
       cellClassName: "willy-mono",
-      renderCell: (params) =>
-        params.row.isSecret ? (
-          <Typography variant="body2" sx={{ color: "text.disabled" }}>
-            —
+      renderCell: (params) => {
+        const shadowed = envRowOrigin(params.row, service) === "shadowed";
+
+        return (
+          <Typography
+            variant="body2"
+            sx={{
+              fontFamily: "inherit",
+              color: params.row.isSecret || shadowed ? "text.disabled" : undefined,
+              textDecoration: shadowed ? "line-through" : undefined,
+            }}
+          >
+            {envValueDisplay(params.row)}
           </Typography>
-        ) : (
-          envValueDisplay(params.row)
-        ),
+        );
+      },
     },
     {
       field: "actions",
@@ -89,26 +122,47 @@ export function EnvVarEditor({
       sortable: false,
       filterable: false,
       align: "right",
-      renderCell: (params) => (
-        <Box>
-          <Tooltip title="Edit">
-            <OperateIconButton size="small" onClick={() => setEditing(params.row)}>
-              <EditIcon fontSize="small" />
-            </OperateIconButton>
-          </Tooltip>
-          <Tooltip title="Delete">
-            <OperateIconButton size="small" onClick={() => void remove(params.row.key)}>
-              <DeleteIcon fontSize="small" />
-            </OperateIconButton>
-          </Tooltip>
-        </Box>
-      ),
+      renderCell: (params) => {
+        // An inherited row is stored in the shared scope; the write hooks are bound to the focused
+        // one, so acting on it here would create a service-scoped copy rather than edit what is
+        // shown. It is edited from the shared scope.
+        if (envRowOrigin(params.row, service) !== "own") {
+          return (
+            <Tooltip title="Defined for every service — switch the scope to Everyone to change it">
+              <Typography variant="body2" sx={{ color: "text.disabled" }}>
+                —
+              </Typography>
+            </Tooltip>
+          );
+        }
+
+        return (
+          <Box>
+            <Tooltip title="Edit">
+              <OperateIconButton size="small" onClick={() => setEditing(params.row)}>
+                <EditIcon fontSize="small" />
+              </OperateIconButton>
+            </Tooltip>
+            <Tooltip title="Delete">
+              <OperateIconButton size="small" onClick={() => void remove(params.row.key)}>
+                <DeleteIcon fontSize="small" />
+              </OperateIconButton>
+            </Tooltip>
+          </Box>
+        );
+      },
     },
   ];
 
   return (
     <Stack spacing={2}>
       {error && <Alert severity="error">{describeError(error)}</Alert>}
+      {orphan && (
+        <Alert severity="warning">
+          No container runs as <strong>{service}</strong> — this deployment has no such compose
+          service. These variables are stored, but nothing receives them.
+        </Alert>
+      )}
 
       <Box sx={{ display: "flex" }}>
         <Box sx={{ flexGrow: 1 }} />
@@ -122,7 +176,7 @@ export function EnvVarEditor({
           rows={data ?? []}
           columns={columns}
           loading={isLoading}
-          getRowId={(row) => row.key}
+          getRowId={(row) => `${row.targetService}:${row.key}`}
           density="compact"
           disableRowSelectionOnClick
           pageSizeOptions={[25, 50, 100]}
@@ -135,6 +189,15 @@ export function EnvVarEditor({
       <Box sx={{ fontSize: 12, color: "text.secondary" }}>
         Regular values are shown and editable. Secret values are encrypted and never shown — enter a
         new value to change one.
+        {service !== "" && (
+          <>
+            {" "}
+            Rows marked <em>shared</em> come from the Everyone scope, which this service inherits; a
+            struck-through one is redefined here. A variable stored on a service reaches that
+            service's container only — it is not available to <code>${"{…}"}</code> interpolation in
+            the compose file.
+          </>
+        )}
       </Box>
 
       {(adding || editing !== null) && (
