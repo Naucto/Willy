@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { type OvhCredentials, signRequest } from "./ovh-client";
+import { type OvhCredentials, ovhErrorMessage, signRequest } from "./ovh-client";
 
 const creds: OvhCredentials = {
   endpoint: "ovh-eu",
@@ -24,5 +24,24 @@ describe("signRequest", () => {
     const withoutBody = signRequest(creds, "POST", "https://x/record", "", 1);
 
     expect(withBody).not.toBe(withoutBody);
+  });
+});
+
+describe("ovhErrorMessage", () => {
+  it("keeps only the explanation OVH put in the body", () => {
+    const body =
+      '{"class":"Client::BadRequest","message":"Invalid subdomain : Subdomain is mandatory for CNAME"}';
+
+    expect(ovhErrorMessage(body)).toBe("Invalid subdomain : Subdomain is mandatory for CNAME");
+  });
+
+  it("falls back to the raw body when it isn't OVH's error shape", () => {
+    expect(ovhErrorMessage("<html>502 Bad Gateway</html>")).toBe("<html>502 Bad Gateway</html>");
+    expect(ovhErrorMessage('{"class":"Client::Forbidden"}')).toBe('{"class":"Client::Forbidden"}');
+  });
+
+  it("truncates a runaway body and names an empty one", () => {
+    expect(ovhErrorMessage("x".repeat(1000))).toHaveLength(300);
+    expect(ovhErrorMessage("")).toBe("no response body");
   });
 });

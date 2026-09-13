@@ -26,6 +26,7 @@ import {
 import type { CreateDnsRecordInput, DnsRecord } from "../api/types";
 import { ManageZonesDialog } from "../components/ManageZonesDialog";
 import { OperateButton, OperateIconButton } from "../components/OperateButton";
+import { recordDraftProblem } from "../dnsRecord";
 import { describeError } from "../errors";
 import { useAction } from "../useAction";
 
@@ -69,6 +70,7 @@ export function DnsPage() {
   const { data: hostIp } = useHostPublicIp();
 
   const isAddressRecord = draft.fieldType === "A" || draft.fieldType === "AAAA";
+  const draftProblem = recordDraftProblem(draft);
 
   // Auto-select the first discovered zone so records show without an extra click.
   useEffect(() => {
@@ -266,6 +268,8 @@ export function DnsPage() {
               label="Subdomain"
               placeholder="app (blank = apex)"
               value={draft.subDomain}
+              error={draftProblem !== null}
+              helperText={draftProblem}
               onChange={(event) => setDraft({ ...draft, subDomain: event.target.value })}
             />
             <TextField
@@ -295,7 +299,7 @@ export function DnsPage() {
           <Button onClick={() => setAdding(false)}>Cancel</Button>
           <OperateButton
             variant="contained"
-            disabled={createRecord.isPending || !draft.target.trim()}
+            disabled={createRecord.isPending || !draft.target.trim() || draftProblem !== null}
             onClick={() => void onCreate()}
           >
             Create

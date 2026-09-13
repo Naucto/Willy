@@ -3,7 +3,17 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { WillyError } from "../common/errors";
 
-export class OvhError extends WillyError {}
+// `status` is 0 when the call never got an answer, so a caller can tell a verdict on the request
+// apart from the API being out of reach.
+export class OvhError extends WillyError {
+  constructor(
+    message: string,
+    readonly status = 0,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
 
 // OVH region endpoint -> API base URL.
 const EU_ENDPOINT = "https://eu.api.ovh.com/1.0";
@@ -20,7 +30,7 @@ export interface OvhCredentials {
   consumerKey: string;
 }
 
-type Method = "GET" | "POST" | "PUT" | "DELETE";
+export type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 // OVH signs requests as "$1$" + sha1(appSecret+consumerKey+method+url+body+timestamp).
 // The SHA-1 is mandated by OVH's API auth protocol — it's a request signature we cannot change, not a
@@ -37,6 +47,23 @@ export function signRequest(
   const hash = createHash("sha1").update(parts.join("+")).digest("hex");
 
   return `$1$${hash}`;
+}
+
+// Of OVH's error body only `message` is worth showing: it is the part that names what to fix. A body
+// carrying no such field is kept whole, capped so an oversized one can't flood the log or the panel.
+// Pure + exported for unit testing.
+export function ovhErrorMessage(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+
+    if (parsed !== null && typeof parsed === "object" && "message" in parsed) {
+      return String((parsed as { message: unknown }).message);
+    }
+  } catch {
+    // Deliberate: an unparseable body is not an error, it is the message.
+  }
+
+  return body.slice(0, 300) || "no response body";
 }
 
 // Thin signed client for the subset of the OVH API Willy uses (DNS zones + records).
@@ -88,10 +115,7 @@ export class OvhClient {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new OvhError(
-        `OVH ${method} ${path} failed (${response.status}): ${text.slice(0, 300)}`,
-      );
+      throw new OvhError(ovhErrorMessage(await response.text()), response.status);
     }
 
     if (response.status === 204) {
