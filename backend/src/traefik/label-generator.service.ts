@@ -3,6 +3,10 @@ import { ConfigService } from "@nestjs/config";
 
 export const OWNER_LABEL = "willy.deploymentId";
 
+// Marks a compose service that runs to completion (a migration runner, a seed job) so anything that
+// only sees the container — the panel, discovery — can tell an exited-0 one-shot from a stopped app.
+export const ONE_SHOT_LABEL = "willy.oneShot";
+
 // Marks a container as Willy's own infrastructure (control plane + throwaway helpers) so the admin
 // panel can hide it from the Images/Containers views by default.
 export const INTERNAL_LABEL = "willy.internal";

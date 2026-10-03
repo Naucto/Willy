@@ -6,6 +6,7 @@ import type { GitService } from "../git/git.service";
 import type { BuildLogStore } from "./build-log.store";
 import type { ContainerOps } from "./container-ops.service";
 import type { CronService } from "./cron.service";
+import { OneShotFailedError } from "./errors";
 import type { HealthProber } from "./health-prober.service";
 import type { ImageBuilder } from "./image-builder.service";
 import { ReleaseRunner } from "./release-runner.service";
@@ -29,6 +30,7 @@ interface Mocks {
     down: Fn;
     downRelease: Fn;
     baseProject: Fn;
+    releaseProject: Fn;
     prepare: Fn;
     upBase: Fn;
     upRelease: Fn;
@@ -38,7 +40,7 @@ interface Mocks {
   health: { composeHealthy: Fn; firstUnreachableRoute: Fn };
   runtimeLog: { stopDeployment: Fn; syncDeployment: Fn };
   buildLog: { append: Fn; finish: Fn };
-  dockerContainers: { listByLabel: Fn };
+  dockerContainers: { listByLabel: Fn; outputTail: Fn };
 }
 
 function makeRunner(deployment: Partial<Deployment>): { runner: ReleaseRunner; mocks: Mocks } {
@@ -62,6 +64,7 @@ function makeRunner(deployment: Partial<Deployment>): { runner: ReleaseRunner; m
       down: vi.fn().mockResolvedValue(undefined),
       downRelease: vi.fn().mockResolvedValue(undefined),
       baseProject: vi.fn().mockReturnValue("willy_app"),
+      releaseProject: vi.fn().mockReturnValue("willy_app_rnewrelea"),
       prepare: vi
         .fn()
         .mockResolvedValue({ split: { pinned: ["db"], eligible: ["web"] }, composeFile: "d.yml" }),
@@ -76,7 +79,10 @@ function makeRunner(deployment: Partial<Deployment>): { runner: ReleaseRunner; m
     },
     runtimeLog: { stopDeployment: vi.fn(), syncDeployment: vi.fn().mockResolvedValue(undefined) },
     buildLog: { append: vi.fn(), finish: vi.fn() },
-    dockerContainers: { listByLabel: vi.fn().mockResolvedValue([]) },
+    dockerContainers: {
+      listByLabel: vi.fn().mockResolvedValue([]),
+      outputTail: vi.fn().mockResolvedValue(""),
+    },
   };
 
   const runner = new ReleaseRunner(
@@ -242,5 +248,98 @@ describe("ReleaseRunner.runComposeRelease (blue-green)", () => {
     expect(mocks.compose.downRelease).not.toHaveBeenCalled();
     expect(mocks.compose.down).not.toHaveBeenCalled();
     expect(mocks.deployments.setState).toHaveBeenLastCalledWith("app", "DEGRADED");
+  });
+
+  it("tears green down when `up` itself fails (a one-shot dependency exited non-zero)", async () => {
+    const { runner, mocks } = makeRunner(composeDeployment());
+    routeReleases(mocks, "willy_app_rold");
+    mocks.compose.upRelease.mockRejectedValue(new Error("docker compose exited with code 1"));
+
+    await runner.runRelease(composeDeployment(), "r-new");
+
+    expect(mocks.compose.downRelease).toHaveBeenCalledWith("willy_app_rnewrelea");
+    expect(mocks.compose.downRelease).not.toHaveBeenCalledWith("willy_app_rold");
+    expect(mocks.health.composeHealthy).not.toHaveBeenCalled();
+    expect(mocks.deployments.setState).toHaveBeenLastCalledWith("app", "DEGRADED");
+  });
+});
+
+describe("ReleaseRunner.runComposeRelease with a one-shot service", () => {
+  const deployment = {
+    id: "app",
+    name: "app",
+    type: "WEB",
+    buildStrategy: "COMPOSE",
+    activeReleaseId: null,
+  } as unknown as Deployment;
+
+  const green = [
+    { id: "migrate-id", service: "migrate" },
+    { id: "api-id", service: "api" },
+  ];
+
+  function makeOneShotRunner(): ReturnType<typeof makeRunner> {
+    const made = makeRunner(deployment);
+
+    made.mocks.compose.prepare.mockResolvedValue({
+      split: { pinned: [], eligible: ["migrate", "api"], oneShot: ["migrate"] },
+      composeFile: "d.yml",
+    });
+    made.mocks.containers.listForProject.mockResolvedValue(green);
+    made.mocks.dockerContainers.outputTail.mockResolvedValue("applied 3 migrations\ndone\n");
+
+    return made;
+  }
+
+  const logLines = (mocks: Mocks): unknown[] =>
+    mocks.buildLog.append.mock.calls.map((call: unknown[]) => call[1]);
+
+  it("hands the one-shots to the gate, goes live, and appends their output once", async () => {
+    const { runner, mocks } = makeOneShotRunner();
+
+    await runner.runRelease(deployment, "r-new");
+
+    expect(mocks.health.composeHealthy).toHaveBeenCalledWith(
+      deployment,
+      green,
+      new Set(["migrate"]),
+    );
+    expect(mocks.health.firstUnreachableRoute).toHaveBeenCalledWith(
+      deployment,
+      green,
+      new Set(["migrate"]),
+    );
+    expect(mocks.dockerContainers.outputTail).toHaveBeenCalledTimes(1);
+    expect(mocks.dockerContainers.outputTail.mock.calls[0]?.[0]).toBe("migrate-id");
+    expect(logLines(mocks)).toEqual(expect.arrayContaining(["applied 3 migrations", "done"]));
+    expect(mocks.deployments.setState).toHaveBeenCalledWith("app", "RUNNING");
+  });
+
+  it("fails with the one-shot's exit code, its output read before green is removed", async () => {
+    const { runner, mocks } = makeOneShotRunner();
+    mocks.health.composeHealthy.mockRejectedValue(new OneShotFailedError("migrate", 2));
+
+    await runner.runRelease(deployment, "r-new");
+
+    const [outputCall] = mocks.dockerContainers.outputTail.mock.invocationCallOrder;
+    const [downCall] = mocks.compose.downRelease.mock.invocationCallOrder;
+
+    expect(outputCall).toBeLessThan(downCall ?? 0);
+    expect(mocks.compose.downRelease).toHaveBeenCalledWith("willy_app_rnewrelea");
+    expect(mocks.releases.setStatus).toHaveBeenCalledWith("r-new", "FAILED", {
+      errorMessage: 'one-shot service "migrate" exited with code 2',
+    });
+    expect(mocks.deployments.setState).toHaveBeenLastCalledWith("app", "ERROR");
+  });
+
+  it("appends the one-shot's output when `up` fails before the gate", async () => {
+    const { runner, mocks } = makeOneShotRunner();
+    mocks.compose.upRelease.mockRejectedValue(new Error("docker compose exited with code 1"));
+
+    await runner.runRelease(deployment, "r-new");
+
+    expect(mocks.containers.listForProject).toHaveBeenCalledWith("willy_app_rnewrelea");
+    expect(logLines(mocks)).toContain("applied 3 migrations");
+    expect(mocks.compose.downRelease).toHaveBeenCalledWith("willy_app_rnewrelea");
   });
 });

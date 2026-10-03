@@ -71,6 +71,13 @@ export interface ContainerStatus {
   name: string | undefined;
   image: string | undefined;
   running: boolean;
+  // Docker State.Status: created/running/paused/restarting/removing/exited/dead.
+  state: string;
+  // Docker State.ExitCode; only meaningful once `state` is "exited".
+  exitCode: number;
+  // The compose service runs to completion by design (its own file sets `restart: "no"`), so
+  // "exited 0" means done rather than down.
+  oneShot: boolean;
   health: string | undefined;
   ip: string | undefined;
   mounts: VolumeMount[];

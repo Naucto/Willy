@@ -5,6 +5,7 @@ import { ContainersService, type DeploymentContainer } from "../containers/conta
 import type { Deployment } from "../deployments/deployments.service";
 import { DomainsService } from "../deployments/domains.service";
 import { DockerContainerService } from "../docker/docker-container.service";
+import { OneShotFailedError } from "./errors";
 
 const EDGE_NETWORK = "willy_edge";
 const WORKER_HEALTH_GRACE_MS = 6_000;
@@ -98,8 +99,13 @@ export class HealthProber {
 
   // Compose health gate: wait until every project container is up to its bar. A service that
   // declares a healthcheck (in the file or injected by Willy) must report Docker-healthy; a service
-  // with no healthcheck passes as soon as it's running. Returns false if the deadline passes first.
-  async composeHealthy(deployment: Deployment, targets?: DeploymentContainer[]): Promise<boolean> {
+  // with no healthcheck passes as soon as it's running; a one-shot passes once it exited 0. Returns
+  // false if the deadline passes first; throws OneShotFailedError as soon as a one-shot fails.
+  async composeHealthy(
+    deployment: Deployment,
+    targets?: DeploymentContainer[],
+    oneShot: ReadonlySet<string> = new Set(),
+  ): Promise<boolean> {
     const deadline = Date.now() + this.resolveTimeoutMs(deployment);
 
     while (Date.now() < deadline) {
@@ -107,7 +113,7 @@ export class HealthProber {
       // still polled live; without one, fall back to the deployment's current containers.
       const containers = targets ?? (await this.containers.listForDeployment(deployment));
 
-      if (containers.length > 0 && (await this.allContainersHealthy(containers))) {
+      if (containers.length > 0 && (await this.allContainersHealthy(containers, oneShot))) {
         return true;
       }
 
@@ -119,9 +125,22 @@ export class HealthProber {
 
   async allContainersHealthy(
     containers: { id: string; service: string | null }[],
+    oneShot: ReadonlySet<string> = new Set(),
   ): Promise<boolean> {
     for (const container of containers) {
       const status = await this.dockerContainers.inspectContainer(container.id);
+
+      if (status && container.service && oneShot.has(container.service)) {
+        if (status.state !== "exited") {
+          return false;
+        }
+
+        if (status.exitCode !== 0) {
+          throw new OneShotFailedError(container.service, status.exitCode);
+        }
+
+        continue;
+      }
 
       if (!status?.running) {
         return false;
@@ -144,11 +163,16 @@ export class HealthProber {
   async firstUnreachableRoute(
     deployment: Deployment,
     targets?: DeploymentContainer[],
+    oneShot: ReadonlySet<string> = new Set(),
   ): Promise<string | null> {
-    const [containers, routes] = await Promise.all([
+    const [all, routes] = await Promise.all([
       targets ?? this.containers.listForDeployment(deployment),
       this.domains.domainRoutes(deployment.id),
     ]);
+
+    // A one-shot has exited and serves nothing; left in, it would make the "exactly one container"
+    // fallback ambiguous and skip the probe of the service that does.
+    const containers = all.filter((c) => !(c.service && oneShot.has(c.service)));
 
     const timeoutMs = this.resolveTimeoutMs(deployment);
 

@@ -14,6 +14,7 @@ import { DockerImageService } from "../../docker/docker-image.service";
 import { DockerSystemService } from "../../docker/docker-system.service";
 import {
   LabelGeneratorService,
+  ONE_SHOT_LABEL,
   OWNER_LABEL,
   groupRoutes,
 } from "../../traefik/label-generator.service";
@@ -27,8 +28,12 @@ const RESTART_COMPOSE: Record<RestartPolicyName, string> = {
 };
 
 // Translate a service's resource limits into compose service keys honoured by `docker compose up`
-// (non-swarm): mem_limit/cpus/cap_add/cap_drop/restart/logging.
-function resourceFragment(limits: ResourceLimits): Record<string, unknown> {
+// (non-swarm): mem_limit/cpus/cap_add/cap_drop/restart/logging. A one-shot keeps its own
+// `restart: "no"`: any other policy would rerun a finished migration in a loop.
+export function resourceFragment(
+  limits: ResourceLimits,
+  oneShot: boolean,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
 
   if (limits.memoryLimitMb) {
@@ -47,7 +52,7 @@ function resourceFragment(limits: ResourceLimits): Record<string, unknown> {
     out.cap_drop = limits.capDrop;
   }
 
-  if (limits.restartPolicy) {
+  if (limits.restartPolicy && !oneShot) {
     out.restart = RESTART_COMPOSE[limits.restartPolicy];
   }
 
@@ -187,6 +192,9 @@ export interface ServiceSplit {
   // Services whose own compose file sets `restart:`. Willy's override must leave those alone —
   // the override file wins the merge, so writing into it would silently replace what was asked for.
   declaresRestart: string[];
+  // Services whose own definition sets `restart: "no"`: one-shots (migrations, seeds) that are meant
+  // to exit, so the deploy gate counts "exited 0" as done instead of down.
+  oneShot: string[];
 }
 
 // A mount that two live copies would fight over (or that would silently diverge). Read-only mounts and
@@ -290,16 +298,24 @@ export function classifyComposeServices(doc: Record<string, unknown>): ServiceSp
   const eligible: string[] = [];
   const pinned: string[] = [];
   const declaresRestart: string[] = [];
+  const oneShot: string[] = [];
 
   for (const [name, service] of Object.entries(services)) {
     (servicePins(service) ? pinned : eligible).push(name);
 
-    if (asRecord(service).restart !== undefined) {
+    const restart = asRecord(service).restart;
+
+    if (restart !== undefined) {
       declaresRestart.push(name);
+    }
+
+    // An unquoted `no` is a boolean to a YAML 1.1 reader, which is why compose asks for it quoted.
+    if (restart === "no" || restart === false) {
+      oneShot.push(name);
     }
   }
 
-  return { eligible, pinned, declaresRestart };
+  return { eligible, pinned, declaresRestart, oneShot };
 }
 
 // Prune a service's `depends_on` (list or condition-map form) to the services that live in the same
@@ -355,6 +371,7 @@ export interface SplitCompose {
   eligible: string[];
   pinned: string[];
   declaresRestart: string[];
+  oneShot: string[];
   baseYaml: string;
   releaseYaml: string;
 }
@@ -362,12 +379,12 @@ export interface SplitCompose {
 export function splitComposeConfig(raw: string, deploymentName: string): SplitCompose {
   const sanitized = sanitizeComposeYaml(raw);
   const doc = asRecord(parseYaml(sanitized.yaml));
-  const { eligible, pinned, declaresRestart } = classifyComposeServices(doc);
+  const { eligible, pinned, declaresRestart, oneShot } = classifyComposeServices(doc);
 
   const baseYaml = buildBaseYaml(doc, pinned);
   const releaseYaml = buildReleaseYaml(doc, eligible, pinned.length > 0, deploymentName);
 
-  return { sanitized, eligible, pinned, declaresRestart, baseYaml, releaseYaml };
+  return { sanitized, eligible, pinned, declaresRestart, oneShot, baseYaml, releaseYaml };
 }
 
 // Pinned services only, keeping top-level volumes/networks so their named volumes stay
@@ -551,8 +568,12 @@ export class ComposeService {
 
     // Domains that don't pin a service route to the explicitly-configured web service when one is
     // still set (back-compat with deployments created before the anchor was dissolved), otherwise
-    // the first declared service.
-    const defaultService = config.composeWebService || split.sanitized.services[0] || null;
+    // the first declared service that stays up — a one-shot has exited by the time traffic arrives.
+    const oneShot = new Set(split.oneShot);
+    const defaultService =
+      config.composeWebService ||
+      split.sanitized.services.find((name) => !oneShot.has(name)) ||
+      null;
     const defaultServiceImage = defaultService
       ? (split.sanitized.images[defaultService] ?? null)
       : null;
@@ -578,6 +599,7 @@ export class ComposeService {
       filename: files.baseOverride,
       serviceNames: plan.split.pinned,
       declaresRestart: plan.split.declaresRestart,
+      oneShot: plan.split.oneShot,
       routerPrefix: deployment.name,
       defaultService: plan.defaultService,
       defaultServiceImage: plan.defaultServiceImage,
@@ -625,6 +647,7 @@ export class ComposeService {
       filename: files.releaseOverride,
       serviceNames: plan.split.eligible,
       declaresRestart: plan.split.declaresRestart,
+      oneShot: plan.split.oneShot,
       routerPrefix: `${deployment.name}-${releaseShort}`,
       defaultService: plan.defaultService,
       defaultServiceImage: plan.defaultServiceImage,
@@ -716,6 +739,7 @@ export class ComposeService {
     filename: string;
     serviceNames: string[];
     declaresRestart: string[];
+    oneShot: string[];
     routerPrefix: string;
     defaultService: string | null;
     defaultServiceImage: string | null;
@@ -724,6 +748,7 @@ export class ComposeService {
     const { deployment, dir, filename, serviceNames, routerPrefix, attachEdge } = opts;
     const inScope = new Set(serviceNames);
     const ownRestart = new Set(opts.declaresRestart);
+    const oneShot = new Set(opts.oneShot);
     const services: Record<string, Record<string, unknown>> = {};
     const networks: Record<string, unknown> = {};
 
@@ -795,13 +820,13 @@ export class ComposeService {
     }
 
     // Per-service resource limits, restricted to the services this project owns. A service that
-    // names its own policy overrides the deployment's.
+    // names its own policy overrides the deployment's — except over a one-shot's own `restart: "no"`.
     for (const [name, limits] of Object.entries(deployment.serviceResources ?? {})) {
       if (!inScope.has(name)) {
         continue;
       }
 
-      const fragment = resourceFragment(limits);
+      const fragment = resourceFragment(limits, oneShot.has(name));
 
       if (Object.keys(fragment).length > 0) {
         services[name] = { ...(services[name] ?? {}), ...fragment };
@@ -830,7 +855,11 @@ export class ComposeService {
 
       services[name] = {
         ...existing,
-        labels: { ...asRecord(existing.labels), [OWNER_LABEL]: deployment.id },
+        labels: {
+          ...asRecord(existing.labels),
+          [OWNER_LABEL]: deployment.id,
+          ...(oneShot.has(name) ? { [ONE_SHOT_LABEL]: "true" } : {}),
+        },
       };
     }
 

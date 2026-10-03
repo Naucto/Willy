@@ -9,6 +9,7 @@ import {
   parseDeclaredHealthcheck,
   parseExposedPorts,
 } from "./docker-helpers";
+import { ONE_SHOT_LABEL } from "../traefik/label-generator.service";
 import { DockerImageService } from "./docker-image.service";
 import type {
   ContainerNetwork,
@@ -152,6 +153,9 @@ export class DockerContainerService {
         name: info.Name?.replace(/^\//, "") || undefined,
         image: info.Config?.Image || undefined,
         running: info.State.Running,
+        state: info.State.Status,
+        exitCode: info.State.ExitCode,
+        oneShot: info.Config?.Labels?.[ONE_SHOT_LABEL] === "true",
         health: info.State.Health?.Status,
         ip: ip || undefined,
         mounts,
@@ -164,6 +168,21 @@ export class DockerContainerService {
     } catch {
       return undefined;
     }
+  }
+
+  // The tail of a finished container's stdout+stderr, capped in characters too: a single runaway line
+  // would otherwise slip past a line-count bound.
+  async outputTail(id: string, lines: number, maxChars: number): Promise<string> {
+    const raw = (await this.docker.getContainer(id).logs({
+      stdout: true,
+      stderr: true,
+      follow: false,
+      timestamps: false,
+      tail: lines,
+    })) as unknown as Buffer;
+    const text = demuxLogBuffer(raw);
+
+    return text.length > maxChars ? text.slice(text.length - maxChars) : text;
   }
 
   async startContainer(id: string): Promise<void> {

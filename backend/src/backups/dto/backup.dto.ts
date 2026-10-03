@@ -233,6 +233,15 @@ export class ContainerDto {
   @ApiProperty({ type: Boolean })
   running!: boolean;
 
+  @ApiProperty({ type: String, example: "exited", description: "Docker State.Status" })
+  state!: string;
+
+  @ApiProperty({ type: Number, example: 0, description: "Docker State.ExitCode" })
+  exitCode!: number;
+
+  @ApiProperty({ type: Boolean, description: "Runs to completion by design (restart: no)" })
+  oneShot!: boolean;
+
   @ApiProperty({ type: [VolumeMountDto] })
   volumes!: VolumeMountDto[];
 

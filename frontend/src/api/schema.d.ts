@@ -2009,6 +2009,18 @@ export interface components {
       name: string;
       image: string;
       running: boolean;
+      /**
+       * @description Docker State.Status
+       * @example exited
+       */
+      state: string;
+      /**
+       * @description Docker State.ExitCode
+       * @example 0
+       */
+      exitCode: number;
+      /** @description Runs to completion by design (restart: no) */
+      oneShot: boolean;
       volumes: components["schemas"]["VolumeMountDto"][];
       service: string | null;
       networks: components["schemas"]["NetworkInfoDto"][];

@@ -1,11 +1,19 @@
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 
-// Compact running/stopped badge for the enriched selectors' status slot.
-export function RunningChip({ running }: { running: boolean }) {
+// Compact running/stopped badge for the enriched selectors' status slot. `completed` is for a
+// container that is meant to exit (a one-shot that finished cleanly), where "stopped" would read as
+// a fault.
+export function RunningChip({
+  running,
+  completed = false,
+}: {
+  running: boolean;
+  completed?: boolean;
+}) {
   return (
     <Chip
-      label={running ? "running" : "stopped"}
+      label={running ? "running" : completed ? "completed" : "stopped"}
       size="small"
       color={running ? "success" : "default"}
       variant="outlined"

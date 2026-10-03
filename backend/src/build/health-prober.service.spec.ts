@@ -5,6 +5,7 @@ import type { Deployment } from "../deployments/deployments.service";
 import type { DomainsService } from "../deployments/domains.service";
 import type { DockerContainerService } from "../docker/docker-container.service";
 import type { ContainerStatus } from "../docker/docker.types";
+import { OneShotFailedError } from "./errors";
 import { HealthProber } from "./health-prober.service";
 
 type Inspect = (id: string) => Promise<ContainerStatus | undefined>;
@@ -87,6 +88,52 @@ describe("HealthProber.allContainersHealthy", () => {
   });
 });
 
+describe("HealthProber one-shot services", () => {
+  const stack = [
+    { id: "migrate", service: "migrate" },
+    { id: "api", service: "api" },
+  ];
+  const oneShot = new Set(["migrate"]);
+
+  // The api is up; the one-shot's state is what each case varies.
+  const inspectWith =
+    (migrate: Partial<ContainerStatus>): Inspect =>
+    async (id) =>
+      id === "migrate"
+        ? status({ id, running: false, state: "exited", exitCode: 0, ...migrate })
+        : status({ id, running: true, state: "running" });
+
+  it("counts a one-shot that exited 0 as done", async () => {
+    const prober = makeProber(inspectWith({}));
+
+    await expect(prober.allContainersHealthy(stack, oneShot)).resolves.toBe(true);
+  });
+
+  it("keeps waiting while the one-shot is still running", async () => {
+    const prober = makeProber(inspectWith({ running: true, state: "running" }));
+
+    await expect(prober.allContainersHealthy(stack, oneShot)).resolves.toBe(false);
+  });
+
+  it("fails the gate at once, without waiting out the deadline, when it exited non-zero", async () => {
+    const prober = makeProber(inspectWith({ exitCode: 3 }), { containers: stack });
+    const verdict = prober.composeHealthy(
+      deployment({ healthTimeoutSec: 600 }),
+      undefined,
+      oneShot,
+    );
+
+    await expect(verdict).rejects.toBeInstanceOf(OneShotFailedError);
+    await expect(verdict).rejects.toThrow('"migrate" exited with code 3');
+  });
+
+  it("still fails an exited service that is not a one-shot", async () => {
+    const prober = makeProber(inspectWith({}));
+
+    await expect(prober.allContainersHealthy(stack)).resolves.toBe(false);
+  });
+});
+
 describe("HealthProber.firstUnreachableRoute", () => {
   it("returns null when no route maps to a known container (nothing to probe)", async () => {
     const prober = makeProber(async () => undefined, {
@@ -128,5 +175,23 @@ describe("HealthProber.firstUnreachableRoute", () => {
     await expect(
       prober.firstUnreachableRoute(deployment({ healthTimeoutSec: null })),
     ).resolves.toContain("isn't accepting connections");
+  });
+
+  it("leaves one-shots out of the single-container fallback so it lands on the real service", async () => {
+    const prober = makeProber(async () => undefined, {
+      ...reachableProbeOpts,
+      containers: [
+        { service: "migrate", networks: [], exposedPorts: [] },
+        { ...reachableProbeOpts.containers[0], service: "api" },
+      ],
+    });
+
+    await expect(
+      prober.firstUnreachableRoute(
+        deployment({ healthTimeoutSec: 0 }),
+        undefined,
+        new Set(["migrate"]),
+      ),
+    ).resolves.toContain("x.example.com is routed to port 3000");
   });
 });

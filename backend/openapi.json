@@ -6261,6 +6261,20 @@
           "running": {
             "type": "boolean"
           },
+          "state": {
+            "type": "string",
+            "example": "exited",
+            "description": "Docker State.Status"
+          },
+          "exitCode": {
+            "type": "number",
+            "example": 0,
+            "description": "Docker State.ExitCode"
+          },
+          "oneShot": {
+            "type": "boolean",
+            "description": "Runs to completion by design (restart: no)"
+          },
           "volumes": {
             "type": "array",
             "items": {
@@ -6303,6 +6317,9 @@
           "name",
           "image",
           "running",
+          "state",
+          "exitCode",
+          "oneShot",
           "volumes",
           "service",
           "networks",
