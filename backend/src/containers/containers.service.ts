@@ -11,6 +11,12 @@ export interface DeploymentContainer {
   name: string;
   image: string;
   running: boolean;
+  // Docker State.Status (created/running/exited/…) and State.ExitCode, so a finished one-shot can be
+  // told apart from a crashed or stopped service.
+  state: string;
+  exitCode: number;
+  // A compose service that runs to completion by design (its own file sets `restart: "no"`).
+  oneShot: boolean;
   volumes: VolumeMount[];
   // Compose service name; null for single-container deployments.
   service: string | null;
@@ -51,6 +57,9 @@ export class ContainersService {
           name: info.name ?? info.id.slice(0, 12),
           image: info.image ?? "",
           running: info.running,
+          state: info.state,
+          exitCode: info.exitCode,
+          oneShot: info.oneShot,
           volumes: info.mounts,
           service: info.service ?? null,
           networks: info.networks,

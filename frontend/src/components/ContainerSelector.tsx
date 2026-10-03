@@ -2,6 +2,10 @@ import { MenuItem, TextField } from "@mui/material";
 import type { Container } from "../api/types";
 import { RunningChip, SelectOption } from "./SelectOption";
 
+// A one-shot (migration, seed) is done, not down, once it exited cleanly.
+const isCompleted = (container: Container): boolean =>
+  container.oneShot && container.state === "exited" && container.exitCode === 0;
+
 // Sentinel value for the Environment tab's "Everyone" (shared, all-services) scope — not a real
 // container id.
 export const ALL_CONTAINERS = "__all__";
@@ -36,7 +40,11 @@ export function ContainerSelector({
       return "";
     }
 
-    return container.running ? titleFor(container) : `${titleFor(container)} (stopped)`;
+    if (container.running) {
+      return titleFor(container);
+    }
+
+    return `${titleFor(container)} (${isCompleted(container) ? "completed" : "stopped"})`;
   };
 
   return (
@@ -58,7 +66,7 @@ export function ContainerSelector({
         <MenuItem key={container.id} value={container.id}>
           <SelectOption
             title={titleFor(container)}
-            status={<RunningChip running={container.running} />}
+            status={<RunningChip running={container.running} completed={isCompleted(container)} />}
             caption={container.image}
           />
         </MenuItem>

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ContainersService } from "../containers/containers.service";
+import { ContainersService, type DeploymentContainer } from "../containers/containers.service";
 import { scrubSecrets } from "../common/redact";
 import { type Deployment, DeploymentsService } from "../deployments/deployments.service";
 import { DockerContainerService } from "../docker/docker-container.service";
@@ -9,12 +9,17 @@ import { OWNER_LABEL } from "../traefik/label-generator.service";
 import { BuildLogStore } from "./build-log.store";
 import { ContainerOps } from "./container-ops.service";
 import { CronService } from "./cron.service";
-import { HealthCheckError } from "./errors";
+import { HealthCheckError, OneShotFailedError } from "./errors";
 import { HealthProber } from "./health-prober.service";
 import { ImageBuilder } from "./image-builder.service";
 import { ReleasesService } from "./releases.service";
 import { RuntimeLogCollector } from "./runtime-log.collector";
 import { type ComposePlan, ComposeService } from "./strategies/compose.service";
+
+// A one-shot's output goes into the build log so a migration's result is readable from the panel;
+// bounded so a chatty seed job can't flood the log store.
+const ONE_SHOT_OUTPUT_LINES = 200;
+const ONE_SHOT_OUTPUT_CHARS = 32_000;
 
 // Runs the background lifecycle work for a release: the git clone -> image build -> health-checked
 // container swap, plus relaunch/rollback/stop. BuildOrchestrator validates and enqueues; these
@@ -269,13 +274,26 @@ export class ReleaseRunner {
             releaseId,
             `starting release services: ${plan.split.eligible.join(", ")}`,
           );
-          ({ project: releaseProject } = await this.compose.upRelease(
-            deployment,
-            dir,
-            plan,
-            releaseShort,
-            (line) => this.buildLog.append(releaseId, line),
-          ));
+
+          // Known before `up` runs: compose fails `up` when a `service_completed_successfully`
+          // dependency exits non-zero, after the rest of green already exists.
+          releaseProject = this.compose.releaseProject(deployment, releaseShort);
+
+          try {
+            await this.compose.upRelease(deployment, dir, plan, releaseShort, (line) =>
+              this.buildLog.append(releaseId, line),
+            );
+          } catch (error) {
+            // A failed one-shot is the likely cause; its output is the only clue to why.
+            const created = await this.containers
+              .listForProject(releaseProject)
+              .catch((): DeploymentContainer[] => []);
+
+            await this.appendOneShotOutput(releaseId, created, new Set(plan.split.oneShot));
+            await this.removeFailedRelease(releaseId, releaseProject);
+
+            throw error;
+          }
         }
       } finally {
         await this.git.cleanup(dir);
@@ -293,11 +311,29 @@ export class ReleaseRunner {
         ...(releaseProject ? await this.containers.listForProject(releaseProject) : []),
       ];
 
-      if (!(await this.health.composeHealthy(deployment, green))) {
-        await this.failGate(releaseId, releaseProject, "compose stack did not become healthy");
+      const oneShot = new Set(plan.split.oneShot);
+      let gateFailure: string | null = null;
+
+      try {
+        if (!(await this.health.composeHealthy(deployment, green, oneShot))) {
+          gateFailure = "compose stack did not become healthy";
+        }
+      } catch (error) {
+        if (!(error instanceof OneShotFailedError)) {
+          throw error;
+        }
+
+        gateFailure = error.message;
       }
 
-      const unreachable = await this.health.firstUnreachableRoute(deployment, green);
+      // Read before failGate: tearing green down removes the containers and their output with them.
+      await this.appendOneShotOutput(releaseId, green, oneShot);
+
+      if (gateFailure) {
+        await this.failGate(releaseId, releaseProject, gateFailure);
+      }
+
+      const unreachable = await this.health.firstUnreachableRoute(deployment, green, oneShot);
 
       if (unreachable) {
         await this.failGate(releaseId, releaseProject, unreachable);
@@ -339,20 +375,51 @@ export class ReleaseRunner {
     }
   }
 
-  // A failed health/reachability gate: tear down the new (green) release project so blue + base keep
-  // serving, then abort. An all-pinned deploy has no release project — its recreated stack is left
-  // running (in-place, non-destructive) rather than forcibly stopped.
+  private async appendOneShotOutput(
+    releaseId: string,
+    containers: DeploymentContainer[],
+    oneShot: ReadonlySet<string>,
+  ): Promise<void> {
+    for (const container of containers) {
+      if (!container.service || !oneShot.has(container.service)) {
+        continue;
+      }
+
+      const output = await this.dockerContainers
+        .outputTail(container.id, ONE_SHOT_OUTPUT_LINES, ONE_SHOT_OUTPUT_CHARS)
+        .catch((error: unknown) => `(output unavailable: ${describeError(error)})`);
+
+      this.buildLog.append(releaseId, `--- output of one-shot service "${container.service}" ---`);
+
+      for (const line of output.split("\n")) {
+        if (line.length > 0) {
+          this.buildLog.append(releaseId, line);
+        }
+      }
+    }
+  }
+
+  // Tear down the new (green) release project so blue + base keep serving. An all-pinned deploy has
+  // no release project — its recreated stack is left running (in-place, non-destructive) rather than
+  // forcibly stopped.
+  private async removeFailedRelease(
+    releaseId: string,
+    releaseProject: string | null,
+  ): Promise<void> {
+    if (releaseProject) {
+      this.buildLog.append(releaseId, `removing failed release ${releaseProject}`);
+      await this.compose.downRelease(releaseProject);
+    }
+  }
+
+  // A failed health/reachability gate: drop green, then abort.
   private async failGate(
     releaseId: string,
     releaseProject: string | null,
     reason: string,
   ): Promise<never> {
     this.buildLog.append(releaseId, reason);
-
-    if (releaseProject) {
-      this.buildLog.append(releaseId, `removing failed release ${releaseProject}`);
-      await this.compose.downRelease(releaseProject);
-    }
+    await this.removeFailedRelease(releaseId, releaseProject);
 
     throw new HealthCheckError(reason);
   }

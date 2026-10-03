@@ -1,7 +1,14 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { ConfigService } from "@nestjs/config";
 import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
+import type { Deployment } from "../../deployments/deployments.service";
 import {
+  ComposeService,
   classifyComposeServices,
+  resourceFragment,
   sanitizeComposeYaml,
   splitComposeConfig,
 } from "./compose.service";
@@ -269,6 +276,93 @@ describe("classifyComposeServices", () => {
     ].join("\n");
 
     expect(classifyFull(raw).declaresRestart).toEqual(["worker", "once"]);
+  });
+
+  it('reports services that declare restart "no" as one-shots, and only those', () => {
+    const raw = [
+      "services:",
+      "  web:",
+      "    image: nginx",
+      "  worker:",
+      "    image: busybox",
+      "    restart: on-failure",
+      "  migrate:",
+      "    image: busybox",
+      '    restart: "no"',
+    ].join("\n");
+
+    expect(classifyFull(raw).oneShot).toEqual(["migrate"]);
+  });
+
+  it("reads an unquoted `no` parsed as a YAML 1.1 boolean as a one-shot too", () => {
+    const raw = ["services:", "  migrate:", "    image: busybox", "    restart: no"].join("\n");
+    const doc = parse(raw, { version: "1.1" }) as Record<string, unknown>;
+
+    expect(classifyComposeServices(doc).oneShot).toEqual(["migrate"]);
+  });
+});
+
+describe("resourceFragment", () => {
+  it("applies a recorded restart policy to an ordinary service", () => {
+    expect(resourceFragment({ restartPolicy: "ALWAYS" }, false)).toEqual({ restart: "always" });
+  });
+
+  it('leaves a one-shot\'s own restart "no" in force over a recorded policy', () => {
+    expect(resourceFragment({ restartPolicy: "ALWAYS", memoryLimitMb: 64 }, true)).toEqual({
+      mem_limit: "64m",
+    });
+  });
+});
+
+describe("ComposeService.prepare", () => {
+  // prepare() only reads and writes files; the Docker/env collaborators are never reached.
+  const service = new ComposeService(
+    { get: () => undefined } as unknown as ConfigService,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  );
+
+  const prepare = async (compose: string, strategyConfig: Record<string, unknown> = {}) => {
+    const dir = await mkdtemp(join(tmpdir(), "willy-compose-"));
+
+    try {
+      await writeFile(join(dir, "docker-compose.yml"), compose, "utf8");
+
+      return await service.prepare(
+        { name: "app", buildStrategy: "COMPOSE", strategyConfig } as unknown as Deployment,
+        dir,
+        () => undefined,
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  };
+
+  const migrateThenApi = [
+    "services:",
+    "  migrate:",
+    "    image: busybox",
+    '    restart: "no"',
+    "  api:",
+    "    image: nginx",
+  ].join("\n");
+
+  it("routes by default to the first service that stays up, skipping a one-shot", async () => {
+    const plan = await prepare(migrateThenApi);
+
+    expect(plan.defaultService).toBe("api");
+    expect(plan.defaultServiceImage).toBe("nginx");
+    expect(plan.split.oneShot).toEqual(["migrate"]);
+  });
+
+  it("keeps an explicitly configured web service even when it comes after a one-shot", async () => {
+    const plan = await prepare(migrateThenApi, { composeWebService: "migrate" });
+
+    expect(plan.defaultService).toBe("migrate");
   });
 });
 
