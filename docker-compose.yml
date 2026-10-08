@@ -65,6 +65,10 @@ services:
       NETWORKS: 1
       VOLUMES: 1
       BUILD: 1
+      # BuildKit, which the builds use, talks to the engine over these two: the same build
+      # capability BUILD already grants, through the protocol BuildKit speaks.
+      SESSION: 1
+      GRPC: 1
       EXEC: 1
       INFO: 1
       PING: 1

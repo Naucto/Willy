@@ -9,6 +9,7 @@ import { type Deployment, composeConfig } from "../../deployments/deployments.se
 import { DomainsService } from "../../deployments/domains.service";
 import type { ResourceLimits, RestartPolicyName } from "../../deployments/resource-limits";
 import { EnvVarsService } from "../../env-vars/env-vars.service";
+import { dockerCliEnv, dockerProxyUrl } from "../../docker/docker-client";
 import { DockerContainerService } from "../../docker/docker-container.service";
 import { DockerImageService } from "../../docker/docker-image.service";
 import { DockerSystemService } from "../../docker/docker-system.service";
@@ -504,10 +505,10 @@ export interface ComposePlan {
   defaultServiceImage: string | null;
 }
 
-// Runs docker-compose stacks for COMPOSE deployments. Builds go through the same socket-proxy with the
-// legacy builder (BuildKit is blocked), driven by the docker CLI + compose plugin in the image. A
-// deploy splits the stack into a pinned base project (singletons + volumes) and a release-scoped
-// project for the eligible tier that is blue-greened; teardown works by container labels (no file).
+// Runs docker-compose stacks for COMPOSE deployments. Builds go through the same socket-proxy with
+// BuildKit, driven by the docker CLI, compose and buildx plugins in the image. A deploy splits the
+// stack into a pinned base project (singletons + volumes) and a release-scoped project for the
+// eligible tier that is blue-greened; teardown works by container labels (no file).
 @Injectable()
 export class ComposeService {
   private readonly dockerHost: string;
@@ -521,9 +522,7 @@ export class ComposeService {
     private readonly labels: LabelGeneratorService,
     private readonly envVars: EnvVarsService,
   ) {
-    const host = config.get<string>("DOCKER_PROXY_HOST") ?? "docker-socket-proxy";
-    const port = config.get<number>("DOCKER_PROXY_PORT") ?? 2375;
-    this.dockerHost = `tcp://${host}:${port}`;
+    this.dockerHost = dockerProxyUrl(config);
   }
 
   // Stable project for the pinned (singleton) tier. Volumes stay `willy_<name>_<vol>` forever.
@@ -889,7 +888,10 @@ export class ComposeService {
     onLog: (line: string) => void,
     extraEnv: Record<string, string> = {},
   ): Promise<void> {
-    const child = spawn("docker", ["compose", ...args], { cwd: dir, env: this.env(extraEnv) });
+    const child = spawn("docker", ["compose", ...args], {
+      cwd: dir,
+      env: dockerCliEnv(this.dockerHost, extraEnv),
+    });
 
     child.stdout.on("data", (chunk: Buffer) => this.emit(chunk, onLog));
     child.stderr.on("data", (chunk: Buffer) => this.emit(chunk, onLog));
@@ -906,17 +908,6 @@ export class ComposeService {
         reject(new ComposeError(`docker compose exited with code ${code}`));
       });
     });
-  }
-
-  // App env vars override the inherited process env, but Willy's docker control vars always win.
-  private env(extraEnv: Record<string, string> = {}): NodeJS.ProcessEnv {
-    return {
-      ...process.env,
-      ...extraEnv,
-      DOCKER_HOST: this.dockerHost,
-      DOCKER_BUILDKIT: "0",
-      COMPOSE_BAKE: "false",
-    };
   }
 
   private emit(chunk: Buffer, onLog: (line: string) => void): void {

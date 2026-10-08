@@ -1,60 +1,70 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type Docker from "dockerode";
-import { DOCKER_CLIENT } from "./docker-client";
+import { WillyError } from "../common/errors";
+import { DOCKER_CLIENT, dockerCliEnv, dockerProxyUrl } from "./docker-client";
 import { describeError, parseExposedPorts } from "./docker-helpers";
 import type { BuildImageOptions } from "./docker.types";
 
-interface BuildEvent {
-  stream?: string;
-  error?: string;
-  errorDetail?: { message?: string };
-}
+export class ImageBuildError extends WillyError {}
 
 // Image build/pull/list/inspect/prune over the Docker Engine API.
 @Injectable()
 export class DockerImageService {
   private readonly logger = new Logger(DockerImageService.name);
 
-  constructor(@Inject(DOCKER_CLIENT) private readonly docker: Docker) {}
+  private readonly dockerHost: string;
 
-  // Builds an image from a context directory, streaming build output to onLog.
-  async buildImage(options: BuildImageOptions): Promise<void> {
-    const tar = spawn("tar", ["-C", options.contextDir, "--exclude=.git", "-czf", "-", "."]);
-    const buildStream = await this.docker.buildImage(tar.stdout, {
-      t: options.imageTag,
-      dockerfile: options.dockerfile ?? "Dockerfile",
-      buildargs: options.buildArgs ?? {},
-      // Legacy builder: BuildKit ("2") needs a /session endpoint the socket-proxy blocks.
-      version: "1",
-    });
+  constructor(
+    @Inject(DOCKER_CLIENT) private readonly docker: Docker,
+    config: ConfigService,
+  ) {
+    this.dockerHost = dockerProxyUrl(config);
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      this.docker.modem.followProgress(
-        buildStream,
-        (error) => {
-          if (error) {
-            reject(error instanceof Error ? error : new Error(String(error)));
+  // Builds an image from a context directory with BuildKit, streaming build output to onLog.
+  buildImage(options: BuildImageOptions): Promise<void> {
+    const args = [
+      "buildx",
+      "build",
+      "--load",
+      "--tag",
+      options.imageTag,
+      "--file",
+      join(options.contextDir, options.dockerfile ?? "Dockerfile"),
+    ];
 
-            return;
-          }
+    for (const [key, value] of Object.entries(options.buildArgs ?? {})) {
+      args.push("--build-arg", `${key}=${value}`);
+    }
 
+    args.push(options.contextDir);
+
+    const child = spawn("docker", args, { env: dockerCliEnv(this.dockerHost) });
+    const relay = (chunk: Buffer): void => {
+      for (const line of chunk.toString("utf8").split("\n")) {
+        if (line.length > 0) {
+          options.onLog?.(line);
+        }
+      }
+    };
+
+    child.stdout.on("data", relay);
+    child.stderr.on("data", relay);
+
+    return new Promise<void>((resolve, reject) => {
+      child.on("error", (error) => reject(new ImageBuildError(error.message)));
+      child.on("close", (code) => {
+        if (code === 0) {
           resolve();
-        },
-        (event: unknown) => {
-          const { stream, error, errorDetail } = event as BuildEvent;
 
-          if (error || errorDetail?.message) {
-            options.onLog?.(error ?? errorDetail?.message ?? "build error");
+          return;
+        }
 
-            return;
-          }
-
-          if (stream && options.onLog) {
-            options.onLog(stream.replace(/\n$/, ""));
-          }
-        },
-      );
+        reject(new ImageBuildError(`docker buildx build exited with code ${code}`));
+      });
     });
   }
 

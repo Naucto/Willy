@@ -12,8 +12,8 @@ RUN npm run build --workspace @willy/backend
 FROM node:26-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-# git clones deployment source repos; the docker CLI + compose plugin drive the Compose strategy
-# (builds run on the legacy builder through the socket-proxy — DOCKER_HOST is set per-invocation).
+# git clones deployment source repos; the docker CLI with its compose and buildx plugins drives
+# every build, with BuildKit, through the socket-proxy (DOCKER_HOST is set per invocation).
 RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates curl gnupg \
   && install -m 0755 -d /etc/apt/keyrings \
@@ -21,7 +21,7 @@ RUN apt-get update \
   && chmod a+r /etc/apt/keyrings/docker.asc \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list \
   && apt-get update \
-  && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+  && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin docker-buildx-plugin \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
